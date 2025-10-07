@@ -405,7 +405,7 @@ def train():
         devices=1,
         gradient_clip_val=args.gradient_clip,
         callbacks=[early_stop, checkpoint],
-        deterministic=True,
+        deterministic=False,
         strategy="auto",
     )
 
