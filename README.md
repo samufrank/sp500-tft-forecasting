@@ -53,10 +53,10 @@ See all options: `python train_tft.py --help`
 
 ## Current Status
 
-⚠️ **Early development** - data processing still being validated
+**Early development** - data processing still being validated
 
-- Data collection: ✅
-- Split creation: ✅
-- TFT training pipeline: ✅
+- Data collection: Done
+- Split creation: Done
+- TFT training pipeline: Done
 - Evaluation metrics: TODO
 - ARIMAX/LSTM baselines: TODO
