@@ -31,6 +31,10 @@ import json
 import argparse
 from datetime import datetime
 
+import warnings
+warnings.filterwarnings('ignore', category=UserWarning)
+warnings.filterwarnings('ignore', category=FutureWarning)
+
 # --- plot safety patch: prevent early-epoch plots from crashing on negative yerr ---
 try:
     from matplotlib.axes import _axes as _mpl_axes
@@ -45,9 +49,25 @@ try:
         return _orig_errorbar(self, x, y, yerr=yerr, *args, **kwargs)
 
     _mpl_axes.Axes.errorbar = _safe_errorbar
-    print("[INFO] Patched matplotlib.Axes.errorbar to abs() negative yerr for robustness.")
+    print("\n[INFO] Patched matplotlib.Axes.errorbar to abs() negative yerr for robustness.")
 except Exception as e:
-    print(f"[WARN] Could not patch matplotlib errorbar: {e}")
+    print(f"\n[WARN] Could not patch matplotlib errorbar: {e}")
+    
+
+from pytorch_lightning.callbacks import Callback
+
+class EpochSummaryCallback(Callback):
+    def on_train_epoch_end(self, trainer, pl_module):
+        metrics = trainer.callback_metrics
+        epoch = trainer.current_epoch
+        train_loss = metrics.get('train_loss_epoch', metrics.get('train_loss', 'N/A'))
+        print(f"Epoch {epoch}: train_loss={train_loss:.4f}" if isinstance(train_loss, float) else f"Epoch {epoch}: train_loss={train_loss}")
+    
+    def on_validation_epoch_end(self, trainer, pl_module):
+        metrics = trainer.callback_metrics
+        epoch = trainer.current_epoch
+        val_loss = metrics.get('val_loss', 'N/A')
+        print(f"Epoch {epoch}: val_loss={val_loss:.4f}" if isinstance(val_loss, float) else f"Epoch {epoch}: val_loss={val_loss}")
 
 
 # ============================================================================
@@ -113,11 +133,11 @@ def parse_args():
 
 # --- device setup (macOS compatibility) ---
 if platform.system() == "Darwin" and torch.backends.mps.is_available():
-    print("[INFO] MPS detected but upsample ops unsupported — using CPU for stability.")
+    print("\n[INFO] MPS detected but upsample ops unsupported — using CPU for stability.")
     device = "cpu"
 else:
     device = "auto"  # let Lightning pick CUDA or CPU
-    print(f"[INFO] Using {device.upper()} device selection.")
+    print(f"\n[INFO] Using {device.upper()} device selection.")
 
 
 # ============================================================================
@@ -391,12 +411,14 @@ def train():
     )
     
     from pytorch_lightning.loggers import CSVLogger, TensorBoardLogger
-
     # Setup both loggers so you get numeric metrics + figures
     csv_logger = CSVLogger("experiments", name=args.experiment_name)
     tb_logger = TensorBoardLogger("experiments", name=args.experiment_name)
     # Ensure tb_logger is first so figure logging is prioritized
     logger = [tb_logger, csv_logger]
+    
+    # Enable Tensor Core optimization for RTX 3070
+    torch.set_float32_matmul_precision('medium')  # or high for even faster, slightly less precise
 
     trainer = pl.Trainer(
         logger=logger,
@@ -404,12 +426,15 @@ def train():
         accelerator=device,
         devices=1,
         gradient_clip_val=args.gradient_clip,
-        callbacks=[early_stop, checkpoint],
+        callbacks=[early_stop, checkpoint, EpochSummaryCallback()],
         deterministic=False,
         strategy="auto",
+        enable_progress_bar=False,
+        enable_model_summary=True,
     )
 
     # Debug prints to inspect logger setup
+    """
     print("Logger(s):", trainer.logger)
     if hasattr(trainer.logger, "loggers"):
         for lg in trainer.logger.loggers:
@@ -424,6 +449,7 @@ def train():
             f"  Single logger: {type(trainer.logger)}, experiment: {type(exp)}, "
             f"has add_figure? {hasattr(exp, 'add_figure')}"
         )
+    """
 
     # Patch fallback for ExperimentWriter if it lacks add_figure
     if hasattr(trainer.logger, "loggers"):
@@ -431,28 +457,30 @@ def train():
             exp = getattr(lg, "experiment", None)
             if exp is not None and not hasattr(exp, "add_figure"):
                 def _dummy_add_figure(*args, **kwargs):
-                    print("[WARN] add_figure called on experiment without support. Skipping.")
+                    print("\n[WARN] add_figure called on experiment without support. Skipping.")
                 setattr(exp, "add_figure", _dummy_add_figure)
-                print(f"[INFO] Patched add_figure on {type(exp)}")
+                print(f"\n[INFO] Patched add_figure on {type(exp)}")
     else:
         exp = getattr(trainer.logger, "experiment", None)
         if exp is not None and not hasattr(exp, "add_figure"):
             def _dummy_add_figure(*args, **kwargs):
-                print("[WARN] add_figure called on experiment without support. Skipping.")
+                print("\n[WARN] add_figure called on experiment without support. Skipping.")
             setattr(exp, "add_figure", _dummy_add_figure)
-            print(f"[INFO] Patched add_figure on {type(exp)}")
+            print(f"\n[INFO] Patched add_figure on {type(exp)}")
 
     # Finally, run training
     print("\nStarting training...")
     print(f"Checkpoints will be saved to: {output_dir}/checkpoints/")
     print(f"Logs will be saved to: {output_dir}/logs/")
-
+    print()
+    
     trainer.fit(
         tft,
         train_dataloaders=train_dataloader,
         val_dataloaders=val_dataloader,
     )
 
+    print()
     print("\n" + "="*70)
     print("Training complete!")
     print("="*70)
