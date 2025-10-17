@@ -13,7 +13,7 @@ def analyze_sweep():
     # Scan all sweep experiments
     exp_dir = 'experiments'
     for exp_name in os.listdir(exp_dir):
-        if not exp_name.startswith('sweep_'):
+        if not exp_name.startswith('sweep'):
             continue
         
         # Load config and metrics
