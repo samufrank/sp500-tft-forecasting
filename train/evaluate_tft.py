@@ -18,6 +18,10 @@ Usage:
         --experiment-name exp004 \\
         --test-split data/splits/core_proposal_daily_test.csv
 """
+import warnings
+warnings.filterwarnings('ignore', category=UserWarning)
+warnings.filterwarnings('ignore', category=FutureWarning)
+warnings.filterwarnings('ignore',message='lightning_fabric')
 
 import os
 import torch
@@ -31,10 +35,7 @@ import argparse
 from datetime import datetime
 import matplotlib.pyplot as plt
 from scipy import stats
-
-import warnings
-warnings.filterwarnings('ignore', category=UserWarning)
-warnings.filterwarnings('ignore', category=FutureWarning)
+from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix, roc_auc_score
 
 
 # ============================================================================
@@ -322,6 +323,41 @@ def compute_financial_metrics(predictions, actuals):
         'hit_rate': hit_rate,
         'num_trades': int(np.sum(predictions > 0)),
     }
+
+    # Binary predictions (0 = down, 1 = up)
+    pred_binary = (predictions > 0).astype(int)
+    actual_binary = (actuals > 0).astype(int)
+
+    # Precision, recall, F1
+    precision = float(precision_score(actual_binary, pred_binary, zero_division=0))
+    recall = float(recall_score(actual_binary, pred_binary, zero_division=0))
+    f1 = float(f1_score(actual_binary, pred_binary, zero_division=0))
+
+    # Confusion matrix: [[TN, FP], [FN, TP]]
+    conf_matrix = confusion_matrix(actual_binary, pred_binary).tolist()
+
+    # AUC-ROC (using continuous predictions as probability scores)
+    # Normalize predictions to [0,1] range for AUC calculation
+    pred_normalized = (predictions - predictions.min()) / (predictions.max() - predictions.min() + 1e-10)
+    try:
+        auc_roc = float(roc_auc_score(actual_binary, pred_normalized))
+    except:
+        auc_roc = 0.5  # Default to random if calculation fails
+
+    # Alpha (excess return over buy-and-hold)
+    buy_hold_returns = actuals  # Buy and hold = just hold through all periods
+    buy_hold_cumulative = np.cumprod(1 + buy_hold_returns / 100) - 1
+    strategy_cumulative = np.cumprod(1 + strategy_returns / 100) - 1
+
+    alpha = float(strategy_cumulative[-1] - buy_hold_cumulative[-1]) if len(strategy_cumulative) > 0 else 0.0
+
+    # Add to metrics dict (before the return statement)
+    metrics['precision'] = precision
+    metrics['recall'] = recall
+    metrics['f1_score'] = f1
+    metrics['confusion_matrix'] = conf_matrix
+    metrics['auc_roc'] = auc_roc
+    metrics['alpha'] = alpha
     
     # DEBUG
     print(f"Predictions - min: {predictions.min():.4f}, max: {predictions.max():.4f}, mean: {predictions.mean():.4f}")
@@ -485,6 +521,19 @@ def print_summary(metrics_stat, metrics_fin):
     print(f"  Max Drawdown:     {metrics_fin['max_drawdown']:.2%}")
     print(f"  Hit Rate:         {metrics_fin['hit_rate']:.2%}")
     print(f"  Number of Trades: {metrics_fin['num_trades']}")
+
+    print("\nCLASSIFICATION METRICS (Binary Up/Down):")
+    print(f"  Precision:        {metrics_fin['precision']:.4f}")
+    print(f"  Recall:           {metrics_fin['recall']:.4f}")
+    print(f"  F1 Score:         {metrics_fin['f1_score']:.4f}")
+    print(f"  AUC-ROC:          {metrics_fin['auc_roc']:.4f}")
+    print(f"\n  Confusion Matrix:")
+    conf = metrics_fin['confusion_matrix']
+    print(f"                   Predicted Down  Predicted Up")
+    print(f"  Actual Down:     {conf[0][0]:6d}          {conf[0][1]:6d}")
+    print(f"  Actual Up:       {conf[1][0]:6d}          {conf[1][1]:6d}")
+    print(f"\nALPHA (vs Buy-and-Hold):")
+    print(f"  Excess Return:    {metrics_fin['alpha']:.2%}")
     
     print("\n" + "="*70)
 
