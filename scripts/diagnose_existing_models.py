@@ -78,7 +78,7 @@ def load_model_and_config(experiment_name):
     return model, config
 
 
-def generate_predictions_like_evaluate(model, dataloader):
+def generate_predictions(model, dataloader):
     """
     Generate predictions using EXACT same logic as evaluate_tft.py.
     """
@@ -123,7 +123,7 @@ def generate_predictions_like_evaluate(model, dataloader):
     return predictions, actuals
 
 
-def diagnose_model(experiment_name, use_test=False, verbose=True):
+def diagnose_model(experiment_name, use_test=False, verbose=True, save=False):
     """
     Run diagnostics on a trained model.
     
@@ -242,8 +242,9 @@ def diagnose_model(experiment_name, use_test=False, verbose=True):
     # Create dataloader
     eval_dataloader = eval_dataset.to_dataloader(train=False, batch_size=128, num_workers=0)
     
-    # Generate predictions using evaluate_tft.py's exact logic
-    predictions, actuals = generate_predictions_like_evaluate(model, eval_dataloader)
+    # Generate predictions
+    print(f"For {experiment_name}")
+    predictions, actuals = generate_predictions(model, eval_dataloader)
     
     # Compute statistics
     pred_stats = {
@@ -288,11 +289,33 @@ def diagnose_model(experiment_name, use_test=False, verbose=True):
     
     if verbose:
         print(f"{'='*70}\n")
+        
+    # optionally save diagnosis
+    if save:
+        exp_dir = Path(f'experiments/{experiment_name}')
+        diagnosis_path = exp_dir / 'collapse_diagnosis.json'
+        
+        # create simplified o/p (no weight_stats, just key info)
+        save_data = {
+            'experiment': diagnostics['experiment'],
+            'collapsed': diagnostics['collapsed'],
+            'collapse_type': diagnostics['collapse_type'],
+            'predictions': diagnostics.get('predictions'),
+            'hidden_size': diagnostics['config']['architecture']['hidden_size'],
+            'total_params': diagnostics['total_params'],
+            'diagnosed_at': pd.Timestamp.now().isoformat(),
+        }
+        
+        with open(diagnosis_path, 'w') as f:
+            json.dump(save_data, f, indent=2)
+        
+        if verbose:
+            print(f"\nSaved diagnosis to: {diagnosis_path}")
     
     return diagnostics
 
 
-def compare_models(experiment_names, use_test=False):
+def compare_models(experiment_names, use_test=False, save=False):
     """Compare diagnostics across multiple models."""
     print(f"\n{'='*70}")
     print(f"COMPARING {len(experiment_names)} MODELS")
@@ -301,7 +324,7 @@ def compare_models(experiment_names, use_test=False):
     all_diagnostics = []
     
     for exp_name in experiment_names:
-        diag = diagnose_model(exp_name, use_test=use_test, verbose=False)
+        diag = diagnose_model(exp_name, use_test=use_test, verbose=False, save=save)
         if diag:
             all_diagnostics.append(diag)
     
@@ -358,7 +381,7 @@ def main():
     parser.add_argument('experiments', nargs='+', help='Experiment name(s) or pattern')
     parser.add_argument('--compare', action='store_true', help='Compare multiple models')
     parser.add_argument('--use-test', action='store_true', help='Use test set instead of validation')
-    
+    parser.add_argument('--save', action='store_true', help='Save collapse diagnosis to JSON file')
     args = parser.parse_args()
     
     # Handle wildcards
@@ -377,9 +400,9 @@ def main():
     
     # Run diagnostics
     if args.compare or len(experiment_names) > 1:
-        compare_models(experiment_names, use_test=args.use_test)
+        compare_models(experiment_names, use_test=args.use_test, save=args.save)
     else:
-        diagnose_model(experiment_names[0], use_test=args.use_test, verbose=True)
+        diagnose_model(experiment_names[0], use_test=args.use_test, verbose=True, save=args.save)
 
 
 if __name__ == '__main__':
