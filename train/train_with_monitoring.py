@@ -1,19 +1,9 @@
 """
-Train Temporal Fusion Transformer on S&P 500 return prediction.
-
-Includes full experiment tracking, checkpointing, and reproducibility controls.
+Modified training script that adds collapse monitoring.
 
 Usage:
-    # Basic usage with defaults
-    python train_tft.py --experiment-name tft_baseline
-    
-    # Custom hyperparameters
-    python train_tft.py --experiment-name tft_large \\
-        --hidden-size 64 --attention-heads 4 --max-epochs 100
-    
-    # Different feature set
-    python train_tft.py --experiment-name tft_macro \\
-        --feature-set macro_heavy --frequency monthly
+    python train/train_with_monitoring.py --experiment-name debug_h16 --hidden-size 16
+    python train/train_with_monitoring.py --experiment-name debug_h24 --hidden-size 24
 """
 
 import os
@@ -38,6 +28,8 @@ from datetime import datetime
 import warnings
 warnings.filterwarnings('ignore', category=UserWarning)
 warnings.filterwarnings('ignore', category=FutureWarning)
+
+from train.collapse_monitor import CollapseMonitor
 
 # --- plot safety patch: prevent early-epoch plots from crashing on negative yerr ---
 try:
@@ -131,6 +123,10 @@ def parse_args():
                         help='Base directory for experiment outputs')
     parser.add_argument('--overwrite', action='store_true',
                         help='Allow overwriting existing experiment directory')
+    
+    # Collapse monitor
+    parser.add_argument('--monitor-every-n-epochs', type=int, default=1,
+                   help='How often to run collapse monitoring')
     
     return parser.parse_args()
 
@@ -303,6 +299,9 @@ def save_config(args, features, output_dir):
                 f"{args.feature_set}_{args.frequency}_val.csv"
             ))),
         },
+        'monitoring': {
+            'monitor_every_n_epochs': args.monitor_every_n_epochs,
+        },
         'architecture': {
             'max_encoder_length': args.max_encoder_length,
             'max_prediction_length': 1,
@@ -414,6 +413,13 @@ def train():
         save_last=True,
     )
     
+    # Add collapse monitor
+    collapse_monitor = CollapseMonitor(
+        val_dataloader=val_dataloader,
+        log_dir=f'{output_dir}/collapse_monitoring',
+        log_every_n_epochs=args.monitor_every_n_epochs  # Or just use 1
+    )
+    
     from pytorch_lightning.loggers import CSVLogger, TensorBoardLogger
     # Setup both loggers so you get numeric metrics + figures
     csv_logger = CSVLogger("experiments", name=args.experiment_name)
@@ -427,7 +433,7 @@ def train():
         accelerator=device,
         devices=1,
         gradient_clip_val=args.gradient_clip,
-        callbacks=[early_stop, checkpoint, EpochSummaryCallback()],
+        callbacks=[early_stop, checkpoint, EpochSummaryCallback(), collapse_monitor],
         deterministic=False,
         strategy="auto",
         enable_progress_bar=False,

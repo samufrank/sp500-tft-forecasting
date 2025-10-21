@@ -236,6 +236,7 @@ def generate_predictions(model, test_dataset, batch_size=128):
             if isinstance(y, tuple):
                 y_actual = y[0]
             else:
+            # Extract actual values - y is also a tup
                 y_actual = y
             
             # DEBUG
@@ -245,6 +246,10 @@ def generate_predictions(model, test_dataset, batch_size=128):
             actuals.append(y_actual[:, 0].cpu().numpy())
     
     predictions = np.concatenate(predictions)
+    # DEBUG
+    #print(f"Predictions range: [{np.min(predictions):.4f}, {np.max(predictions):.4f}]")
+    #print(f"Num negative: {np.sum(predictions < 0)}")
+    #print(f"Num positive: {np.sum(predictions > 0)}")
     actuals = np.concatenate(actuals)
     
     print(f"Total predictions: {len(predictions)}, Total actuals: {len(actuals)}")
