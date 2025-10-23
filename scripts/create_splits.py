@@ -14,6 +14,7 @@ import json
 import argparse
 import pandas as pd
 from datetime import datetime
+from src.feature_configs import FEATURE_METADATA
 from src.data_utils import load_feature_set, create_train_val_test_split
 
 def parse_args():
@@ -92,7 +93,39 @@ def main():
         #data_path=args.data_path,
         verbose=True
     )
+
+    # ADD SOURCE COLUMNS FOR STALENESS DETECTION 
+    source_cols_to_add = []
+
+    for feature in df.columns:
+        if feature in FEATURE_METADATA:
+            metadata = FEATURE_METADATA[feature]
+            if metadata.get('needs_staleness') and 'source_column' in metadata:
+                source_col = metadata['source_column']
+                if source_col not in df.columns:
+                    source_cols_to_add.append(source_col)
     
+    if source_cols_to_add:
+        print(f"\nAdding source columns for staleness detection: {source_cols_to_add}")
+
+        # Determine which source dataset to use
+        # if splits output dir contains 'vintage', use vintage dataset
+        if 'vintage' in args.output_dir:
+            version = 'vintage'
+        else:
+            version = 'fixed'
+        
+        # Load from raw CSV to get ALL columns including source columns
+        filename = f"data/financial_dataset_{args.frequency}_{version}.csv"
+        full_df = pd.read_csv(filename, index_col='Date', parse_dates=True)
+        
+        for col in source_cols_to_add:
+            if col in full_df.columns:
+                df[col] = full_df[col]
+                print(f"  Added: {col}")
+
+    print(f"\nFinal columns in dataset: {list(df.columns)}")
+
     # Create temporal splits
     print(f"\nCreating temporal splits (train={args.train_pct}, val={args.val_pct})...")
     train, val, test = create_train_val_test_split(

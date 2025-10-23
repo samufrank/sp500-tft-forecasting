@@ -35,6 +35,20 @@ import warnings
 warnings.filterwarnings('ignore', category=UserWarning)
 warnings.filterwarnings('ignore', category=FutureWarning)
 
+
+# --- enable Tensor Core optimization for RTX 3070 ---
+torch.set_float32_matmul_precision('medium')  # high for even faster, but slightly less precise
+
+
+# --- device setup (macOS compatibility) ---
+if platform.system() == "Darwin" and torch.backends.mps.is_available():
+    print("\n[INFO] MPS detected but upsample ops unsupported — using CPU for stability.")
+    device = "cpu"
+else:
+    device = "auto"  # let Lightning pick CUDA or CPU
+    print(f"\n[INFO] Using {device.upper()} device selection.")
+
+
 # --- plot safety patch: prevent early-epoch plots from crashing on negative yerr ---
 try:
     from matplotlib.axes import _axes as _mpl_axes
@@ -53,6 +67,10 @@ try:
 except Exception as e:
     print(f"\n[WARN] Could not patch matplotlib errorbar: {e}")
     
+
+# ============================================================================
+# Callbacks
+# ============================================================================
 
 from pytorch_lightning.callbacks import Callback
 
@@ -119,6 +137,10 @@ def parse_args():
                         help='Gradient clipping value')
     parser.add_argument('--early-stop-patience', type=int, default=10,
                         help='Early stopping patience')
+
+    # Include staleness features
+    parser.add_argument('--no-staleness', action='store_true',
+                        help='Disable staleness features (for baseline comparison)')    
     
     # Paths
     parser.add_argument('--splits-dir', type=str, default='data/splits',
@@ -131,26 +153,33 @@ def parse_args():
     return parser.parse_args()
 
 
-# --- device setup (macOS compatibility) ---
-if platform.system() == "Darwin" and torch.backends.mps.is_available():
-    print("\n[INFO] MPS detected but upsample ops unsupported — using CPU for stability.")
-    device = "cpu"
-else:
-    device = "auto"  # let Lightning pick CUDA or CPU
-    print(f"\n[INFO] Using {device.upper()} device selection.")
-
-
 # ============================================================================
 # FEATURE DEFINITIONS (based on frequency and feature set)
 # ============================================================================
 
-def get_features(feature_set, frequency):
+def get_features(feature_set, frequency, include_staleness=True):
     """
     Get feature lists based on configuration.
     Must match feature_configs.py exactly.
+    
+    Parameters:
+    -----------
+    feature_set : str
+        Name of feature set from FEATURE_SETS
+    frequency : str
+        'daily' or 'monthly'
+    include_staleness : bool
+        If True, add staleness features for low-frequency variables
+        
+    Returns:
+    --------
+    dict with keys:
+        'high_freq': list of high-frequency feature names
+        'low_freq': list of low-frequency feature names
+        'all': list of all feature names (including staleness if enabled)
+        'staleness': list of staleness feature names (empty if not enabled)
     """
-    # Import the actual config
-    from src.feature_configs import FEATURE_SETS
+    from src.feature_configs import FEATURE_SETS, get_staleness_features
     
     config = FEATURE_SETS[feature_set]
     if config['features'] == 'all':
@@ -170,11 +199,17 @@ def get_features(feature_set, frequency):
                     ["Inflation_YoY", "Unemployment", "Fed_Rate", 
                      "Consumer_Sentiment", "Industrial_Production"]]
     
+    # Add staleness features if requested
+    staleness_info = get_staleness_features(all_features)
+    staleness_features = staleness_info['staleness_features'] if include_staleness else []
+    
     return {
         'high_freq': high_freq,
         'low_freq': low_freq,
-        'all': all_features
+        'all': all_features + staleness_features,
+        'staleness': staleness_features,
     }
+
 
 # ============================================================================
 # REPRODUCIBILITY SETUP
@@ -214,8 +249,36 @@ def load_splits(splits_dir, feature_set, frequency):
     )
     return train, val, test
 
-def prepare_tft_data(train_df, val_df, args, features):
+def prepare_tft_data(train_df, val_df, args, features, add_staleness=True):
     """Prepare data in TimeSeriesDataSet format for TFT."""
+    
+    # add staleness
+    if add_staleness and len(features['staleness']) > 0:
+        print("\nAdding staleness features to data...")
+        from src.data_utils import add_staleness_features
+        
+        train_df = add_staleness_features(train_df, use_vintage=False, verbose=True)
+        val_df = add_staleness_features(val_df, use_vintage=False, verbose=True)
+
+    # DROP SOURCE COLUMNS (used for staleness detection only, not model features)
+    source_cols_to_drop = []
+    from src.feature_configs import FEATURE_METADATA
+    for feature in train_df.columns:
+        if feature in FEATURE_METADATA:
+            continue  # Keep actual features
+        # Check if this is a source column for another feature
+        for feat, meta in FEATURE_METADATA.items():
+            if meta.get('source_column') == feature:
+                source_cols_to_drop.append(feature)
+                break
+    
+    if source_cols_to_drop:
+        print(f"\nDropping source columns (used for staleness only): {source_cols_to_drop}")
+        train_df = train_df.drop(columns=source_cols_to_drop)
+        val_df = val_df.drop(columns=source_cols_to_drop)
+    
+    print(f"\nFinal features for TFT: {list(train_df.columns)}")
+
     # Reset index and add required columns
     train_df = train_df.reset_index()
     val_df = val_df.reset_index()
@@ -351,7 +414,7 @@ def train():
         return None, None
     
     # Get features for this configuration
-    features = get_features(args.feature_set, args.frequency)
+    features = get_features(args.feature_set, args.frequency, include_staleness=not args.no_staleness)
     
     print("="*70)
     print(f"Training TFT: {args.experiment_name}")
@@ -417,9 +480,6 @@ def train():
     # Ensure tb_logger is first so figure logging is prioritized
     logger = [tb_logger, csv_logger]
     
-    # Enable Tensor Core optimization for RTX 3070
-    torch.set_float32_matmul_precision('medium')  # or high for even faster, slightly less precise
-
     trainer = pl.Trainer(
         logger=logger,
         max_epochs=args.max_epochs,
@@ -482,7 +542,7 @@ def train():
 
     print()
     print("\n" + "="*70)
-    print("Training complete!")
+    print("Training complete")
     print("="*70)
     print(f"\nBest model checkpoint: {checkpoint.best_model_path}")
     print(f"Best validation loss: {checkpoint.best_model_score:.6f}")
