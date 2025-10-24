@@ -1,9 +1,9 @@
 #!/bin/bash
-# Phase 1 Training Suite - Staleness Feature Validation
-# Run comprehensive experiments comparing baseline vs staleness features
+# Phase 1 Parallel Training Suite - Staleness Feature Validation
+# Runs baseline and staleness experiments in parallel
 
 echo "========================================================================"
-echo "PHASE 1 TRAINING SUITE - STALENESS FEATURE VALIDATION"
+echo "PHASE 1 PARALLEL TRAINING SUITE - STALENESS FEATURE VALIDATION"
 echo "========================================================================"
 echo "Started at: $(date)"
 echo ""
@@ -16,8 +16,6 @@ LR=0.0005
 MAX_EPOCHS=50
 ENCODER_LENGTH=20
 
-mkdir -p experiments/01_staleness_features
-
 echo "Configuration:"
 echo "  Splits: $SPLITS_DIR"
 echo "  Hidden size: $HIDDEN_SIZE"
@@ -26,12 +24,17 @@ echo "  Learning rate: $LR"
 echo "  Max epochs: $MAX_EPOCHS"
 echo ""
 
+# Create logs directory
+mkdir -p logs
+
 # ============================================================================
-# EXPERIMENT 1: Baseline (no staleness) - 50 epochs
+# PARALLEL TRAINING: Baseline + Staleness
 # ============================================================================
 echo "========================================================================"
-echo "EXPERIMENT 1/4: Baseline (no staleness features)"
+echo "Starting parallel training (baseline + staleness)"
 echo "========================================================================"
+
+# Launch baseline training
 python train/train_tft.py \
     --experiment-name baseline_fixed_h16_drop0.25 \
     --splits-dir $SPLITS_DIR \
@@ -40,18 +43,12 @@ python train/train_tft.py \
     --learning-rate $LR \
     --max-epochs $MAX_EPOCHS \
     --max-encoder-length $ENCODER_LENGTH \
-    --no-staleness
+    --no-staleness \
+    > logs/baseline_training.log 2>&1 &
 
-echo ""
-echo "Baseline training complete at: $(date)"
-echo ""
+BASELINE_PID=$!
 
-# ============================================================================
-# EXPERIMENT 2: With staleness features - 50 epochs
-# ============================================================================
-echo "========================================================================"
-echo "EXPERIMENT 2/4: With staleness features"
-echo "========================================================================"
+# Launch staleness training
 python train/train_tft.py \
     --experiment-name staleness_fixed_h16_drop0.25 \
     --splits-dir $SPLITS_DIR \
@@ -59,36 +56,42 @@ python train/train_tft.py \
     --dropout $DROPOUT \
     --learning-rate $LR \
     --max-epochs $MAX_EPOCHS \
-    --max-encoder-length $ENCODER_LENGTH
+    --max-encoder-length $ENCODER_LENGTH \
+    > logs/staleness_training.log 2>&1 &
 
-echo ""
-echo "Staleness training complete at: $(date)"
+STALENESS_PID=$!
+
+echo "Baseline training PID: $BASELINE_PID"
+echo "Staleness training PID: $STALENESS_PID"
+
+# Wait for both trainings to complete
+echo "Waiting for training to complete..."
+wait $BASELINE_PID || true
+echo "Baseline training completed at: $(date)"
+wait $STALENESS_PID || true
+echo "Staleness training completed at: $(date)"
 echo ""
 
 # ============================================================================
-# EXPERIMENT 3: Evaluate baseline
+# EVALUATION: Run on test set
 # ============================================================================
 echo "========================================================================"
-echo "EXPERIMENT 3/4: Evaluating baseline on test set"
+echo "Evaluating models on test set"
 echo "========================================================================"
+
+echo "Evaluating baseline..."
 python train/evaluate_tft.py \
-    --experiment-name baseline_fixed_h16_drop0.25
+    --experiment-name baseline_fixed_h16_drop0.25 \
+	--test-split data/splits/fixed/core_proposal_daily_test.csv \
+    > logs/baseline_evaluation.log 2>&1
 
-echo ""
-echo "Baseline evaluation complete at: $(date)"
-echo ""
-
-# ============================================================================
-# EXPERIMENT 4: Evaluate staleness model
-# ============================================================================
-echo "========================================================================"
-echo "EXPERIMENT 4/4: Evaluating staleness model on test set"
-echo "========================================================================"
+echo "Evaluating staleness model..."
 python train/evaluate_tft.py \
-    --experiment-name staleness_fixed_h16_drop0.25
+    --experiment-name staleness_fixed_h16_drop0.25 \
+	--test-split data/splits/fixed/core_proposal_daily_test.csv \
+    > logs/staleness_evaluation.log 2>&1
 
-echo ""
-echo "Staleness evaluation complete at: $(date)"
+echo "Evaluation complete at: $(date)"
 echo ""
 
 # ============================================================================
@@ -98,8 +101,7 @@ echo "========================================================================"
 echo "RESULTS SUMMARY"
 echo "========================================================================"
 
-# Extract key metrics using Python
-python << 'EOF'
+python << 'EOF' | tee logs/results_summary.log
 import json
 
 def load_metrics(exp_name):
@@ -141,11 +143,12 @@ EOF
 
 echo ""
 echo "========================================================================"
-echo "PHASE 1 TRAINING SUITE COMPLETE"
+echo "PHASE 1 PARALLEL TRAINING SUITE COMPLETE"
 echo "========================================================================"
 echo "Completed at: $(date)"
 echo ""
 echo "Results saved to:"
 echo "  experiments/baseline_fixed_h16_drop0.25/"
 echo "  experiments/staleness_fixed_h16_drop0.25/"
+echo "  logs/results_summary.log"
 echo ""

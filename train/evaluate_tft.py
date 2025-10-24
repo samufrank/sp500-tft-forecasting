@@ -89,19 +89,37 @@ def load_config(experiment_name):
 
 def load_test_data(config, test_split_path=None):
     """Load test split and prepare for evaluation."""
+    # Get splits directory from config
+    splits_dir = config.get('data', {}).get('splits_dir', 'data/splits')
+    split_prefix = f"{config['feature_set']}_{config['frequency']}"
+    
     # Determine test split path
     if test_split_path is None:
-        split_prefix = f"{config['feature_set']}_{config['frequency']}"
-        test_split_path = f"data/splits/{split_prefix}_test.csv"
+        test_split_path = f"{splits_dir}/{split_prefix}_test.csv"
     
     # Load test data
     test_df = pd.read_csv(test_split_path, index_col='Date', parse_dates=True)
     
-    # Also need training data for TimeSeriesDataSet creation
-    # (TFT needs training stats for normalization)
-    split_prefix = f"{config['feature_set']}_{config['frequency']}"
-    train_path = f"data/splits/{split_prefix}_train.csv"
+    # Load training data from same directory
+    train_path = f"{splits_dir}/{split_prefix}_train.csv"
     train_df = pd.read_csv(train_path, index_col='Date', parse_dates=True)
+    
+    # Check if staleness features are expected based on config
+    features_list = config['features']['all']
+    has_staleness = any('days_since' in f or 'is_fresh' in f for f in features_list)
+    
+    if has_staleness:
+        from src.data_utils import add_staleness_features
+        
+        print("Detected staleness features in config, adding to data...")
+        train_df = add_staleness_features(train_df, verbose=False)
+        test_df = add_staleness_features(test_df, verbose=False)
+        
+        # Apply same normalization as training
+        staleness_cols = [c for c in train_df.columns if 'days_since' in c]
+        for col in staleness_cols:
+            train_df[col] = train_df[col] / 30.0
+            test_df[col] = test_df[col] / 30.0
     
     return train_df, test_df
 

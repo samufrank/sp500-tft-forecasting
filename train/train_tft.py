@@ -259,7 +259,7 @@ def prepare_tft_data(train_df, val_df, args, features, add_staleness=True):
         
         train_df = add_staleness_features(train_df, use_vintage=False, verbose=True)
         val_df = add_staleness_features(val_df, use_vintage=False, verbose=True)
-
+    
     # DROP SOURCE COLUMNS (used for staleness detection only, not model features)
     source_cols_to_drop = []
     from src.feature_configs import FEATURE_METADATA
@@ -278,10 +278,37 @@ def prepare_tft_data(train_df, val_df, args, features, add_staleness=True):
         val_df = val_df.drop(columns=source_cols_to_drop)
     
     print(f"\nFinal features for TFT: {list(train_df.columns)}")
-
+    
     # Reset index and add required columns
     train_df = train_df.reset_index()
     val_df = val_df.reset_index()
+    
+    # DEBUG: Print raw feature statistics
+    print("\n" + "="*70)
+    print("FEATURE STATISTICS - BEFORE NORMALIZATION")
+    print("="*70)
+    feature_cols = [c for c in train_df.columns if c in features['all']]
+    for col in feature_cols:
+        data = train_df[col]
+        print(f"{col:30s}  mean={data.mean():8.4f}  std={data.std():8.4f}  "
+              f"min={data.min():8.4f}  max={data.max():8.4f}")
+    
+    # NORMALIZE: Pre-normalize staleness features to [0, 1] range
+    staleness_cols = [c for c in train_df.columns if 'days_since' in c]
+    if staleness_cols:
+        print("\n" + "="*70)
+        print("NORMALIZING STALENESS FEATURES (dividing by 30)")
+        print("="*70)
+        for col in staleness_cols:
+            train_df[col] = train_df[col] / 30.0
+            val_df[col] = val_df[col] / 30.0
+        
+        # Print after normalization
+        print("\nSTALENESS FEATURES - AFTER MANUAL NORMALIZATION")
+        for col in staleness_cols:
+            data = train_df[col]
+            print(f"{col:30s}  mean={data.mean():8.4f}  std={data.std():8.4f}  "
+                  f"min={data.min():8.4f}  max={data.max():8.4f}")
     
     # Add time index (sequential integers)
     train_df['time_idx'] = range(len(train_df))
@@ -305,6 +332,22 @@ def prepare_tft_data(train_df, val_df, args, features, add_staleness=True):
         add_relative_time_idx=True,
         add_encoder_length=True,
     )
+    
+    # DEBUG: Check what GroupNormalizer did (sample a batch)
+    print("\n" + "="*70)
+    print("FEATURES AFTER GROUPNORMALIZER (first batch, last timestep)")
+    print("="*70)
+    dataloader = training.to_dataloader(train=True, batch_size=64, num_workers=0)
+    x, y = next(iter(dataloader))
+    
+    # Extract feature values from batch
+    encoder_cont = x['encoder_cont']  # Shape: [batch, time, features]
+    # Get first sample, last timestep
+    sample = encoder_cont[0, -1, :].cpu().numpy()
+    
+    for i, col in enumerate(features['all']):
+        print(f"{col:30s}  normalized_value={sample[i]:8.4f}")
+    print("="*70 + "\n")
     
     # Create validation dataset (uses training stats)
     validation = TimeSeriesDataSet.from_dataset(
