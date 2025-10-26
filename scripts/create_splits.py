@@ -14,7 +14,6 @@ import json
 import argparse
 import pandas as pd
 from datetime import datetime
-from src.feature_configs import FEATURE_METADATA
 from src.data_utils import load_feature_set, create_train_val_test_split
 
 def parse_args():
@@ -71,6 +70,13 @@ def parse_args():
         default=None,
         help='Optional version suffix (e.g., "v2" for core_proposal_daily_v2_train.csv)'
     )
+    parser.add_argument(
+        '--data-version',
+        type=str,
+        default='fixed',
+        choices=['fixed', 'vintage'],
+        help='Data version to use: fixed (fixed-shift alignment) or vintage (ALFRED alignment)'
+    )
     return parser.parse_args()
 
 def main():
@@ -87,45 +93,15 @@ def main():
     # Load feature set
     print(f"\nLoading feature set: {args.feature_set}")
     print(f"Frequency: {args.frequency}")
+    print(f"Data version: {args.data_version}")
     df = load_feature_set(
         config_name=args.feature_set,
         frequency=args.frequency,
+        version=args.data_version,
         #data_path=args.data_path,
         verbose=True
     )
-
-    # ADD SOURCE COLUMNS FOR STALENESS DETECTION 
-    source_cols_to_add = []
-
-    for feature in df.columns:
-        if feature in FEATURE_METADATA:
-            metadata = FEATURE_METADATA[feature]
-            if metadata.get('needs_staleness') and 'source_column' in metadata:
-                source_col = metadata['source_column']
-                if source_col not in df.columns:
-                    source_cols_to_add.append(source_col)
     
-    if source_cols_to_add:
-        print(f"\nAdding source columns for staleness detection: {source_cols_to_add}")
-
-        # Determine which source dataset to use
-        # if splits output dir contains 'vintage', use vintage dataset
-        if 'vintage' in args.output_dir:
-            version = 'vintage'
-        else:
-            version = 'fixed'
-        
-        # Load from raw CSV to get ALL columns including source columns
-        filename = f"data/financial_dataset_{args.frequency}_{version}.csv"
-        full_df = pd.read_csv(filename, index_col='Date', parse_dates=True)
-        
-        for col in source_cols_to_add:
-            if col in full_df.columns:
-                df[col] = full_df[col]
-                print(f"  Added: {col}")
-
-    print(f"\nFinal columns in dataset: {list(df.columns)}")
-
     # Create temporal splits
     print(f"\nCreating temporal splits (train={args.train_pct}, val={args.val_pct})...")
     train, val, test = create_train_val_test_split(
@@ -161,6 +137,7 @@ def main():
         'created_at': datetime.now().isoformat(),
         'feature_set': args.feature_set,
         'frequency': args.frequency,
+        'data_version': args.data_version,
         'train_pct': args.train_pct,
         'val_pct': args.val_pct,
         'test_pct': 1 - args.train_pct - args.val_pct,
