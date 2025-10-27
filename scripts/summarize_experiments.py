@@ -105,6 +105,22 @@ def extract_experiment_data(exp_path):
         data['auc_roc'] = fin.get('auc_roc')
         data['alpha'] = fin.get('alpha')
         
+        # Mode statistics (from new 4-mode quality detection)
+        if 'mode_stats' in eval_data:
+            mode_stats = eval_data['mode_stats']
+            data['healthy_pct'] = mode_stats.get('healthy_pct')
+            data['degraded_pct'] = mode_stats.get('degraded_pct')
+            data['weak_collapse_pct'] = mode_stats.get('weak_collapse_pct')
+            data['strong_collapse_pct'] = mode_stats.get('strong_collapse_pct')
+            data['healthy_days'] = mode_stats.get('healthy_days')
+            data['degraded_days'] = mode_stats.get('degraded_days')
+            data['weak_collapse_days'] = mode_stats.get('weak_collapse_days')
+            data['strong_collapse_days'] = mode_stats.get('strong_collapse_days')
+        
+        # Collapse detection flags
+        data['has_collapse'] = eval_data.get('collapse_detected', False)
+        data['has_degradation'] = eval_data.get('degradation_detected', False)
+        
         # Enhanced collapse detection from confusion matrix
         if 'confusion_matrix' in fin:
             conf = fin['confusion_matrix']
@@ -340,7 +356,7 @@ def main():
                 continue
             
             results.append(data)
-            status = "✓ evaluated" if data.get('evaluated') else "  not evaluated"
+            status = "âœ“ evaluated" if data.get('evaluated') else "  not evaluated"
             collapsed = " (COLLAPSED)" if data.get('collapsed') else ""
             print(f"  {exp_path.name}: {status}{collapsed}")
         except Exception as e:
@@ -365,7 +381,7 @@ def main():
     
     # Save full results
     df.to_csv(output_path, index=False)
-    print(f"\n✓ Saved {len(df)} experiments to {output_path}")
+    print(f"\nâœ“ Saved {len(df)} experiments to {output_path}")
     
     # Create a condensed summary with key metrics
     key_metrics_cols = [
@@ -373,6 +389,8 @@ def main():
         'best_val_loss', 'total_epochs', 'early_stopped',
         'test_mse', 'test_rmse', 'test_r2',
         'dir_acc', 'sharpe_ratio', 'auc_roc', 'alpha',
+        'healthy_pct', 'degraded_pct', 'weak_collapse_pct', 'strong_collapse_pct',
+        'has_collapse', 'has_degradation',
         'pred_std', 'num_unique', 'pct_positive', 'pct_negative',
         'composite_score', 'collapsed', 'evaluated'
     ]
@@ -381,7 +399,7 @@ def main():
     df_key_metrics = df[key_metrics_cols]
     
     df_key_metrics.to_csv(key_metrics_path, index=False)
-    print(f"✓ Saved key metrics summary to {key_metrics_path}")
+    print(f"âœ“ Saved key metrics summary to {key_metrics_path}")
     
     # Split working vs collapsed if requested
     if args.split_working and 'collapsed' in df.columns:
@@ -392,12 +410,12 @@ def main():
         if len(working) > 0:
             working_path = output_dir / 'working_models.csv'
             working.to_csv(working_path, index=False)
-            print(f"✓ Saved working_models.csv ({len(working)} models) to {working_path}")
+            print(f"âœ“ Saved working_models.csv ({len(working)} models) to {working_path}")
         
         if len(collapsed) > 0:
             collapsed_path = output_dir / 'collapsed_models.csv'
             collapsed.to_csv(collapsed_path, index=False)
-            print(f"✓ Saved collapsed_models.csv ({len(collapsed)} models) to {collapsed_path}")
+            print(f"âœ“ Saved collapsed_models.csv ({len(collapsed)} models) to {collapsed_path}")
     
     # Print quick stats
     print(f"\n{'='*80}")
