@@ -199,10 +199,19 @@ def diagnose_model(experiment_name, use_test=False, verbose=True, save=False):
     
     # Get features
     features = config['features']['all']
+    has_staleness = any('days_since' in f or 'is_fresh' in f for f in features)
     
     # Prepare datasets EXACTLY like evaluate_tft.py
     train_df = train_df.reset_index()
     eval_df = eval_df.reset_index()
+    
+    if has_staleness:
+        from src.data_utils import add_staleness_features
+        
+        #print("Detected staleness features in config, adding to data...")
+        train_df = add_staleness_features(train_df, verbose=False)
+        eval_df = add_staleness_features(eval_df, verbose=False)
+    
     
     train_df['time_idx'] = range(len(train_df))
     train_df['group'] = 'SP500'
@@ -397,7 +406,7 @@ def main():
     if not experiment_names:
         print("No experiments found matching pattern")
         return
-    
+
     # Run diagnostics
     if args.compare or len(experiment_names) > 1:
         compare_models(experiment_names, use_test=args.use_test, save=args.save)

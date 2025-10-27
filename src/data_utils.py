@@ -3,10 +3,11 @@ Utilities for loading and preparing datasets for modeling.
 """
 
 import pandas as pd
-from src.feature_configs import FEATURE_SETS, TARGET
+from src.feature_configs import FEATURE_SETS, FEATURE_METADATA, TARGET
 
 def load_feature_set(config_name='core_proposal', 
                      frequency='daily',
+                     version='fixed',
                      data_path='data',
                      verbose=True):
     """
@@ -36,7 +37,7 @@ def load_feature_set(config_name='core_proposal',
     config = FEATURE_SETS[config_name]
     
     # Load full dataset
-    filename = f"{data_path}/financial_dataset_{frequency}.csv"
+    filename = f"{data_path}/financial_dataset_{frequency}_{version}.csv"
     df = pd.read_csv(filename, index_col='Date', parse_dates=True)
     
     if verbose:
@@ -119,8 +120,104 @@ def create_train_val_test_split(df, train_pct=0.7, val_pct=0.15, verbose=True):
     return train, val, test
 
 
+def add_staleness_features(df, use_vintage=False, verbose=True):
+    """
+    Add staleness indicators for low-frequency features.
+    
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        DataFrame with DatetimeIndex and financial features
+    use_vintage : bool
+        If True, compute staleness from actual release dates (vintage)
+        If False, use typical lag patterns (fixed)
+    verbose : bool
+        Print information about staleness computation
+        
+    Returns:
+    --------
+    pd.DataFrame
+        Original dataframe with additional staleness features
+    """
+    
+    df = df.copy()
+    
+    if verbose:
+        print(f"\n{'='*70}")
+        print("Adding Staleness Features")
+        print(f"{'='*70}")
+        print(f"Mode: {'Vintage (ALFRED)' if use_vintage else 'Fixed lag'}")
+    
+    for feature, metadata in FEATURE_METADATA.items():
+        if not metadata['needs_staleness']:
+            continue
+            
+        if feature not in df.columns:
+            continue
+       
+        # Use source_column if specified, otherwise use feature itself
+        source_col = metadata.get('source_column', feature)
+        
+        if source_col not in df.columns:
+            if verbose:
+                print(f"\nSkipping {feature}: source column {source_col} not found")
+            continue
+        
+        if verbose:
+            print(f"\nProcessing: {feature} (detecting from {source_col})")
+        
+        # Detect updates from source column
+        feature_values = df[source_col]
+        
+        # Detect updates: value changed from previous day
+        # updates = (feature_values != feature_values.shift(1))
+        # updates = (feature_values.diff().abs() > 1e-6)  # Only count changes > threshold
+
+        # For CPI/inflation, changes should be substantial (at least 0.01%)
+        updates = (feature_values.diff().abs() > 0.01)
+
+        # For first observation, assume it's an update
+        updates.at[updates.index[0]] = True
+        
+        # Days since last update
+        days_since_update = pd.Series(0, index=df.index)
+        last_update_idx = 0
+        
+        for i in range(len(df)):
+            if updates.iloc[i]:
+                last_update_idx = i
+                days_since_update.iloc[i] = 0
+            else:
+                days_since_update.iloc[i] = i - last_update_idx
+        
+        # Binary freshness indicator
+        is_fresh = updates.astype(int)
+        
+        # Add to dataframe with appropriate names
+        staleness_col_name = metadata['staleness_features'][0]  # e.g., 'days_since_CPI_update'
+        freshness_col_name = metadata['staleness_features'][1]  # e.g., 'CPI_is_fresh'
+        
+        df[staleness_col_name] = days_since_update
+        df[freshness_col_name] = is_fresh
+        
+        if verbose:
+            num_updates = is_fresh.sum()
+            avg_staleness = days_since_update.mean()
+            max_staleness = days_since_update.max()
+            print(f"  Updates detected: {num_updates}")
+            print(f"  Avg days stale: {avg_staleness:.1f}")
+            print(f"  Max days stale: {max_staleness}")
+    
+    if verbose:
+        print(f"\n{'='*70}")
+        print(f"Total staleness features added: {len([c for c in df.columns if 'days_since' in c or 'is_fresh' in c])}")
+        print(f"{'='*70}\n")
+    
+    return df
+
+
+
 if __name__ == "__main__":
-    # Example usage / testing
     print("Testing feature set loading...\n")
     
     # Test each config

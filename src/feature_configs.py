@@ -72,3 +72,93 @@ TARGET = 'SP500_Returns'
 
 # Define which features are lagged returns (for proper temporal splits)
 AUTOREGRESSIVE_FEATURES = ['SP500_Returns']
+
+# To create staleness features
+FEATURE_METADATA = {
+    # High-frequency features (daily updates, no staleness needed)
+    'VIX': {
+        'update_frequency': 'daily',
+        'needs_staleness': False,
+    },
+    'Treasury_10Y': {
+        'update_frequency': 'daily',
+        'needs_staleness': False,
+    },
+    'Yield_Spread': {
+        'update_frequency': 'daily',
+        'needs_staleness': False,
+    },
+    'SP500_Returns': {
+        'update_frequency': 'daily',
+        'needs_staleness': False,
+    },
+    'SP500_Volatility': {
+        'update_frequency': 'daily',
+        'needs_staleness': False,
+    },
+    
+    # Low-frequency features (monthly updates with lag, need staleness)
+    'Inflation_YoY': {
+        'update_frequency': 'monthly',
+        'needs_staleness': True,
+        'typical_lag_days': 14,  # CPI released ~2 weeks after month end
+        'staleness_features': ['days_since_CPI_update', 'CPI_is_fresh'],
+        'source_column': 'CPI',  # use CPI for staleness since Inflation_YoY updates daily from rolling window
+    },
+    'Unemployment': {
+        'update_frequency': 'monthly',
+        'needs_staleness': True,
+        'typical_lag_days': 7,  # Jobs report released ~1 week after month end
+        'staleness_features': ['days_since_unemployment_update', 'unemployment_is_fresh'],
+    },
+    'Fed_Rate': {
+        'update_frequency': 'irregular',  # FOMC meetings ~8x per year
+        'needs_staleness': True,
+        'typical_lag_days': 0,  # Immediate release
+        'staleness_features': ['days_since_fed_update', 'fed_is_fresh'],
+    },
+    'Consumer_Sentiment': {
+        'update_frequency': 'monthly',
+        'needs_staleness': True,
+        'typical_lag_days': 0,  # Michigan survey, immediate release
+        'staleness_features': ['days_since_sentiment_update', 'sentiment_is_fresh'],
+    },
+    'Industrial_Production': {
+        'update_frequency': 'monthly',
+        'needs_staleness': True,
+        'typical_lag_days': 14,
+        'staleness_features': ['days_since_indprod_update', 'indprod_is_fresh'],
+    },
+}
+
+
+def get_staleness_features(feature_list):
+    """
+    Given a list of features, return staleness features that should be added.
+
+    Parameters:
+    -----------
+    feature_list : list
+        List of feature names (e.g., ['VIX', 'Inflation_YoY', ...])
+
+    Returns:
+    --------
+    dict with keys:
+        'staleness_features': list of staleness feature names to add
+        'needs_staleness': dict mapping original features to bool
+    """
+    staleness_features = []
+    needs_staleness = {}
+
+    for feature in feature_list:
+        if feature in FEATURE_METADATA:
+            metadata = FEATURE_METADATA[feature]
+            needs_staleness[feature] = metadata['needs_staleness']
+
+            if metadata['needs_staleness']:
+                staleness_features.extend(metadata['staleness_features'])
+
+    return {
+        'staleness_features': staleness_features,
+        'needs_staleness': needs_staleness,
+    }

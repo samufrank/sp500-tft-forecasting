@@ -70,6 +70,13 @@ def parse_args():
         default=None,
         help='Optional version suffix (e.g., "v2" for core_proposal_daily_v2_train.csv)'
     )
+    parser.add_argument(
+        '--data-version',
+        type=str,
+        default='fixed',
+        choices=['fixed', 'vintage'],
+        help='Data version to use: fixed (fixed-shift alignment) or vintage (ALFRED alignment)'
+    )
     return parser.parse_args()
 
 def main():
@@ -86,9 +93,11 @@ def main():
     # Load feature set
     print(f"\nLoading feature set: {args.feature_set}")
     print(f"Frequency: {args.frequency}")
+    print(f"Data version: {args.data_version}")
     df = load_feature_set(
         config_name=args.feature_set,
         frequency=args.frequency,
+        version=args.data_version,
         #data_path=args.data_path,
         verbose=True
     )
@@ -128,6 +137,7 @@ def main():
         'created_at': datetime.now().isoformat(),
         'feature_set': args.feature_set,
         'frequency': args.frequency,
+        'data_version': args.data_version,
         'train_pct': args.train_pct,
         'val_pct': args.val_pct,
         'test_pct': 1 - args.train_pct - args.val_pct,
