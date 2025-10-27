@@ -111,23 +111,34 @@ def main():
         verbose=True
     )
     
-    # Save splits
-    split_prefix = f"{args.feature_set}_{args.frequency}"
+    # Save splits with data version in filename and subdirectory
+    # Create subdirectory for data version (unless already specified in output-dir)
+    if args.output_dir.endswith(args.data_version):
+        # User already specified version in path (e.g., data/splits/vintage)
+        version_output_dir = args.output_dir
+    else:
+        # Add version subdirectory (e.g., data/splits -> data/splits/vintage)
+        version_output_dir = os.path.join(args.output_dir, args.data_version)
+    
+    os.makedirs(version_output_dir, exist_ok=True)
+    
+    split_prefix = f"{args.feature_set}_{args.frequency}_{args.data_version}"
     if args.version:
+        # Optional additional version suffix (e.g., "v2" for experiments)
         split_prefix = f"{split_prefix}_{args.version}"
     if args.timestamp:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         split_prefix = f"{split_prefix}_{timestamp}"
     
-    train_path = os.path.join(args.output_dir, f"{split_prefix}_train.csv")
-    val_path = os.path.join(args.output_dir, f"{split_prefix}_val.csv")
-    test_path = os.path.join(args.output_dir, f"{split_prefix}_test.csv")
+    train_path = os.path.join(version_output_dir, f"{split_prefix}_train.csv")
+    val_path = os.path.join(version_output_dir, f"{split_prefix}_val.csv")
+    test_path = os.path.join(version_output_dir, f"{split_prefix}_test.csv")
     
     train.to_csv(train_path)
     val.to_csv(val_path)
     test.to_csv(test_path)
     
-    print(f"\nSaved splits to {args.output_dir}/")
+    print(f"\nSaved splits to {version_output_dir}/")
     print(f"  Train: {train_path}")
     print(f"  Val: {val_path}")
     print(f"  Test: {test_path}")
@@ -159,7 +170,7 @@ def main():
         'features': list(df.columns),
     }
     
-    metadata_path = os.path.join(args.output_dir, f"{split_prefix}_metadata.json")
+    metadata_path = os.path.join(version_output_dir, f"{split_prefix}_metadata.json")
     with open(metadata_path, 'w') as f:
         json.dump(metadata, f, indent=2)
     

@@ -35,6 +35,9 @@ import warnings
 warnings.filterwarnings('ignore', category=UserWarning)
 warnings.filterwarnings('ignore', category=FutureWarning)
 
+# in same /train dir
+from collapse_monitor import CollapseMonitor
+
 
 # --- enable Tensor Core optimization for RTX 3070 ---
 torch.set_float32_matmul_precision('medium')  # high for even faster, but slightly less precise
@@ -42,7 +45,7 @@ torch.set_float32_matmul_precision('medium')  # high for even faster, but slight
 
 # --- device setup (macOS compatibility) ---
 if platform.system() == "Darwin" and torch.backends.mps.is_available():
-    print("\n[INFO] MPS detected but upsample ops unsupported — using CPU for stability.")
+    print("\n[INFO] MPS detected but upsample ops unsupported â€” using CPU for stability.")
     device = "cpu"
 else:
     device = "auto"  # let Lightning pick CUDA or CPU
@@ -109,6 +112,9 @@ def parse_args():
     parser.add_argument('--frequency', type=str, default='daily',
                         choices=['daily', 'monthly'],
                         help='Data frequency')
+    parser.add_argument('--alignment', type=str, default='vintage',
+                        choices=['fixed', 'vintage'],
+                        help='Release date alignment mode (vintage uses actual release dates)')
     
     # Reproducibility
     parser.add_argument('--seed', type=int, default=42,
@@ -149,6 +155,10 @@ def parse_args():
                         help='Base directory for experiment outputs')
     parser.add_argument('--overwrite', action='store_true',
                         help='Allow overwriting existing experiment directory')
+
+    # Collapse monitor
+    parser.add_argument('--monitor-every-n-epochs', type=int, default=1,
+                   help='How often to run collapse monitoring')
     
     return parser.parse_args()
 
@@ -229,24 +239,35 @@ def set_all_seeds(seed):
 # DATA LOADING
 # ============================================================================
 
-def load_splits(splits_dir, feature_set, frequency):
-    """Load pre-created train/val/test splits."""
-    split_prefix = f"{feature_set}_{frequency}"
-    train = pd.read_csv(
-        os.path.join(splits_dir, f"{split_prefix}_train.csv"),
-        index_col='Date',
-        parse_dates=True
-    )
-    val = pd.read_csv(
-        os.path.join(splits_dir, f"{split_prefix}_val.csv"),
-        index_col='Date',
-        parse_dates=True
-    )
-    test = pd.read_csv(
-        os.path.join(splits_dir, f"{split_prefix}_test.csv"),
-        index_col='Date',
-        parse_dates=True
-    )
+def load_splits(splits_dir, feature_set, frequency, alignment):
+    """
+    Load pre-created train/val/test splits.
+    
+    Expects new directory structure:
+    data/splits/{alignment}/{feature_set}_{frequency}_{alignment}_{split}.csv
+    
+    Example: data/splits/vintage/core_proposal_daily_vintage_train.csv
+    """
+    # Construct paths with new naming convention
+    splits_path = os.path.join(splits_dir, alignment)
+    split_prefix = f"{feature_set}_{frequency}_{alignment}"
+    
+    train_path = os.path.join(splits_path, f"{split_prefix}_train.csv")
+    val_path = os.path.join(splits_path, f"{split_prefix}_val.csv")
+    test_path = os.path.join(splits_path, f"{split_prefix}_test.csv")
+    
+    # Check if files exist and provide helpful error
+    for path, split_name in [(train_path, 'train'), (val_path, 'val'), (test_path, 'test')]:
+        if not os.path.exists(path):
+            raise FileNotFoundError(
+                f"Could not find {split_name} split at: {path}\n"
+                f"Expected structure: {splits_dir}/{alignment}/{feature_set}_{frequency}_{alignment}_{split_name}.csv"
+            )
+    
+    train = pd.read_csv(train_path, index_col='Date', parse_dates=True)
+    val = pd.read_csv(val_path, index_col='Date', parse_dates=True)
+    test = pd.read_csv(test_path, index_col='Date', parse_dates=True)
+    
     return train, val, test
 
 def prepare_tft_data(train_df, val_df, args, features, add_staleness=True):
@@ -257,8 +278,10 @@ def prepare_tft_data(train_df, val_df, args, features, add_staleness=True):
         print("\nAdding staleness features to data...")
         from src.data_utils import add_staleness_features
         
-        train_df = add_staleness_features(train_df, use_vintage=False, verbose=True)
-        val_df = add_staleness_features(val_df, use_vintage=False, verbose=True)
+        # Use vintage=True if alignment is vintage, False if fixed
+        use_vintage = (args.alignment == 'vintage')
+        train_df = add_staleness_features(train_df, use_vintage=use_vintage, verbose=True)
+        val_df = add_staleness_features(val_df, use_vintage=use_vintage, verbose=True)
     
     # DROP SOURCE COLUMNS (used for staleness detection only, not model features)
     source_cols_to_drop = []
@@ -393,17 +416,24 @@ def save_config(args, features, output_dir):
         'random_seed': args.seed,
         'feature_set': args.feature_set,
         'frequency': args.frequency,
+        'alignment': args.alignment,
         'data': {
             'splits_dir': args.splits_dir,
-            'split_prefix': f"{args.feature_set}_{args.frequency}",
+            'release_date_mode': args.alignment,  # For compatibility with evaluate_tft.py
+            'split_prefix': f"{args.feature_set}_{args.frequency}_{args.alignment}",
             'train_size': len(pd.read_csv(os.path.join(
                 args.splits_dir, 
-                f"{args.feature_set}_{args.frequency}_train.csv"
+                args.alignment,
+                f"{args.feature_set}_{args.frequency}_{args.alignment}_train.csv"
             ))),
             'val_size': len(pd.read_csv(os.path.join(
-                args.splits_dir, 
-                f"{args.feature_set}_{args.frequency}_val.csv"
+                args.splits_dir,
+                args.alignment, 
+                f"{args.feature_set}_{args.frequency}_{args.alignment}_val.csv"
             ))),
+        },
+        'monitoring': {
+            'monitor_every_n_epochs': args.monitor_every_n_epochs,
         },
         'architecture': {
             'max_encoder_length': args.max_encoder_length,
@@ -471,7 +501,8 @@ def train():
     train_df, val_df, test_df = load_splits(
         args.splits_dir, 
         args.feature_set, 
-        args.frequency
+        args.frequency,
+        args.alignment
     )
     print(f"Train: {len(train_df)} samples")
     print(f"Val: {len(val_df)} samples")
@@ -506,7 +537,14 @@ def train():
         patience=args.early_stop_patience,
         mode="min"
     )
-    
+
+    # add collapse monitor
+    collapse_monitor = CollapseMonitor(
+        val_dataloader=val_dataloader,
+        log_dir=f'{output_dir}/collapse_monitoring',
+        log_every_n_epochs=args.monitor_every_n_epochs
+    )
+        
     checkpoint = ModelCheckpoint(
         dirpath=os.path.join(output_dir, 'checkpoints'),
         filename='tft-{epoch:02d}-{val_loss:.4f}',
@@ -529,7 +567,7 @@ def train():
         accelerator=device,
         devices=1,
         gradient_clip_val=args.gradient_clip,
-        callbacks=[early_stop, checkpoint, EpochSummaryCallback()],
+        callbacks=[early_stop, checkpoint, EpochSummaryCallback(), collapse_monitor],
         deterministic=False,
         strategy="auto",
         enable_progress_bar=False,

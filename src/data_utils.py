@@ -51,8 +51,22 @@ def load_feature_set(config_name='core_proposal',
         # Kitchen sink: use everything except derived features we'll recalculate
         selected = df.copy()
     else:
-        # Add Date to features if not already included
-        selected = df[config['features']].copy()
+        # Start with requested features
+        features_to_load = config['features'].copy()
+        
+        # Add source columns needed for staleness computation
+        from src.feature_configs import FEATURE_METADATA
+        for feature in config['features']:
+            if feature in FEATURE_METADATA:
+                metadata = FEATURE_METADATA[feature]
+                if metadata.get('needs_staleness', False):
+                    source_col = metadata.get('source_column', feature)
+                    if source_col != feature and source_col not in features_to_load:
+                        features_to_load.append(source_col)
+                        if verbose:
+                            print(f"Including source column '{source_col}' for staleness computation of '{feature}'")
+        
+        selected = df[features_to_load].copy()
     
     # Apply date filtering if specified
     if config['min_date'] is not None:

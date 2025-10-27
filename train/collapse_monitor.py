@@ -33,6 +33,9 @@ class CollapseMonitor(Callback):
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.log_every_n_epochs = log_every_n_epochs
         
+        # Buffer to store gradients captured during training
+        self._current_epoch_gradients = {}
+        
         self.history = {
             'epoch': [],
             'prediction_std': [],
@@ -48,6 +51,18 @@ class CollapseMonitor(Callback):
             'attention_entropy': [],
         }
         
+    def on_before_optimizer_step(self, trainer, pl_module, optimizer, optimizer_idx=0):
+        """Capture gradients before they're cleared by optimizer."""
+        # Store gradient norms for this batch
+        for name, param in pl_module.named_parameters():
+            if param.grad is not None:
+                grad_norm = param.grad.norm().item()
+                
+                if name not in self._current_epoch_gradients:
+                    self._current_epoch_gradients[name] = []
+                    
+                self._current_epoch_gradients[name].append(grad_norm)
+        
     def on_train_epoch_end(self, trainer, pl_module):
         """Log metrics at end of each epoch."""
         if trainer.current_epoch % self.log_every_n_epochs != 0:
@@ -56,7 +71,7 @@ class CollapseMonitor(Callback):
         print(f"\n[CollapseMonitor] Epoch {trainer.current_epoch}")
         
         # 1. Prediction diversity metrics
-        #self._log_prediction_diversity(trainer, pl_module)
+        self._log_prediction_diversity(trainer, pl_module)
         
         # 2. Gradient flow
         self._log_gradient_flow(pl_module)
@@ -79,7 +94,15 @@ class CollapseMonitor(Callback):
             pl_module._current_fx_name = None
         
     def _log_prediction_diversity(self, trainer, pl_module):
-        """Measure diversity of predictions on validation set."""
+        """
+        Measure diversity of predictions on validation set.
+        
+        Metrics:
+        - std/range/mean: Basic statistics over all validation predictions
+        - Pos/Neg %: Percentage of predictions above/below zero
+        - Unique: Number of distinct prediction values across entire val set
+          (1 = collapsed to constant, hundreds = healthy diversity)
+        """
         pl_module.eval()
         all_predictions = []
         
@@ -91,9 +114,15 @@ class CollapseMonitor(Callback):
                 x = {k: v.to(pl_module.device) if torch.is_tensor(v) else v 
                      for k, v in x.items()}
                 
-                # Get predictions - output is dict with 'prediction' key
+                # Get predictions - handle dict or namedtuple
                 output = pl_module(x)
-                preds = output['prediction'][:, 0, 3]  # [batch, time=0, quantile=3 (median)]
+                if isinstance(output, dict):
+                    preds = output['prediction'][:, 0, 3]
+                elif hasattr(output, 'prediction'):
+                    preds = output.prediction[:, 0, 3]
+                else:
+                    # Fallback - assume output is the prediction tensor
+                    preds = output[:, 0, 3]
                     
                 all_predictions.append(preds.cpu().numpy())
        
@@ -119,23 +148,20 @@ class CollapseMonitor(Callback):
               f"mean: {pred_mean:.6f}")
         print(f"  Pos: {pct_pos:.1f}%, Neg: {pct_neg:.1f}%, "
               f"Unique: {n_unique}")
-        
-        # Warning if collapse detected
-        if pred_std < 0.01 or n_unique < 10:
-            print(f"  WARNING: Potential collapse detected!")
             
     def _log_gradient_flow(self, pl_module):
-        """Log gradient magnitudes by layer."""
+        """Log gradient magnitudes by layer using stored gradients from training."""
         epoch = len(self.history['epoch']) - 1
         
-        for name, param in pl_module.named_parameters():
-            if param.grad is not None:
-                grad_norm = param.grad.norm().item()
+        # Use the gradients we captured during training
+        for name, grad_norms in self._current_epoch_gradients.items():
+            # Average gradient norm across all batches in this epoch
+            avg_grad_norm = np.mean(grad_norms)
+            
+            if name not in self.history['gradient_norms']:
+                self.history['gradient_norms'][name] = []
                 
-                if name not in self.history['gradient_norms']:
-                    self.history['gradient_norms'][name] = []
-                    
-                self.history['gradient_norms'][name].append(float(grad_norm))
+            self.history['gradient_norms'][name].append(float(avg_grad_norm))
         
         # Print summary of key layers
         key_layers = ['lstm_encoder', 'lstm_decoder', 'multihead_attn', 
@@ -148,6 +174,9 @@ class CollapseMonitor(Callback):
                 norms = [self.history['gradient_norms'][k][-1] for k in matching]
                 avg_norm = np.mean(norms)
                 print(f"    {layer_name}: {avg_norm:.6f}")
+        
+        # Clear buffer for next epoch
+        self._current_epoch_gradients = {}
                 
     def _log_weight_statistics(self, pl_module):
         """Log weight matrix statistics."""
@@ -182,13 +211,17 @@ class CollapseMonitor(Callback):
                 x = {k: v.to(pl_module.device) if torch.is_tensor(v) else v 
                      for k, v in x.items()}
                 
-                # Access the actual TFT model (nested inside Lightning module)
-                tft_model = pl_module
-                
-                # Get encoder VSN output - encoder_variables is in output dict
+                # Get output - could be dict or namedtuple
                 output = pl_module(x)
-                if 'encoder_variables' in output and output['encoder_variables'] is not None:
+                
+                # Try to extract encoder_variables
+                encoder_vsn = None
+                if isinstance(output, dict) and 'encoder_variables' in output:
                     encoder_vsn = output['encoder_variables']
+                elif hasattr(output, 'encoder_variables'):
+                    encoder_vsn = output.encoder_variables
+                
+                if encoder_vsn is not None:
                     vsn_outputs['encoder'].append(encoder_vsn.cpu().numpy())
         
         # Compute std for each VSN
@@ -204,9 +237,19 @@ class CollapseMonitor(Callback):
                     
                 self.history['vsn_output_std'][vsn_name].append(float(vsn_std))
                 print(f"    {vsn_name}: {vsn_std:.6f}")
+            else:
+                print(f"    {vsn_name}: (no data captured)")
+                if vsn_name not in self.history['vsn_output_std']:
+                    self.history['vsn_output_std'][vsn_name] = []
+                self.history['vsn_output_std'][vsn_name].append(None)
                 
     def _log_attention_patterns(self, trainer, pl_module):
-        """Log attention weight entropy."""
+        """
+        Log attention weight entropy using interpret_output() method.
+        
+        TFT attention weights are not returned in standard forward() pass.
+        Must use model.interpret_output(predictions) to extract them.
+        """
         pl_module.eval()
         attention_entropies = []
         
@@ -219,14 +262,31 @@ class CollapseMonitor(Callback):
                 x = {k: v.to(pl_module.device) if torch.is_tensor(v) else v 
                      for k, v in x.items()}
                 
-                # Get attention from output dict
+                # Get predictions first
                 output = pl_module(x)
-                if 'attention' in output and output['attention'] is not None:
-                    attn = output['attention'].cpu().numpy()
-                    # Compute entropy of attention distribution
-                    # attn shape: [batch, time, heads] or similar
-                    entropy = -np.sum(attn * np.log(attn + 1e-10), axis=-1)
-                    attention_entropies.append(entropy)
+                
+                # Use interpret_output to get attention weights
+                # reduction='none' keeps batch dimension
+                try:
+                    interpretation = pl_module.interpret_output(
+                        output, 
+                        reduction='none',
+                        attention_prediction_horizon=0  # Focus on first prediction step
+                    )
+                    
+                    # Extract attention weights from interpretation dict
+                    if 'attention' in interpretation:
+                        attn = interpretation['attention'].cpu().numpy()
+                        # Compute entropy of attention distribution
+                        # attn shape: [batch, encoder_length] typically
+                        # Normalize if not already (attention should sum to 1)
+                        attn_norm = attn / (attn.sum(axis=-1, keepdims=True) + 1e-10)
+                        entropy = -np.sum(attn_norm * np.log(attn_norm + 1e-10), axis=-1)
+                        attention_entropies.append(entropy)
+                except Exception as e:
+                    # interpret_output might fail for various reasons
+                    print(f"    (interpret_output failed: {type(e).__name__})")
+                    break
         
         if attention_entropies:
             avg_entropy = np.mean(np.concatenate(attention_entropies))
@@ -234,6 +294,7 @@ class CollapseMonitor(Callback):
             print(f"  Attention entropy: {avg_entropy:.6f}")
         else:
             self.history['attention_entropy'].append(None)
+            print(f"  Attention entropy: (no data captured)")
             
     def _save_history(self, epoch):
         """Save monitoring history to disk."""
@@ -248,30 +309,3 @@ class CollapseMonitor(Callback):
             json.dump(self.history, f, indent=2)
             
         print(f"  Saved to: {save_path}")
-        
-    def on_train_end(self, trainer, pl_module):
-        """Final summary on training completion."""
-        print("\n" + "="*70)
-        print("COLLAPSE MONITOR SUMMARY")
-        print("="*70)
-        
-        epochs = self.history['epoch']
-        pred_stds = self.history['prediction_std']
-        
-        print(f"Total epochs: {len(epochs)}")
-        print(f"\nPrediction std over time:")
-        print(f"  Initial: {pred_stds[0]:.6f}")
-        print(f"  Final: {pred_stds[-1]:.6f}")
-        print(f"  Min: {min(pred_stds):.6f} (epoch {epochs[pred_stds.index(min(pred_stds))]})")
-        print(f"  Max: {max(pred_stds):.6f} (epoch {epochs[pred_stds.index(max(pred_stds))]})")
-        
-        # Check for collapse
-        if pred_stds[-1] < 0.01:
-            print("\n    MODEL COLLAPSED - final prediction std < 0.01")
-        elif pred_stds[-1] < 0.1:
-            print("\n    MODEL NEAR COLLAPSE - final prediction std < 0.1")
-        else:
-            print("\n    Model predictions remain diverse")
-            
-        print("="*70)
-
