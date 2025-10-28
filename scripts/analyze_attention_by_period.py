@@ -230,6 +230,30 @@ def load_test_data(config, test_split_path=None):
     train_df = pd.read_csv(train_split_path, index_col='Date', parse_dates=True)
     test_df = pd.read_csv(test_split_path, index_col='Date', parse_dates=True)
     
+    # Check if staleness features are expected based on config
+    features_list = config.get('features', {}).get('all', [])
+    has_staleness = any('days_since' in f or 'is_fresh' in f for f in features_list)
+    
+    if has_staleness:
+        try:
+            from data_utils import add_staleness_features
+        except ImportError:
+            try:
+                from src.data_utils import add_staleness_features
+            except ImportError:
+                print("Warning: Could not import add_staleness_features, skipping staleness feature generation")
+                return train_df, test_df
+        
+        print("Detected staleness features in config, adding to data...")
+        train_df = add_staleness_features(train_df, verbose=False)
+        test_df = add_staleness_features(test_df, verbose=False)
+        
+        # Apply same normalization as training
+        staleness_cols = [c for c in train_df.columns if 'days_since' in c]
+        for col in staleness_cols:
+            train_df[col] = train_df[col] / 30.0
+            test_df[col] = test_df[col] / 30.0
+    
     return train_df, test_df
 
 
