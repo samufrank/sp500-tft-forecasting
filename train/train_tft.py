@@ -320,7 +320,7 @@ def prepare_tft_data(train_df, val_df, args, features, add_staleness=True):
     staleness_cols = [c for c in train_df.columns if 'days_since' in c]
     if staleness_cols:
         print("\n" + "="*70)
-        print("NORMALIZING STALENESS FEATURES (dividing by 30)")
+        print("NORMALIZING STALENESS FEATURES")
         print("="*70)
         for col in staleness_cols:
             train_df[col] = train_df[col] / 30.0
