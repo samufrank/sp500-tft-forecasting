@@ -1,8 +1,6 @@
 # Phase 0: Baseline Exploration (Oct 6-20, 2025)
 
-Initial hyperparameter search without staleness features, using fixed-date preprocessing.
-
-All models trained with fixed release dates (i.e. 14-day CPI lag for core proposal feature set).
+Initial hyperparameter search without staleness features, using fixed-date preprocessing (i.e. 14-day CPI lag for core proposal feature set).
 
 ## Example model
 sweep2_h16_drop_0.25
@@ -58,7 +56,7 @@ python train/evaluate_tft.py --experiment-name 00_baseline_exploration/experimen
 
 For batch re-evaluation with updated diagnostics:
 ```bash
-bash scripts/reevaluate_all.sh  # Evaluates all experiments with latest evaluation framework
+bash scripts/archive/reevaluate_all.sh  # Evaluates all experiments with latest evaluation framework
 python scripts/summarize_experiments.py --all  # Generates experiments_summary.csv with mode statistics
 ```
 

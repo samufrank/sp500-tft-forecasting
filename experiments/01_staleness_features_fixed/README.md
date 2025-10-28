@@ -55,7 +55,7 @@ Important: Like phase 0, uses fixed release date assumption (i.e. 14-day CPI lag
 Additional staleness features for other macroeconomic indicators will be included when those feature configs are tested.
 
 ## Results summary
-See `experiments_summary_key_metrics.csv` for complete results across all experiments. Compare `healthy_pct`, `degraded_pct`, `weak_collapse_pct`, and `strong_collapse_pct` between Phase 0 and Phase 1 to quantify staleness feature impact.
+See `experiments_summary.csv` for complete results across all experiments and `experiments_summary_key_metrics.csv` for a condensed version. Compare `healthy_pct`, `degraded_pct`, `weak_collapse_pct`, and `strong_collapse_pct` between Phase 0 and Phase 1 to quantify staleness feature impact.
 
 Key metrics show systematic degradation:
 - Directional Accuracy: Most models ~50% (random)
@@ -83,7 +83,7 @@ python train/evaluate_tft.py --experiment-name 01_staleness_features/experiment_
 
 For batch re-evaluation:
 ```bash
-bash scripts/evaluate_all.sh # will reevaluate every experiment in all phases!
+bash scripts/archive/evaluate_all.sh # will reevaluate every experiment in all phases!
 python scripts/summarize_experiments.py --all
 ```
 

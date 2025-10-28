@@ -62,7 +62,7 @@ Very strong shifts: 3+ signals fired
 
 ### Key Findings
 
-#### 1. Attention Shifts Align with Market Regimes
+#### 1. Attention shifts align with market regime shifts (interesting note!)
 
 2022 to 2023 shows massive shift (43 experiments):
 - Corresponds to Fed pivot from rate hikes to pause
@@ -94,7 +94,7 @@ All correlations weak (|r| < 0.31), explaining <10% of variance.
 Attention patterns appear to be a symptom of model behavior, not a cause of collapse. The model’s attention mechanism detects important changes but the output layer cannot adapt appropriately.
 
 
-#### 3. Phase Comparison: Staleness Features Impact
+#### 3. Staleness features impact
 
 Entropy (attention diffusion):
 - Phase 0: Mean = 3.09 ± 0.37 (wide variance, many outliers)
@@ -112,7 +112,7 @@ Interpretation:
 - Over-regularization may prevent adaptive attention behavior
 
 
-#### 4. Multi-Signal Shift Detection Results
+#### 4. Multi-Signal shift detection
 
 Overall statistics:
 - 142 total shifts detected across 55 experiments (45% of models)
@@ -132,7 +132,7 @@ Most notable shifts (3+ signals):
 
 ---
 
-### Implications for Model Development
+### Implications
 
 1. Attention mechanism works as designed
    - Detects important market changes
@@ -154,24 +154,6 @@ Most notable shifts (3+ signals):
    - Models detect regimes (attention shifts) but can't adapt
    - Need explicit regime-conditional output strategies
    - Or output regularization to prevent collapse
-
-
-These findings motivate the following:
-
-Phase 2a: Test Log-Transformed Staleness
-- Quick test to see if scale mismatch was the issue
-- Provides staleness info without dominating input space
-- Low risk, high potential reward
-
-Phase 2b: Distribution-Aware Regularization
-- Target the actual problem (output instability)
-- Domain-aware constraints on prediction statistics
-- Independent of attention architecture
-
-Phase 3: Custom Architecture (only if needed)
-- Mixed-frequency attention with architectural staleness encoding
-- Only pursue if Phases 2a/2b insufficient
-- Significant implementation effort
 
 ---
 
@@ -256,7 +238,7 @@ attention_collapse_correlation.png:
 
 ---
 
-### To reproduce
+### Reproducability
 
 #### Generate attention analysis (per experiment)
 ```bash
