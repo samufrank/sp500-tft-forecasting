@@ -379,7 +379,6 @@ def generate_predictions(model, test_dataset, batch_size=128):
             if isinstance(y, tuple):
                 y_actual = y[0]
             else:
-            # Extract actual values - y is also a tup
                 y_actual = y
             
             # DEBUG
@@ -389,10 +388,6 @@ def generate_predictions(model, test_dataset, batch_size=128):
             actuals.append(y_actual[:, 0].cpu().numpy())
     
     predictions = np.concatenate(predictions)
-    # DEBUG
-    #print(f"Predictions range: [{np.min(predictions):.4f}, {np.max(predictions):.4f}]")
-    #print(f"Num negative: {np.sum(predictions < 0)}")
-    #print(f"Num positive: {np.sum(predictions > 0)}")
     actuals = np.concatenate(actuals)
     
     print(f"Total predictions: {len(predictions)}, Total actuals: {len(actuals)}")
@@ -670,17 +665,24 @@ def detect_model_collapse(predictions, actuals, dates, window=60):
     # Flag if >98% positive or >98% negative (essentially unidirectional)
     unidirectional = np.nan_to_num((rolling_pct_positive > 0.98) | (rolling_pct_positive < 0.02), nan=False)
     
-    # Determine mode for each timestep (priority order)
+    # Determine mode for each timestep (priority order: worst to best)
     modes = []
     for i in range(len(predictions)):
         if structural_consensus[i] >= 3:
+            # Worst: Predictions frozen (constant or near-constant)
             modes.append('STRONG_COLLAPSE')
         elif structural_consensus[i] >= 2:
+            # Predictions barely varying (reduced variation)
             modes.append('WEAK_COLLAPSE')
-        elif unidirectional[i] or quality_degraded[i] or structural_consensus[i] >= 1:
-            # DEGRADED: Unidirectional OR quality poor OR borderline structural issues
+        elif unidirectional[i]:
+            # Predictions vary but stuck in one direction (structural blindness to market state)
+            modes.append('UNIDIRECTIONAL')
+        elif quality_degraded[i] or structural_consensus[i] >= 1:
+            # Predictions vary in both directions but poor quality (wrong magnitude/timing)
+            # OR borderline structural issues (1/3 checks failed)
             modes.append('DEGRADED')
         else:
+            # Best: Predictions vary appropriately with good quality
             modes.append('HEALTHY')
     
     modes = np.array(modes)
@@ -722,6 +724,8 @@ def detect_model_collapse(predictions, actuals, dates, window=60):
                     symbol = "[ OK ]"
                 elif current_mode == 'DEGRADED':
                     symbol = "[DEGD]"
+                elif current_mode == 'UNIDIRECTIONAL':
+                    symbol = "[UNI ]"
                 elif current_mode == 'WEAK_COLLAPSE':
                     symbol = "[WEAK]"
                 else:  # STRONG_COLLAPSE
@@ -774,6 +778,8 @@ def detect_model_collapse(predictions, actuals, dates, window=60):
             symbol = "[ OK ]"
         elif current_mode == 'DEGRADED':
             symbol = "[DEGD]"
+        elif current_mode == 'UNIDIRECTIONAL':
+            symbol = "[UNI ]"
         elif current_mode == 'WEAK_COLLAPSE':
             symbol = "[WEAK]"
         else:
@@ -801,6 +807,7 @@ def detect_model_collapse(predictions, actuals, dates, window=60):
     # Calculate summary statistics by mode
     healthy_days = int(np.sum(modes == 'HEALTHY'))
     degraded_days = int(np.sum(modes == 'DEGRADED'))
+    unidirectional_days = int(np.sum(modes == 'UNIDIRECTIONAL'))
     weak_collapse_days = int(np.sum(modes == 'WEAK_COLLAPSE'))
     strong_collapse_days = int(np.sum(modes == 'STRONG_COLLAPSE'))
     total_days = len(modes)
@@ -818,7 +825,7 @@ def detect_model_collapse(predictions, actuals, dates, window=60):
     
     # Determine overall status
     collapse_detected = strong_collapse_days > 0 or weak_collapse_days > 0
-    degradation_detected = degraded_days > 0
+    degradation_detected = degraded_days > 0 or unidirectional_days > 0
     
     return {
         'collapse_detected': collapse_detected,
@@ -828,11 +835,13 @@ def detect_model_collapse(predictions, actuals, dates, window=60):
         'mode_stats': {
             'healthy_days': healthy_days,
             'degraded_days': degraded_days,
+            'unidirectional_days': unidirectional_days,
             'weak_collapse_days': weak_collapse_days,
             'strong_collapse_days': strong_collapse_days,
             'total_days': total_days,
             'healthy_pct': healthy_days / total_days * 100,
             'degraded_pct': degraded_days / total_days * 100,
+            'unidirectional_pct': unidirectional_days / total_days * 100,
             'weak_collapse_pct': weak_collapse_days / total_days * 100,
             'strong_collapse_pct': strong_collapse_days / total_days * 100,
         },
@@ -1047,12 +1056,16 @@ def create_performance_plots(actuals, strategy_returns, dates, output_dir, colla
                 color, alpha = 'yellow', 0.12
                 label = 'Degraded' if 'Degraded' not in added_labels else ''
                 added_labels.add('Degraded')
+            elif period['mode'] == 'UNIDIRECTIONAL':
+                color, alpha = 'gold', 0.15
+                label = 'Unidirectional' if 'Unidirectional' not in added_labels else ''
+                added_labels.add('Unidirectional')
             elif period['mode'] == 'WEAK_COLLAPSE':
-                color, alpha = 'orange', 0.15
+                color, alpha = 'orange', 0.18
                 label = 'Weak collapse' if 'Weak collapse' not in added_labels else ''
                 added_labels.add('Weak collapse')
             else:  # STRONG_COLLAPSE
-                color, alpha = 'red', 0.2
+                color, alpha = 'red', 0.22
                 label = 'Strong collapse' if 'Strong collapse' not in added_labels else ''
                 added_labels.add('Strong collapse')
             
@@ -1154,7 +1167,7 @@ def create_performance_plots(actuals, strategy_returns, dates, output_dir, colla
 # ============================================================================
 
 def save_results(predictions, actuals, dates, metrics_stat, metrics_fin, 
-                 diagnostics, output_dir):
+                 diagnostics, collapse_diagnostics, output_dir):
     """Save all evaluation results."""
     # Create output directory
     os.makedirs(output_dir, exist_ok=True)
@@ -1203,6 +1216,9 @@ def save_results(predictions, actuals, dates, metrics_stat, metrics_fin,
         'statistical_metrics': metrics_stat,
         'financial_metrics': metrics_fin,
         'residual_diagnostics': diagnostics,
+        'mode_stats': collapse_diagnostics['mode_stats'],
+        'collapse_detected': collapse_diagnostics['collapse_detected'],
+        'degradation_detected': collapse_diagnostics['degradation_detected'],
     }
     
     # Save metrics JSON
@@ -1222,7 +1238,7 @@ def print_summary(metrics_stat, metrics_fin):
     print(f"  MSE:              {metrics_stat['mse']:.6f}")
     print(f"  RMSE:             {metrics_stat['rmse']:.6f}")
     print(f"  MAE:              {metrics_stat['mae']:.6f}")
-    print(f"  Out-of-sample R²: {metrics_stat['r2']:.4f}")
+    print(f"  Out-of-sample RÂ²: {metrics_stat['r2']:.4f}")
     
     print("\nFINANCIAL METRICS:")
     print(f"  Directional Acc:  {metrics_fin['directional_accuracy']:.2%}")
@@ -1494,11 +1510,12 @@ def evaluate():
     print("\nMode Distribution:")
     print(f"  HEALTHY:          {ms['healthy_days']:4d} days ({ms['healthy_pct']:5.1f}%)")
     print(f"  DEGRADED:         {ms['degraded_days']:4d} days ({ms['degraded_pct']:5.1f}%)")
+    print(f"  UNIDIRECTIONAL:   {ms['unidirectional_days']:4d} days ({ms['unidirectional_pct']:5.1f}%)")
     print(f"  WEAK_COLLAPSE:    {ms['weak_collapse_days']:4d} days ({ms['weak_collapse_pct']:5.1f}%)")
     print(f"  STRONG_COLLAPSE:  {ms['strong_collapse_days']:4d} days ({ms['strong_collapse_pct']:5.1f}%)")
     
-    problematic_days = ms['degraded_days'] + ms['weak_collapse_days'] + ms['strong_collapse_days']
-    problematic_pct = ms['degraded_pct'] + ms['weak_collapse_pct'] + ms['strong_collapse_pct']
+    problematic_days = ms['degraded_days'] + ms['unidirectional_days'] + ms['weak_collapse_days'] + ms['strong_collapse_days']
+    problematic_pct = ms['degraded_pct'] + ms['unidirectional_pct'] + ms['weak_collapse_pct'] + ms['strong_collapse_pct']
     
     print(f"\n  Total problematic: {problematic_days:4d} days ({problematic_pct:.1f}%)")
     
@@ -1520,10 +1537,7 @@ def evaluate():
     # Save results
     print("Saving results...")
     all_metrics = save_results(predictions, actuals, dates, metrics_stat, 
-                                metrics_fin, diagnostics, output_dir)
-    
-    # Add collapse diagnostics to saved metrics
-    all_metrics['collapse_diagnostics'] = collapse_diagnostics
+                                metrics_fin, diagnostics, collapse_diagnostics, output_dir)
     
     # Add checkpoint info to saved metrics
     all_metrics['checkpoint_used'] = checkpoint_path

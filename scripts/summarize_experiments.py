@@ -105,21 +105,29 @@ def extract_experiment_data(exp_path):
         data['auc_roc'] = fin.get('auc_roc')
         data['alpha'] = fin.get('alpha')
         
-        # Mode statistics (from new 4-mode quality detection)
+        # Mode statistics (from 4-mode quality detection system)
         if 'mode_stats' in eval_data:
             mode_stats = eval_data['mode_stats']
             data['healthy_pct'] = mode_stats.get('healthy_pct')
             data['degraded_pct'] = mode_stats.get('degraded_pct')
+            data['unidirectional_pct'] = mode_stats.get('unidirectional_pct')
             data['weak_collapse_pct'] = mode_stats.get('weak_collapse_pct')
             data['strong_collapse_pct'] = mode_stats.get('strong_collapse_pct')
             data['healthy_days'] = mode_stats.get('healthy_days')
             data['degraded_days'] = mode_stats.get('degraded_days')
+            data['unidirectional_days'] = mode_stats.get('unidirectional_days')
             data['weak_collapse_days'] = mode_stats.get('weak_collapse_days')
             data['strong_collapse_days'] = mode_stats.get('strong_collapse_days')
-        
-        # Collapse detection flags
-        data['has_collapse'] = eval_data.get('collapse_detected', False)
-        data['has_degradation'] = eval_data.get('degradation_detected', False)
+            
+            # Compute boolean quality flags from mode percentages
+            data['has_any_collapse'] = (mode_stats.get('weak_collapse_pct', 0) + mode_stats.get('strong_collapse_pct', 0)) > 0
+            data['has_strong_collapse'] = mode_stats.get('strong_collapse_pct', 0) > 0
+            data['has_degradation'] = mode_stats.get('degraded_pct', 0) > 0
+            data['has_unidirectional'] = mode_stats.get('unidirectional_pct', 0) > 0
+            data['problematic_pct'] = (mode_stats.get('degraded_pct', 0) + 
+                                       mode_stats.get('unidirectional_pct', 0) +
+                                       mode_stats.get('weak_collapse_pct', 0) + 
+                                       mode_stats.get('strong_collapse_pct', 0))
         
         # Enhanced collapse detection from confusion matrix
         if 'confusion_matrix' in fin:
@@ -389,10 +397,12 @@ def main():
         'best_val_loss', 'total_epochs', 'early_stopped',
         'test_mse', 'test_rmse', 'test_r2',
         'dir_acc', 'sharpe_ratio', 'auc_roc', 'alpha',
-        'healthy_pct', 'degraded_pct', 'weak_collapse_pct', 'strong_collapse_pct',
-        'has_collapse', 'has_degradation',
+        # 5-mode quality metrics (PRIMARY)
+        'healthy_pct', 'degraded_pct', 'unidirectional_pct', 'weak_collapse_pct', 'strong_collapse_pct', 'problematic_pct',
+        'has_any_collapse', 'has_strong_collapse', 'has_degradation', 'has_unidirectional',
+        # Prediction characteristics
         'pred_std', 'num_unique', 'pct_positive', 'pct_negative',
-        'composite_score', 'collapsed', 'evaluated'
+        'composite_score', 'evaluated'
     ]
     # Only include columns that exist
     key_metrics_cols = [c for c in key_metrics_cols if c in df.columns]
