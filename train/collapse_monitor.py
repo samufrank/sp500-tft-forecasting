@@ -107,7 +107,9 @@ class CollapseMonitor(Callback):
         all_predictions = []
         
         with torch.no_grad():
+            batch_count = 0
             for batch in self.val_dataloader:
+                batch_count += 1
                 x, y = batch
                 
                 # Move batch to device
@@ -125,9 +127,14 @@ class CollapseMonitor(Callback):
                     preds = output[:, 0, 3]
                     
                 all_predictions.append(preds.cpu().numpy())
-       
+
+        print(f"  [DEBUG] Processed {batch_count} batches from val_dataloader")
+           
         predictions = np.concatenate(all_predictions)
-        
+        print(f"  [DEBUG] Predictions shape after concat: {predictions.shape}")
+        print(f"  [DEBUG] All predictions list length: {len(all_predictions)}")
+        print(f"  [DEBUG] First batch shape: {all_predictions[0].shape if all_predictions else 'empty'}")
+
         # Compute diversity metrics
         pred_std = np.std(predictions)
         pred_range = np.ptp(predictions)
@@ -149,6 +156,11 @@ class CollapseMonitor(Callback):
         print(f"  Pos: {pct_pos:.1f}%, Neg: {pct_neg:.1f}%, "
               f"Unique: {n_unique}")
             
+        # Save actual predictions for debugging
+        pred_save_path = self.log_dir / f'val_predictions_epoch{trainer.current_epoch}.npy'
+        np.save(pred_save_path, predictions)
+        print(f"  Saved validation predictions to: {pred_save_path}")
+
     def _log_gradient_flow(self, pl_module):
         """Log gradient magnitudes by layer using stored gradients from training."""
         epoch = len(self.history['epoch']) - 1

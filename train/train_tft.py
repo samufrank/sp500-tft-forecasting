@@ -45,7 +45,7 @@ torch.set_float32_matmul_precision('medium')  # high for even faster, but slight
 
 # --- device setup (macOS compatibility) ---
 if platform.system() == "Darwin" and torch.backends.mps.is_available():
-    print("\n[INFO] MPS detected but upsample ops unsupported â€” using CPU for stability.")
+    print("\n[INFO] MPS detected but upsample ops unsupported Ã¢â‚¬â€ using CPU for stability.")
     device = "cpu"
 else:
     device = "auto"  # let Lightning pick CUDA or CPU
@@ -320,7 +320,7 @@ def prepare_tft_data(train_df, val_df, args, features, add_staleness=True):
     staleness_cols = [c for c in train_df.columns if 'days_since' in c]
     if staleness_cols:
         print("\n" + "="*70)
-        print("NORMALIZING STALENESS FEATURES")
+        print("NORMALIZING STALENESS FEATURES (dividing by 30)")
         print("="*70)
         for col in staleness_cols:
             train_df[col] = train_df[col] / 30.0
@@ -376,7 +376,7 @@ def prepare_tft_data(train_df, val_df, args, features, add_staleness=True):
     validation = TimeSeriesDataSet.from_dataset(
         training,
         val_df,
-        predict=True,
+        predict=False,
         stop_randomization=True
     )
     
@@ -486,11 +486,37 @@ def train():
         print("  3. Manually delete the directory")
         return None, None
     
+    # Setup automatic logging to file
+    os.makedirs(output_dir, exist_ok=True)
+    log_file = os.path.join(output_dir, f'training_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log')
+    
+    class Tee:
+        """Redirect stdout/stderr to both console and file."""
+        def __init__(self, *files):
+            self.files = files
+        def write(self, obj):
+            for f in self.files:
+                f.write(obj)
+                f.flush()
+        def flush(self):
+            for f in self.files:
+                f.flush()
+    
+    log_handle = open(log_file, 'w', buffering=1)  # Line buffering
+    import sys
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
+    sys.stdout = Tee(original_stdout, log_handle)
+    sys.stderr = Tee(original_stderr, log_handle)
+    
     # Get features for this configuration
     features = get_features(args.feature_set, args.frequency, include_staleness=not args.no_staleness)
     
     print("="*70)
     print(f"Training TFT: {args.experiment_name}")
+    print("="*70)
+    print(f"Logging to: {log_file}")
+    print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("="*70)
     
     # Save configuration
@@ -523,8 +549,11 @@ def train():
         batch_size=args.batch_size,
         num_workers=0
     )
-    
+
     print(f"Batches per epoch: {len(train_dataloader)}")
+    print(f"[DEBUG] Validation batches: {len(val_dataloader)}")
+    print(f"[DEBUG] Validation dataset size: {len(validation)}")
+    print(f"[DEBUG] Batch size: {args.batch_size}")
     
     # Initialize model
     print("\nInitializing model...")
@@ -627,6 +656,9 @@ def train():
     print("="*70)
     print(f"\nBest model checkpoint: {checkpoint.best_model_path}")
     print(f"Best validation loss: {checkpoint.best_model_score:.6f}")
+    print(f"Completed at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Log saved to: {log_file}")
+    print("="*70)
 
 
     # --- Determine if early stopping triggered ---
@@ -649,6 +681,11 @@ def train():
     metrics_path = os.path.join(output_dir, 'final_metrics.json')
     with open(metrics_path, 'w') as f:
         json.dump(metrics, f, indent=2)
+    
+    # Close log file and restore stdout/stderr
+    sys.stdout = original_stdout
+    sys.stderr = original_stderr
+    log_handle.close()
     
     return tft, trainer
 
