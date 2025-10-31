@@ -320,6 +320,12 @@ def load_model(checkpoint_path):
     print(f"Loading model from: {checkpoint_path}")
     model = TemporalFusionTransformer.load_from_checkpoint(checkpoint_path)
     model.eval()
+    
+    # Move model to appropriate device
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = model.to(device)
+    print(f"Model moved to device: {device}")
+    
     return model
 
 
@@ -605,7 +611,7 @@ def plot_attention_heatmap(period_stats, feature_names, output_path):
     period_names = list(period_stats.keys())
     n_features = len(feature_names)
     
-    # Build matrix: periods × features
+    # Build matrix: periods Ã— features
     attention_matrix = np.zeros((len(period_names), n_features))
     for i, period in enumerate(period_names):
         attention_matrix[i] = period_stats[period]['mean_attention']
@@ -757,7 +763,7 @@ def print_summary(period_stats, comparisons):
     for period, stats in period_stats.items():
         print(f"\n{period}:")
         print(f"  Samples: {stats['n_samples']}")
-        print(f"  Entropy: {stats['entropy_mean']:.4f} ± {stats['entropy_std']:.4f}")
+        print(f"  Entropy: {stats['entropy_mean']:.4f} Â± {stats['entropy_std']:.4f}")
         print(f"  Concentration: {stats['attention_concentration']:.4f}")
         print(f"  Top 5 features:")
         for feat, weight in stats['top_features']:

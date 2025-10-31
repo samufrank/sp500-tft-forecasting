@@ -240,11 +240,19 @@ def load_test_data(config, test_split_path=None):
         train_df = add_staleness_features(train_df, verbose=False)
         test_df = add_staleness_features(test_df, verbose=False)
         
-        # Apply same normalization as training
+        # Apply same log normalization as training
         staleness_cols = [c for c in train_df.columns if 'days_since' in c]
-        for col in staleness_cols:
-            train_df[col] = train_df[col] / 30.0
-            test_df[col] = test_df[col] / 30.0
+        if staleness_cols:
+            # Calculate max from actual data (same as training)
+            max_train = train_df[staleness_cols].max().max()
+            max_test = test_df[staleness_cols].max().max()
+            MAX_DAYS_STALE = np.ceil(max(max_train, max_test)) + 5
+            
+            print(f"Normalizing staleness features with max={MAX_DAYS_STALE:.0f} days")
+            
+            for col in staleness_cols:
+                train_df[col] = np.log1p(train_df[col]) / np.log1p(MAX_DAYS_STALE)
+                test_df[col] = np.log1p(test_df[col]) / np.log1p(MAX_DAYS_STALE)
     
     return train_df, test_df
 
@@ -336,7 +344,8 @@ def generate_predictions(model, test_dataset, batch_size=128):
     test_dataloader = test_dataset.to_dataloader(
         train=False,
         batch_size=batch_size,
-        num_workers=0
+        num_workers=4,
+        persistent_workers=True
     )
     
     # DEBUG
@@ -961,6 +970,85 @@ def create_diagnostic_plots(predictions, actuals, dates, output_dir):
     print(f"Quality diagnostic plots saved to: {output_dir}/quality_diagnostics.png")
 
 
+def create_regression_diagnostic_plots(predictions, actuals, dates, output_dir):
+    """
+    Create classic regression diagnostic plots (4-panel layout).
+    
+    Standard ML regression diagnostics:
+    1. Actual vs Predicted scatter
+    2. Residuals over time
+    3. Residual distribution histogram
+    4. Q-Q plot for normality
+    """
+    errors = actuals - predictions
+    dates_dt = pd.to_datetime(dates)
+    
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    
+    # ========================================================================
+    # 1. ACTUAL VS PREDICTED
+    # ========================================================================
+    axes[0, 0].scatter(actuals, predictions, alpha=0.5, s=20, edgecolors='k', linewidths=0.5)
+    min_val = min(actuals.min(), predictions.min())
+    max_val = max(actuals.max(), predictions.max())
+    axes[0, 0].plot([min_val, max_val], [min_val, max_val], 'r--', lw=2, label='Perfect prediction')
+    axes[0, 0].set_xlabel('Actual Returns (%)')
+    axes[0, 0].set_ylabel('Predicted Returns (%)')
+    axes[0, 0].set_title('Actual vs Predicted')
+    axes[0, 0].legend()
+    axes[0, 0].grid(True, alpha=0.3)
+    
+    # ========================================================================
+    # 2. RESIDUALS OVER TIME
+    # ========================================================================
+    axes[0, 1].plot(dates_dt, errors, alpha=0.6, linewidth=0.8, color='steelblue')
+    axes[0, 1].axhline(y=0, color='r', linestyle='--', linewidth=2, label='Zero error')
+    axes[0, 1].set_xlabel('Date')
+    axes[0, 1].set_ylabel('Prediction Error (%)')
+    axes[0, 1].set_title('Residuals Over Time')
+    axes[0, 1].legend()
+    axes[0, 1].grid(True, alpha=0.3)
+    
+    # Format x-axis
+    import matplotlib.dates as mdates
+    axes[0, 1].xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+    axes[0, 1].xaxis.set_major_locator(mdates.MonthLocator(interval=6))
+    plt.setp(axes[0, 1].xaxis.get_majorticklabels(), rotation=45, ha='right')
+    
+    # ========================================================================
+    # 3. RESIDUAL DISTRIBUTION
+    # ========================================================================
+    axes[1, 0].hist(errors, bins=50, density=True, alpha=0.7, color='steelblue', edgecolor='black')
+    # Overlay normal distribution
+    mu, sigma = errors.mean(), errors.std()
+    x = np.linspace(errors.min(), errors.max(), 100)
+    axes[1, 0].plot(x, stats.norm.pdf(x, mu, sigma), 'r-', linewidth=2, label=f'Normal(μ={mu:.3f}, σ={sigma:.3f})')
+    axes[1, 0].set_xlabel('Prediction Error (%)')
+    axes[1, 0].set_ylabel('Density')
+    axes[1, 0].set_title('Residual Distribution')
+    axes[1, 0].legend()
+    axes[1, 0].grid(True, alpha=0.3)
+    
+    # ========================================================================
+    # 4. Q-Q PLOT
+    # ========================================================================
+    stats.probplot(errors, dist="norm", plot=axes[1, 1])
+    axes[1, 1].set_title('Q-Q Plot')
+    axes[1, 1].grid(True, alpha=0.3)
+    # Enhance Q-Q plot styling
+    axes[1, 1].get_lines()[0].set_markerfacecolor('steelblue')
+    axes[1, 1].get_lines()[0].set_markeredgecolor('black')
+    axes[1, 1].get_lines()[0].set_markersize(4)
+    axes[1, 1].get_lines()[1].set_color('red')
+    axes[1, 1].get_lines()[1].set_linewidth(2)
+    
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'diagnostic_plots.png'), dpi=150, bbox_inches='tight')
+    plt.close()
+    
+    print(f"Regression diagnostic plots saved to: {output_dir}/diagnostic_plots.png")
+
+
 def create_diagnostic_plots_OLD_BACKUP(predictions, actuals, dates, output_dir):
     """Create diagnostic plots."""
     errors = actuals - predictions
@@ -1238,7 +1326,7 @@ def print_summary(metrics_stat, metrics_fin):
     print(f"  MSE:              {metrics_stat['mse']:.6f}")
     print(f"  RMSE:             {metrics_stat['rmse']:.6f}")
     print(f"  MAE:              {metrics_stat['mae']:.6f}")
-    print(f"  Out-of-sample RÂ²: {metrics_stat['r2']:.4f}")
+    print(f"  Out-of-sample R²: {metrics_stat['r2']:.4f}")
     
     print("\nFINANCIAL METRICS:")
     print(f"  Directional Acc:  {metrics_fin['directional_accuracy']:.2%}")
@@ -1530,7 +1618,8 @@ def evaluate():
     
     # Create plots (pass collapse diagnostics for visual markers)
     print("Creating diagnostic plots...")
-    create_diagnostic_plots(predictions, actuals, dates, output_dir)
+    create_regression_diagnostic_plots(predictions, actuals, dates, output_dir)  # Classic 4-panel regression diagnostics
+    create_diagnostic_plots(predictions, actuals, dates, output_dir)  # Financial quality diagnostics
     create_performance_plots(actuals, strategy_returns, dates, output_dir, 
                            collapse_diagnostics=collapse_diagnostics)
     

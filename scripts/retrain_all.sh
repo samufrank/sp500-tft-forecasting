@@ -20,8 +20,9 @@ echo ""
 
 # Configuration
 CONFIG_FILE="experiments/experiment_configs.csv"
-SPLITS_DIR="data/splits/fixed"
-MAX_PARALLEL=2  
+SPLITS_DIR="data/splits"  # Base directory - alignment will be appended
+MAX_PARALLEL=10  # Number of parallel training jobs (adjust based on your hardware)
+LOG_DIR="logs/retrain"
 
 # Verify config file exists
 if [ ! -f "$CONFIG_FILE" ]; then
@@ -29,6 +30,11 @@ if [ ! -f "$CONFIG_FILE" ]; then
     echo "Run the Python script to generate it first"
     exit 1
 fi
+
+# Create log directory
+mkdir -p "$LOG_DIR"
+
+echo "Parallel execution: $MAX_PARALLEL jobs"
 
 # Function to wait for available training slot
 wait_for_slot() {
@@ -62,6 +68,7 @@ train_experiment() {
     local cmd="python train/train_tft.py \
         --experiment-name \"$full_exp_name\" \
         --splits-dir \"$SPLITS_DIR\" \
+        --alignment fixed \
         --frequency \"$frequency\" \
         --hidden-size $hidden_size \
         --dropout $dropout \
@@ -81,9 +88,9 @@ train_experiment() {
     fi
     
     # Execute training
-    eval $cmd > "logs/retrain_${phase}_${exp_name}.log" 2>&1
+    eval $cmd > "$LOG_DIR/train_${phase}_${exp_name}.log" 2>&1
     
-    echo "  ✓ Training complete: $full_exp_name"
+    echo "  Training complete: $full_exp_name"
 }
 
 # Function to evaluate a single experiment
@@ -96,13 +103,10 @@ evaluate_experiment() {
     
     python train/evaluate_tft.py \
         --experiment-name "$full_exp_name" \
-        > "logs/eval_${phase}_${exp_name}.log" 2>&1
+        > "$LOG_DIR/eval_${phase}_${exp_name}.log" 2>&1
     
-    echo "  ✓ Evaluation complete: $full_exp_name"
+    echo "  Evaluation complete: $full_exp_name"
 }
-
-# Create logs directory
-mkdir -p logs
 
 # ============================================================================
 # PARSE CSV AND RETRAIN ALL EXPERIMENTS
@@ -130,15 +134,36 @@ tail -n +2 "$CONFIG_FILE" | while IFS=',' read -r phase experiment frequency hid
     echo "[$COUNTER/$TOTAL_EXPS] Processing: ${phase}/${experiment}"
     
     # Wait for available slot if running in parallel
-    # wait_for_slot
+    wait_for_slot
     
-    # Train experiment (sequential for now - uncomment wait_for_slot and add & to parallelize)
+    # Train experiment in background for parallel execution
     train_experiment "$phase" "$experiment" "$frequency" "$hidden_size" "$dropout" \
         "$attention_heads" "$hidden_continuous" "$learning_rate" "$batch_size" \
         "$max_epochs" "$encoder_length" "$gradient_clip" "$early_stop_patience" \
-        "$has_staleness"
+        "$has_staleness" &
     
-    # Evaluate immediately after training
+    # Small delay to avoid race conditions
+    sleep 2
+    
+done
+
+# Wait for all training jobs to complete
+echo ""
+echo "Waiting for all training jobs to complete..."
+wait
+
+echo ""
+echo "All training complete. Starting evaluations..."
+echo ""
+
+# Now evaluate all experiments sequentially
+COUNTER=0
+tail -n +2 "$CONFIG_FILE" | while IFS=',' read -r phase experiment frequency hidden_size dropout attention_heads hidden_continuous learning_rate batch_size max_epochs encoder_length gradient_clip early_stop_patience has_staleness; do
+    
+    COUNTER=$((COUNTER + 1))
+    echo "[$COUNTER/$TOTAL_EXPS] Evaluating: ${phase}/${experiment}"
+    
+    # Evaluate experiment (sequential to avoid overloading)
     evaluate_experiment "$phase" "$experiment"
     
     echo ""
@@ -157,4 +182,9 @@ echo "Summary:"
 echo "  Total experiments: $TOTAL_EXPS"
 echo "  Phase 0 (baseline exploration): 57 experiments"
 echo "  Phase 1 (staleness features): 64 experiments"
+echo ""
+echo "Next:"
+echo "  1. Review logs in $LOG_DIR/ directory"
+echo "  2. Run python summarize_experiments.py"
+echo "  3. Run attention analysis"
 echo ""

@@ -45,6 +45,8 @@ For each experiment:
    - Top time step: most-attended position in lookback window
 5. Detected shifts between consecutive periods using 4 signals
 
+**Note:** These results reflect models retrained with proper validation procedures. The tight entropy variance in both phases (0.05-0.06) indicates proper training convergence compared to earlier runs.
+
 #### Shift Detection Methodology
 Multi-signal approach - shift detected if any of the following fire:
 
@@ -64,15 +66,16 @@ Very strong shifts: 3+ signals fired
 
 #### 1. Attention shifts align with market regime shifts (interesting note!)
 
-2022 to 2023 shows massive shift (43 experiments):
+2022 to 2023 shows massive shift (114 experiments):
 - Corresponds to Fed pivot from rate hikes to pause
 - Most common transition across all experiments
-- Primary signals: `top_timestep` (21), `l2_distance` (18)
+- Primary signals: `l2_distance`, `entropy`
 
 Other significant transitions:
-- 2023 to 2024: 32 experiments (post-pivot adjustment)
-- 2024 to 2025: 26 experiments (recent period)
-- 2021 to 2022: 24 experiments (end of COVID stimulus)
+- 2021 to 2022: 91 experiments (end of COVID stimulus)
+- 2020 to 2021: 74 experiments (pandemic market recovery)
+- 2024 to 2025: 73 experiments (recent period)
+- 2023 to 2024: 71 experiments (post-pivot adjustment)
 
 This implies models do detect regime changes (attention patterns shift) but cannot adapt predictions appropriately (still collapse).
 
@@ -83,47 +86,48 @@ Correlation analysis (attention metrics vs model performance):
 
 | Metric Pair                 | Correlation | Interpretation                                  |
 | --------------------------- | ----------- | ----------------------------------------------- |
-| std_entropy + healthy_pct   | -0.29       | Variable attention --> less healthy             |
-| entropy_trend + healthy_pct | +0.31       | Sharpening attention --> worse outcomes         |
-| std_entropy + pred_std      | +0.26       | Variable attention --> variable predictions     |
-| avg_entropy + dir_acc       | ~0.00       | Attention doesn’t predict accuracy              |
-| avg_entropy + sharpe_ratio  | ~0.00       | Attention doesn’t predict risk-adjusted returns |
+| std_entropy + healthy_pct   | +0.14       | Weak positive relationship                      |
+| std_entropy + degraded_pct  | +0.13       | Weak positive relationship                      |
+| entropy_trend + healthy_pct | +0.11       | Weak positive relationship                      |
+| std_entropy + pred_std      | +0.14       | Variable attention → variable predictions       |
+| avg_entropy + dir_acc       | -0.01       | Attention doesn’t predict accuracy              |
+| avg_entropy + sharpe_ratio  | +0.00       | Attention doesn’t predict risk-adjusted returns |
 
-All correlations weak (|r| < 0.31), explaining <10% of variance.
+All correlations weak (|r| < 0.15), explaining <2.5% of variance.
 
-Attention patterns appear to be a symptom of model behavior, not a cause of collapse. The model’s attention mechanism detects important changes but the output layer cannot adapt appropriately.
+Attention patterns show no meaningful predictive relationship with collapse. The’s attention mechanism detects important changes but the output layer cannot adapt appropriately.
 
 
 #### 3. Staleness features impact
 
 Entropy (attention diffusion):
-- Phase 0: Mean = 3.09 ± 0.37 (wide variance, many outliers)
-- Phase 1: Mean = 2.97 ± 0.06 (tight distribution, almost no variance)
-- Finding: Staleness features reduce entropy variance by 6x
+- Phase 0: Mean = 2.90 ± 0.06 (narrow variance)
+- Phase 1: Mean = 2.79 ± 0.05 (tight distribution, slightly tighter)
+- Finding: Staleness features reduce entropy and slightly tighten variance
 
 Concentration (focus on top timesteps):
-- Phase 0: Mean = 0.047 ± 0.015
-- Phase 1: Mean = 0.051 ± 0.004
-- Finding: Nearly identical, but Phase 1 more consistent
+- Phase 0: Mean = 0.053 ± 0.022
+- Phase 1: Mean = 0.057 ± 0.013
+- Finding: Phase 1 slightly more concentrated with tighter distribution
 
 Interpretation: 
-- Staleness features make attention more consistent (less variance)
-- But this consistency doesn't help performance - Phase 1 has worse collapse rates
-- Over-regularization may prevent adaptive attention behavior
+- Both phases show tight attention variance (proper training convergence)
+- Phase 1 has slightly lower entropy (more focused) and tighter concentration variance
+- This modest constraint doesn't improve performance - Phase 1 has worse collapse rates
 
 
 #### 4. Multi-Signal shift detection
 
 Overall statistics:
-- 142 total shifts detected across 55 experiments (45% of models)
-- 64 high-confidence shifts (2+ signals)
-- 15 very strong shifts (3+ signals)
+- 423 total shifts detected across 119 experiments (98% of models)
+- 220 high-confidence shifts (2+ signals)
+- 47 very strong shifts (3+ signals)
 
 Signal effectiveness (% of shifts where signal fired):
-- Top timestep: Most informative for strategy changes
-- L2 distance: Good for magnitude changes
-- Entropy: Captures focus sharpening/diffusion
-- Cosine: Least sensitive (high baseline similarity)
+- Entropy: 81.1% - Captures focus sharpening/diffusion (most sensitive)
+- L2 distance: 56.3% - Good for magnitude changes
+- Top timestep: 20.6% - Detects strategy changes
+- Cosine: 5.9% - Least sensitive (high baseline similarity)
 
 Most notable shifts (3+ signals):
 - Typically occur at major regime boundaries (2022, 2023)
@@ -222,7 +226,7 @@ attention_metrics_by_phase.png:
 - 2×2 grid comparing Phase 0 vs Phase 1
 - Top row: Entropy (bar chart with error bars + violin plot)
 - Bottom row: Concentration (same format)
-- Shows how phase 1 has much tighter distributions
+- Shows both phases have similar distributions with Phase 1 slightly tighter
 
 attention_shift_timeline.png:
 - Bar chart of shift frequency by consecutive year transitions

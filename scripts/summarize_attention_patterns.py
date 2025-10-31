@@ -58,7 +58,9 @@ def find_attention_results(paths):
     --------
     dict: {experiment_name: result_file_path}
     """
+    import re
     results = {}
+    phase_pattern = re.compile(r'^\d{2}_')  # Pattern for phase directories like 00_, 01_, etc.
     
     for path_pattern in paths:
         # Expand globs
@@ -73,22 +75,30 @@ def find_attention_results(paths):
                 print(f"Warning: Path does not exist: {path}")
                 continue
             
+            # Check if this path itself is a phase directory
+            is_phase_dir = phase_pattern.match(path.name)
+            
             # Search for attention_analysis_*/attention_analysis_results.json
             if path.is_file() and path.name == 'attention_analysis_results.json':
                 # Direct file provided
                 exp_name = path.parent.parent.name
+                if is_phase_dir:
+                    exp_name = f"{path.name}/{exp_name}"
                 results[exp_name] = path
             else:
                 # Directory - search recursively
                 for result_file in path.rglob('attention_analysis_*/attention_analysis_results.json'):
                     # Extract experiment name from path
                     # e.g., experiments/00_baseline/sweep2_h16/attention_analysis_year/results.json
-                    # -> 00_baseline/sweep2_h16
                     exp_path = result_file.relative_to(path).parts
                     if len(exp_path) >= 3:
                         exp_name = '/'.join(exp_path[:-2])  # Remove attention_analysis_*/ and filename
                     else:
                         exp_name = result_file.parent.parent.name
+                    
+                    # If we're searching within a phase directory, prepend the phase name
+                    if is_phase_dir:
+                        exp_name = f"{path.name}/{exp_name}"
                     
                     results[exp_name] = result_file
     

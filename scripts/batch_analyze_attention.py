@@ -96,17 +96,17 @@ def run_attention_analysis(experiment_path, output_subdir='attention_analysis_ye
             check=True
         )
         
-        print(f"✓ Success: {experiment_path}")
+        print(f" Success: {experiment_path}")
         return True, None
         
     except subprocess.CalledProcessError as e:
         error_msg = e.stderr if e.stderr else str(e)
-        print(f"✗ Failed: {experiment_path}")
+        print(f"  Failed: {experiment_path}")
         print(f"  Error: {error_msg[:200]}")  # First 200 chars
         return False, error_msg
     
     except Exception as e:
-        print(f"✗ Failed: {experiment_path}")
+        print(f"  Failed: {experiment_path}")
         print(f"  Error: {str(e)}")
         return False, str(e)
 
@@ -154,7 +154,7 @@ def main():
         
         # Check if results already exist
         if not args.force and has_existing_results(exp_path, args.output_subdir):
-            print(f"⊘ Skipping (results exist): {exp_path}")
+            print(f Skipping (results exist): {exp_path}")
             results['skipped'].append(exp_path)
             continue
         

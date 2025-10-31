@@ -45,7 +45,7 @@ torch.set_float32_matmul_precision('medium')  # high for even faster, but slight
 
 # --- device setup (macOS compatibility) ---
 if platform.system() == "Darwin" and torch.backends.mps.is_available():
-    print("\n[INFO] MPS detected but upsample ops unsupported Ã¢â‚¬â€ using CPU for stability.")
+    print("\n[INFO] MPS detected but upsample ops unsupported, using CPU for stability.")
     device = "cpu"
 else:
     device = "auto"  # let Lightning pick CUDA or CPU
@@ -320,11 +320,23 @@ def prepare_tft_data(train_df, val_df, args, features, add_staleness=True):
     staleness_cols = [c for c in train_df.columns if 'days_since' in c]
     if staleness_cols:
         print("\n" + "="*70)
-        print("NORMALIZING STALENESS FEATURES (dividing by 30)")
+        print("NORMALIZING STALENESS FEATURES (log transform)")
         print("="*70)
+        
+        # Calculate max from actual data to handle both vintage and fixed alignments
+        max_train = train_df[staleness_cols].max().max()
+        max_val = val_df[staleness_cols].max().max()
+        MAX_DAYS_STALE = np.ceil(max(max_train, max_val)) + 5  # Add 5-day buffer
+        
+        print(f"Max staleness observed: train={max_train:.0f}, val={max_val:.0f}")
+        print(f"Using normalization max: {MAX_DAYS_STALE:.0f} days")
+        print()
+        
         for col in staleness_cols:
-            train_df[col] = train_df[col] / 30.0
-            val_df[col] = val_df[col] / 30.0
+            # Log transform: log(1 + days) / log(1 + max_days)
+            # Maps [0, max_days] → [0, 1] with compression of large values
+            train_df[col] = np.log1p(train_df[col]) / np.log1p(MAX_DAYS_STALE)
+            val_df[col] = np.log1p(val_df[col]) / np.log1p(MAX_DAYS_STALE)
         
         # Print after normalization
         print("\nSTALENESS FEATURES - AFTER MANUAL NORMALIZATION")
@@ -542,12 +554,17 @@ def train():
     train_dataloader = training.to_dataloader(
         train=True, 
         batch_size=args.batch_size,
-        num_workers=0  # Set to 0 for reproducibility
+        num_workers=4,
+        persistent_workers=True,
+        pin_memory=True,
+        prefetch_factor = 2
     )
     val_dataloader = validation.to_dataloader(
         train=False,
         batch_size=args.batch_size,
-        num_workers=0
+        num_workers=2,
+        persistent_workers=True,
+        pin_memory=True
     )
 
     print(f"Batches per epoch: {len(train_dataloader)}")
