@@ -322,17 +322,86 @@ def prepare_test_dataset(train_df, test_df, config):
 # MODEL LOADING
 # ============================================================================
 
-def load_model(checkpoint_path):
+def load_model(checkpoint_path, config):
     """Load trained TFT model from checkpoint."""
     if not os.path.exists(checkpoint_path):
         raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
     
-    # Load model
-    model = TemporalFusionTransformer.load_from_checkpoint(checkpoint_path)
+    # Check if this model used distribution loss
+    training_config = config.get('training', {})
+    mean_weight = training_config.get('dist_loss_mean_weight', 0.0)
+    std_weight = training_config.get('dist_loss_std_weight', 0.0)
+    uses_dist_loss = mean_weight > 0 or std_weight > 0
+    
+    if not uses_dist_loss:
+        # Normal loading for models without distribution loss
+        model = TemporalFusionTransformer.load_from_checkpoint(checkpoint_path)
+        model.eval()
+        return model
+    
+    # Distribution loss models: need custom unpickling
+    print(f"  Loading distribution loss checkpoint (bypassing corrupted loss)...")
+    
+    import torch
+    import pickle
+    import io
+    import zipfile
+    import tempfile
+    
+    # PyTorch 1.x uses different checkpoint structure - check format
+    # Try to load as regular pickle first, fall back to ZIP if needed
+    
+    # Custom unpickler that creates fresh QuantileLoss instances
+    class FixedUnpickler(pickle.Unpickler):
+        def find_class(self, module, name):
+            if name == 'QuantileLoss' and 'pytorch_forecasting' in module:
+                from pytorch_forecasting.metrics import QuantileLoss
+                return QuantileLoss
+            return super().find_class(module, name)
+    
+    try:
+        # Try loading as direct pickle (PyTorch 1.x format)
+        with open(checkpoint_path, 'rb') as f:
+            checkpoint = FixedUnpickler(f).load()
+    except (pickle.UnpicklingError, zipfile.BadZipFile, Exception) as e:
+        # Might be ZIP format or different structure
+        print(f"  Direct unpickling failed, checkpoint may be unfixable: {e}")
+        raise RuntimeError(
+            f"Cannot load checkpoint with monkey-patched loss. "
+            f"The checkpoint is corrupted beyond repair. "
+            f"Recommendation: Retrain this experiment without distribution loss, "
+            f"or skip distribution loss analysis for Phase 3."
+        )
+    
+    # Fix hyperparameters if loss object exists
+    if 'hyper_parameters' in checkpoint and 'loss' in checkpoint['hyper_parameters']:
+        from pytorch_forecasting.metrics import QuantileLoss
+        checkpoint['hyper_parameters']['loss'] = QuantileLoss()
+    
+    # Save fixed checkpoint temporarily
+    with tempfile.NamedTemporaryFile(suffix='.ckpt', delete=False) as tmp:
+        tmp_path = tmp.name
+    
+    try:
+        torch.save(checkpoint, tmp_path)
+        model = TemporalFusionTransformer.load_from_checkpoint(tmp_path)
+    finally:
+        os.unlink(tmp_path)
+    
     model.eval()
     
+    # Re-apply distribution penalties
+    from loss_wrapper import add_distribution_penalties
+    model = add_distribution_penalties(
+        model,
+        mean_weight=mean_weight,
+        std_weight=std_weight,
+        target_mean=training_config.get('dist_loss_target_mean', 0.0003),
+        target_std=training_config.get('dist_loss_target_std', 0.01)
+    )
+    print(f"  Re-applied distribution penalties: mean_weight={mean_weight}, std_weight={std_weight}")
+    
     return model
-
 
 # ============================================================================
 # PREDICTION
@@ -1498,7 +1567,7 @@ def evaluate():
     
     # Load model
     print(f"Loading model from checkpoint...")
-    model = load_model(checkpoint_path)
+    model = load_model(checkpoint_path, config)
     
     # Generate predictions
     print("Generating predictions...")
