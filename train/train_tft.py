@@ -37,58 +37,8 @@ warnings.filterwarnings('ignore', category=FutureWarning)
 
 # in same /train dir
 from collapse_monitor import CollapseMonitor
-
-
-# --- enable Tensor Core optimization for RTX 3070 ---
-torch.set_float32_matmul_precision('medium')  # high for even faster, but slightly less precise
-
-
-# --- device setup (macOS compatibility) ---
-if platform.system() == "Darwin" and torch.backends.mps.is_available():
-    print("\n[INFO] MPS detected but upsample ops unsupported, using CPU for stability.")
-    device = "cpu"
-else:
-    device = "auto"  # let Lightning pick CUDA or CPU
-    print(f"\n[INFO] Using {device.upper()} device selection.")
-
-
-# --- plot safety patch: prevent early-epoch plots from crashing on negative yerr ---
-try:
-    from matplotlib.axes import _axes as _mpl_axes
-
-    _orig_errorbar = _mpl_axes.Axes.errorbar
-    def _safe_errorbar(self, x, y, yerr=None, *args, **kwargs):
-        # matplotlib expects yerr as magnitudes; if PF hands us negatives, make them magnitudes
-        if yerr is not None:
-            yerr_arr = np.asarray(yerr)
-            if (yerr_arr < 0).any():
-                yerr = np.abs(yerr_arr)
-        return _orig_errorbar(self, x, y, yerr=yerr, *args, **kwargs)
-
-    _mpl_axes.Axes.errorbar = _safe_errorbar
-    print("\n[INFO] Patched matplotlib.Axes.errorbar to abs() negative yerr for robustness.")
-except Exception as e:
-    print(f"\n[WARN] Could not patch matplotlib errorbar: {e}")
+from callbacks import EpochSummaryCallback, DistributionLossLogger
     
-
-# ============================================================================
-# Callbacks
-# ============================================================================
-
-from pytorch_lightning.callbacks import Callback
-
-class EpochSummaryCallback(Callback):
-    def on_train_epoch_end(self, trainer, pl_module):
-        metrics = trainer.callback_metrics
-        epoch = trainer.current_epoch
-        train_loss = metrics.get('train_loss_epoch', metrics.get('train_loss', 'N/A'))
-        print(f"Epoch {epoch}: train_loss={train_loss:.4f}" if isinstance(train_loss, float) else f"Epoch {epoch}: train_loss={train_loss}")
-    
-    def on_validation_epoch_end(self, trainer, pl_module):
-        metrics = trainer.callback_metrics
-        epoch = trainer.current_epoch
-        val_loss = metrics.get('val_loss', 'N/A')
-        print(f"Epoch {epoch}: val_loss={val_loss:.4f}" if isinstance(val_loss, float) else f"Epoch {epoch}: val_loss={val_loss}")
 
 
 # ============================================================================
@@ -159,6 +109,13 @@ def parse_args():
     # Collapse monitor
     parser.add_argument('--monitor-every-n-epochs', type=int, default=1,
                    help='How often to run collapse monitoring')
+
+
+    # anti-collapse loss
+    parser.add_argument('--dist-loss-mean-weight', type=float, default=0.0,
+                    help='Anti-drift penalty weight (0=disabled, typical: 0.1-0.2)')
+    parser.add_argument('--dist-loss-std-weight', type=float, default=0.0,
+                    help='Anti-collapse penalty weight (0=disabled, typical: 0.1-0.2)')
     
     return parser.parse_args()
 
@@ -399,7 +356,7 @@ def prepare_tft_data(train_df, val_df, args, features, add_staleness=True):
 # ============================================================================
 
 def create_model(training_dataset, args):
-    """Initialize TFT model."""
+    """Initialize TFT model with standard QuantileLoss."""
     tft = TemporalFusionTransformer.from_dataset(
         training_dataset,
         learning_rate=args.learning_rate,
@@ -407,7 +364,7 @@ def create_model(training_dataset, args):
         attention_head_size=args.attention_heads,
         dropout=args.dropout,
         hidden_continuous_size=args.hidden_continuous_size,
-        output_size=7,  # 7 quantiles for probabilistic forecasting
+        output_size=7,
         loss=QuantileLoss(),
         log_interval=10,
         reduce_on_plateau_patience=4,
@@ -520,6 +477,37 @@ def train():
     original_stderr = sys.stderr
     sys.stdout = Tee(original_stdout, log_handle)
     sys.stderr = Tee(original_stderr, log_handle)
+
+    # --- enable Tensor Core optimization for RTX 3070 ---
+    torch.set_float32_matmul_precision('medium')  # high for even faster, but slightly less precise
+
+
+    # --- device setup (macOS compatibility) ---
+    if platform.system() == "Darwin" and torch.backends.mps.is_available():
+        print("\n[INFO] MPS detected but upsample ops unsupported, using CPU for stability.")
+        device = "cpu"
+    else:
+        device = "auto"  # let Lightning pick CUDA or CPU
+        print(f"\n[INFO] Using {device.upper()} device selection.")
+
+
+    # --- plot safety patch: prevent early-epoch plots from crashing on negative yerr ---
+    try:
+        from matplotlib.axes import _axes as _mpl_axes
+
+        _orig_errorbar = _mpl_axes.Axes.errorbar
+        def _safe_errorbar(self, x, y, yerr=None, *args, **kwargs):
+            # matplotlib expects yerr as magnitudes; if PF hands us negatives, make them magnitudes
+            if yerr is not None:
+                yerr_arr = np.asarray(yerr)
+                if (yerr_arr < 0).any():
+                    yerr = np.abs(yerr_arr)
+            return _orig_errorbar(self, x, y, yerr=yerr, *args, **kwargs)
+
+        _mpl_axes.Axes.errorbar = _safe_errorbar
+        print("\n[INFO] Patched matplotlib.Axes.errorbar to abs() negative yerr for robustness.")
+    except Exception as e:
+        print(f"\n[WARN] Could not patch matplotlib errorbar: {e}")
     
     # Get features for this configuration
     features = get_features(args.feature_set, args.frequency, include_staleness=not args.no_staleness)
@@ -554,16 +542,16 @@ def train():
     train_dataloader = training.to_dataloader(
         train=True, 
         batch_size=args.batch_size,
-        num_workers=4,
-        persistent_workers=True,
+        num_workers=0,
+        persistent_workers=False,
         pin_memory=True,
         prefetch_factor = 2
     )
     val_dataloader = validation.to_dataloader(
         train=False,
         batch_size=args.batch_size,
-        num_workers=2,
-        persistent_workers=True,
+        num_workers=0,
+        persistent_workers=False,
         pin_memory=True
     )
 
@@ -575,6 +563,23 @@ def train():
     # Initialize model
     print("\nInitializing model...")
     tft = create_model(training, args)
+    
+    # Optionally add distribution penalties
+    if args.dist_loss_mean_weight > 0 or args.dist_loss_std_weight > 0:
+        from loss_wrapper import add_distribution_penalties
+        tft = add_distribution_penalties(
+            tft,
+            mean_weight=args.dist_loss_mean_weight,
+            std_weight=args.dist_loss_std_weight,
+            target_mean=0.0003,
+            target_std=0.01
+        )
+        print(f"\n>>> Distribution penalties enabled:")
+        print(f"    mean_weight={args.dist_loss_mean_weight}")
+        print(f"    std_weight={args.dist_loss_std_weight}")
+    else:
+        print("\n>>> Using standard QuantileLoss (no distribution penalties)")
+    
     print(f"Model parameters: {sum(p.numel() for p in tft.parameters()):,}")
     
     # Setup callbacks
@@ -601,11 +606,23 @@ def train():
     )
     
     from pytorch_lightning.loggers import CSVLogger, TensorBoardLogger
-    # Setup both loggers so you get numeric metrics + figures
+    # Setup both loggers to get numeric metrics + figures
     csv_logger = CSVLogger("experiments", name=args.experiment_name)
     tb_logger = TensorBoardLogger("experiments", name=args.experiment_name)
     # Ensure tb_logger is first so figure logging is prioritized
     logger = [tb_logger, csv_logger]
+
+    # build callback list
+    callbacks = [
+        early_stop,
+        checkpoint,
+        EpochSummaryCallback(),
+        collapse_monitor
+    ]
+
+    # add distribution loss logger if using custom loss
+    if args.dist_loss_mean_weight > 0 or args.dist_loss_std_weight > 0:
+        callbacks.append(DistributionLossLogger())
     
     trainer = pl.Trainer(
         logger=logger,
@@ -613,7 +630,7 @@ def train():
         accelerator=device,
         devices=1,
         gradient_clip_val=args.gradient_clip,
-        callbacks=[early_stop, checkpoint, EpochSummaryCallback(), collapse_monitor],
+        callbacks=callbacks,
         deterministic=False,
         strategy="auto",
         enable_progress_bar=False,

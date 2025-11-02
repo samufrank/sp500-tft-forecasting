@@ -10,7 +10,6 @@
 # 3. Evaluates each experiment after training
 # 4. Preserves exact naming and directory structure
 
-#set -e  # Exit on error
 
 echo "========================================================================"
 echo "MASTER RETRAINING SCRIPT - ALL PHASES"
@@ -182,9 +181,4 @@ echo "Summary:"
 echo "  Total experiments: $TOTAL_EXPS"
 echo "  Phase 0 (baseline exploration): 57 experiments"
 echo "  Phase 1 (staleness features): 64 experiments"
-echo ""
-echo "Next:"
-echo "  1. Review logs in $LOG_DIR/ directory"
-echo "  2. Run python summarize_experiments.py"
-echo "  3. Run attention analysis"
 echo ""
