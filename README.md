@@ -2,7 +2,7 @@
 
 Research implementation examining whether attention-based Transformers can effectively model macro-market relationships for financial return prediction. This work focuses on the challenge of mixed-frequency data integration—combining daily market indicators (VIX, Treasury yields) with monthly macroeconomic releases (CPI, unemployment) that exhibit explicit staleness between updates.
 
-## Key Features
+## Key features
 
 - **Temporal Fusion Transformer** implementation using pytorch-forecasting
 - **Mixed-frequency data handling** with proper release date alignment to prevent look-ahead bias
@@ -28,7 +28,7 @@ pip install -r requirements.txt
 
 **Critical:** Project requires `pytorch-lightning==1.9.5` and `pytorch-forecasting==0.10.3` due to breaking API changes in Lightning 2.x. These versions are locked in `requirements.txt`.
 
-## Quick Start
+## Quick start
 
 ```bash
 # 1. Create train/val/test splits
@@ -45,7 +45,7 @@ python scripts/summarize_experiments.py
 python scripts/list_checkpoints.py my_experiment
 ```
 
-## Project Structure
+## Project structure
 
 ```
 sp500-tft-forecasting/
@@ -68,8 +68,10 @@ sp500-tft-forecasting/
 │   ├── financial_dataset_daily.csv  # 8,913 daily observations (1990-2025)
 │   └── splits/                  # Generated train/val/test splits
 ├── experiments/
-│   ├── 00_baseline_exploration/ # Phase 0: Baseline TFT experiments
-│   └── 01_staleness_features_fixed/  # Phase 1: Staleness feature experiments
+│   ├── 00_baseline_exploration/     # Phase 0: Baseline TFT experiments
+│   ├── 01_staleness_features_fixed/ # Phase 1: Staleness feature experiments
+│   ├── 02_vintage_baseline/         # Phase 2: Vintage alignment validation
+│   └── 03_distribution_loss/        # Phase 3: Distribution-aware loss (checkpoint failure)
 └── results/
     ├── experiments_summary.csv      # Aggregated metrics across all experiments
     ├── experiments_summary_key_metrics.csv
@@ -78,7 +80,7 @@ sp500-tft-forecasting/
 
 ## Usage
 
-### Training Models
+### Training models
 
 ```bash
 # Basic training with defaults
@@ -123,7 +125,7 @@ Training outputs are saved to `experiments/{name}/`:
 - `evaluation/` - Test set evaluation outputs (if evaluated)
 - `attention_analysis_year/` - Attention patterns (if analyzed)
 
-### Evaluating Models
+### Evaluating models
 
 ```bash
 # Automatic checkpoint selection (uses best validation loss)
@@ -160,7 +162,7 @@ Financial: Sharpe ratio, total return, max drawdown, alpha
 
 Quality: 5-mode temporal classification (HEALTHY/DEGRADED/UNIDIRECTIONAL/WEAK_COLLAPSE/STRONG_COLLAPSE)
 
-### Analyzing Results
+### Analyzing results
 
 ```bash
 # Generate summary of all experiments
@@ -182,7 +184,7 @@ python scripts/summarize_attention_patterns.py \
     experiments/01_staleness_features_fixed/
 ```
 
-## Features and Data
+## Features and data
 
 Core feature set (core_proposal):
 1. **Lagged S&P 500 Returns** - Momentum and mean reversion
@@ -203,7 +205,7 @@ Data characteristics:
 
 ## Model Evaluation Framework
 
-### 5-Mode Quality Classification
+### 5-Mode quality classification
 
 Models are evaluated with temporal quality classification across five modes:
 
@@ -237,32 +239,52 @@ cat experiments/{experiment_name}/config.json
 python train/train_tft.py --experiment-name {new_name} [args from config]
 ```
 
-## Current Research Status
+## Current status
 
 Completed:
-- Phase 0: Baseline TFT characterization (68+ experiments)
-  - Best baseline: hidden_size=16, 52.4% directional accuracy, 0.544 AUC-ROC
-  - Collapse phenomenon discovery: models with hidden_size ≥20 collapse to constant predictions
-- Phase 1: Staleness feature exploration (61 experiments)
-  - Comprehensive negative result: raw staleness features cause universal collapse
-  - Root cause identified: scale mismatch after normalization dominates input space
-- Attention pattern analysis (121 experiments)
-  - 142 attention shifts detected, clustering at major market regime changes
-  - Models detect regime changes but cannot adapt predictions appropriately
-  - Attention is symptom, not cause of collapse
 
-Current focus:
-- Testing log-transformed staleness features to address scale mismatch
-- Exploring distribution-aware regularization as architectural constraint
-- Developing custom attention mechanisms for mixed-frequency financial data
+Phase 0: Baseline TFT characterization (57 experiments, retrained with proper validation)
+- Best baseline: sweep2_h16_drop_0.1, 53.6% directional accuracy, 0.529 AUC-ROC, 0.879 Sharpe
+- Tight hyperparameter convergence: val_loss 0.392-0.403 across all configurations
+- Small models (hidden_size=16) with moderate dropout (0.1-0.25) perform best
 
-## Known Issues and Limitations
+Phase 1: Staleness feature exploration (64 experiments, retrained)
+- Comprehensive negative result: 60/64 experiments (94%) collapsed with unidirectional predictions
+- Log-transformed staleness tested: collapse persists (100% positive predictions)
+- Root cause: architectural incompatibility, not just scale mismatch
+
+Phase 2: Vintage alignment validation (6 experiments)
+- Vintage (realistic release dates) improves baseline quality vs fixed alignment
+- Reduced unidirectional behavior: 23-43% (vintage) vs 36-72% (fixed)
+- Increased healthy predictions: 50-62% (vintage) vs 21-48% (fixed)
+- Staleness features still collapse on vintage (confirms architectural issue)
+
+Phase 3: Distribution-aware loss (9 experiments trained, unevaluable)
+- Attempted anti-collapse and anti-drift penalties via monkey-patching
+- Training successful but checkpoints corrupted by pickle serialization incompatibility
+- Demonstrated fundamental limitation of runtime patching with PyTorch checkpoints
+
+Attention pattern analysis (121 experiments, post-retraining)
+- 423 attention shifts detected, 114 at 2022->2023 Fed pivot
+- Weak correlations (|r| < 0.15) confirm attention works but output layer unstable
+- Models detect regime changes but cannot adapt predictions appropriately
+
+### Next:
+- Custom TFT implementation from scratch for full architectural control
+- Native distribution-aware loss (mean/std penalties) without serialization issues
+- Staleness-aware attention mechanisms to handle mixed-frequency data
+- Regime-conditional attention heads for volatility-dependent processing
+
+
+## Known issues / limitations
 
 Version compatibility: Project requires old versions of PyTorch Lightning (1.9.5) due to breaking changes in 2.x. The `pytorch-forecasting` library is in maintenance mode but stable with this configuration. See troubleshooting documentation for details.
 
 Model collapse: TFT models exhibit capacity-dependent collapse in financial forecasting tasks. Models with hidden_size 16-18 produce varied predictions, while larger models collapse to constant predictions. This is a novel finding not reported in the original TFT literature and represents a fundamental challenge for applying Transformers to extremely noisy financial data.
 
 Financial forecasting context: R² near zero is expected and not indicative of model failure. Daily S&P 500 returns have a 30:1 noise-to-signal ratio. Directional accuracy of 52-54% represents strong performance (random walk baseline is 50%, top quantitative hedge funds operate at 52-55%). Lead with Sharpe ratio and cumulative returns when evaluating model quality.
+
+Checkpoint serialization with monkey-patching: Phase 3 demonstrated that runtime method patching (monkey-patching) is fundamentally incompatible with PyTorch checkpoint serialization. While models train successfully, checkpoints cannot be loaded due to pickle attempting to restore runtime-added attributes on fresh class instances. This limitation necessitates custom TFT implementation for any non-trivial architectural modifications.
 
 ## References
 
