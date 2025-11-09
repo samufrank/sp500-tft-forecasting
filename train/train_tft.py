@@ -95,8 +95,8 @@ def parse_args():
                         help='Early stopping patience')
 
     # Include staleness features
-    parser.add_argument('--no-staleness', action='store_true',
-                        help='Disable staleness features (for baseline comparison)')    
+    parser.add_argument('--staleness', action='store_true',
+                        help='Enable staleness features (experimental)')    
     
     # Paths
     parser.add_argument('--splits-dir', type=str, default='data/splits',
@@ -291,7 +291,7 @@ def prepare_tft_data(train_df, val_df, args, features, add_staleness=True):
         
         for col in staleness_cols:
             # Log transform: log(1 + days) / log(1 + max_days)
-            # Maps [0, max_days] → [0, 1] with compression of large values
+            # Maps [0, max_days] â†’ [0, 1] with compression of large values
             train_df[col] = np.log1p(train_df[col]) / np.log1p(MAX_DAYS_STALE)
             val_df[col] = np.log1p(val_df[col]) / np.log1p(MAX_DAYS_STALE)
         
@@ -418,10 +418,6 @@ def save_config(args, features, output_dir):
             'learning_rate': args.learning_rate,
             'gradient_clip_val': args.gradient_clip,
             'early_stop_patience': args.early_stop_patience,
-            'dist_loss_mean_weight': args.dist_loss_mean_weight,      
-            'dist_loss_std_weight': args.dist_loss_std_weight,       
-            'dist_loss_target_mean': 0.0003,                          
-            'dist_loss_target_std': 0.01,                             
         },
         'features': features,
         'pytorch_version': torch.__version__,
@@ -514,7 +510,7 @@ def train():
         print(f"\n[WARN] Could not patch matplotlib errorbar: {e}")
     
     # Get features for this configuration
-    features = get_features(args.feature_set, args.frequency, include_staleness=not args.no_staleness)
+    features = get_features(args.feature_set, args.frequency, include_staleness=args.staleness)
     
     print("="*70)
     print(f"Training TFT: {args.experiment_name}")
