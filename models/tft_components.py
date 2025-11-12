@@ -4,7 +4,7 @@ Core TFT building blocks for custom implementation.
 This module implements the fundamental neural network components used in
 Temporal Fusion Transformers as specified in:
 
-    Lim, B., ArÄ±k, S. Ã–., Loeff, N., & Pfister, T. (2021). 
+    Lim, B., ArÃƒâ€žÃ‚Â±k, S. ÃƒÆ’Ã¢â‚¬â€œ., Loeff, N., & Pfister, T. (2021). 
     "Temporal Fusion Transformers for Interpretable Multi-horizon Time Series Forecasting."
     International Journal of Forecasting, 37(4), 1748-1764.
 
@@ -37,13 +37,13 @@ class GatedResidualNetwork(nn.Module):
     with learnable gates for improved gradient flow.
     
     Architecture per paper:
-        Î· = LayerNorm(a)
-        Î·1 = Linear_1(Î·)  
-        Î·2 = ELU(Î·1)
-        Î·2 = Dropout(Î·2)
-        Î·3 = Linear_2(Î·2) + skip_linear(a)  # Residual connection
-        Î·4 = GLU(Î·3) âŠ™ Î·3  # Gated Linear Unit
-        output = LayerNorm(Î·4)
+        ÃƒÅ½Ã‚Â· = LayerNorm(a)
+        ÃƒÅ½Ã‚Â·1 = Linear_1(ÃƒÅ½Ã‚Â·)  
+        ÃƒÅ½Ã‚Â·2 = ELU(ÃƒÅ½Ã‚Â·1)
+        ÃƒÅ½Ã‚Â·2 = Dropout(ÃƒÅ½Ã‚Â·2)
+        ÃƒÅ½Ã‚Â·3 = Linear_2(ÃƒÅ½Ã‚Â·2) + skip_linear(a)  # Residual connection
+        ÃƒÅ½Ã‚Â·4 = GLU(ÃƒÅ½Ã‚Â·3) ÃƒÂ¢Ã…Â Ã¢â€žÂ¢ ÃƒÅ½Ã‚Â·3  # Gated Linear Unit
+        output = LayerNorm(ÃƒÅ½Ã‚Â·4)
     
     Optional context vector c can be added before the second linear transformation
     for static covariate enrichment (not used in our financial forecasting setup).
@@ -55,6 +55,7 @@ class GatedResidualNetwork(nn.Module):
         dropout: Dropout probability for regularization (default: 0.1)
         context_size: Size of optional context vector (default: None)
         batch_first: Whether batch dimension is first (default: True)
+        residual: Whether to use residual connection (default: True)
     """
     
     def __init__(
@@ -65,8 +66,7 @@ class GatedResidualNetwork(nn.Module):
         dropout: float = 0.1,
         context_size: Optional[int] = None,
         batch_first: bool = True,
-        debug_mode: bool = False,
-        log_full_intermediates: bool = False,
+        residual: bool = True,
     ):
         super().__init__()
         self.input_size = input_size
@@ -74,12 +74,7 @@ class GatedResidualNetwork(nn.Module):
         self.output_size = output_size
         self.context_size = context_size
         self.batch_first = batch_first
-        
-        # Debug instrumentation
-        self.debug_mode = debug_mode
-        self.log_full_intermediates = log_full_intermediates
-        self.stats = {} if debug_mode else None
-        self.intermediates = {} if log_full_intermediates else None
+        self.residual = residual
         
         # First linear transformation
         self.fc1 = nn.Linear(input_size, hidden_size)
@@ -92,7 +87,8 @@ class GatedResidualNetwork(nn.Module):
         self.fc2 = nn.Linear(hidden_size, output_size)
         
         # Skip connection (handles dimension change if needed)
-        if input_size != output_size:
+        # Only create if residual=True AND dimensions differ
+        if self.residual and input_size != output_size:
             self.skip_linear = nn.Linear(input_size, output_size)
         else:
             self.skip_linear = None
@@ -128,23 +124,6 @@ class GatedResidualNetwork(nn.Module):
         if hasattr(self.gate, 'bias') and self.gate.bias is not None:
             nn.init.constant_(self.gate.bias, -1.0)
     
-    def _track_stats(self, name: str, x: torch.Tensor):
-        """Helper to track tensor statistics during forward pass."""
-        if not self.debug_mode:
-            return
-        
-        self.stats[name] = {
-            'mean': x.mean().item(),
-            'std': x.std().item(),
-            'max': x.max().item(),
-            'min': x.min().item(),
-            'has_nan': torch.isnan(x).any().item(),
-            'has_inf': torch.isinf(x).any().item(),
-        }
-        
-        if self.log_full_intermediates:
-            self.intermediates[name] = x.detach().clone()
-    
     def forward(
         self, 
         x: torch.Tensor, 
@@ -162,52 +141,36 @@ class GatedResidualNetwork(nn.Module):
         """
         # Store for residual connection
         residual = x
-        self._track_stats('input', x)
         
         # Input normalization
         x = self.input_norm(x)
-        self._track_stats('after_input_norm', x)
         
         # First transformation: Linear -> ELU
         x = self.fc1(x)
-        self._track_stats('after_fc1', x)
         
         # Add context if provided
         if context is not None and self.context_size is not None:
-            context_contribution = self.context_fc(context)
-            self._track_stats('context_contribution', context_contribution)
-            x = x + context_contribution
-            self._track_stats('after_context_add', x)
+            x = x + self.context_fc(context)
         
         x = F.elu(x)
-        self._track_stats('after_elu', x)
-        
         x = self.dropout(x)
-        self._track_stats('after_dropout', x)
         
         # Second transformation
         x = self.fc2(x)
-        self._track_stats('after_fc2', x)
         
-        # Skip connection (project residual if needed)
-        if self.skip_linear is not None:
-            residual = self.skip_linear(residual)
-            self._track_stats('projected_residual', residual)
+        # Skip connection (only if residual=True)
+        if self.residual:
+            if self.skip_linear is not None:
+                residual = self.skip_linear(residual)
+            x = x + residual
         
-        x = x + residual
-        self._track_stats('after_residual_add', x)
-        
-        # Gated Linear Unit: gate ⊙ x
+        # Gated Linear Unit: gate ÃƒÂ¢Ã…Â Ã¢â€žÂ¢ x
         # GLU allows network to suppress unnecessary transformations
         gate = torch.sigmoid(self.gate(x))
-        self._track_stats('gate_values', gate)
-        
         x = x * gate
-        self._track_stats('after_gating', x)
         
         # Output normalization
         x = self.output_norm(x)
-        self._track_stats('output', x)
         
         return x
 
@@ -242,8 +205,6 @@ class VariableSelectionNetwork(nn.Module):
         hidden_size: int,
         dropout: float = 0.1,
         context_size: Optional[int] = None,
-        debug_mode: bool = False,
-        log_full_intermediates: bool = False,
     ):
         super().__init__()
         self.input_sizes = input_sizes
@@ -251,58 +212,37 @@ class VariableSelectionNetwork(nn.Module):
         self.num_inputs = len(input_sizes)
         self.context_size = context_size
         
-        # Debug instrumentation
-        self.debug_mode = debug_mode
-        self.log_full_intermediates = log_full_intermediates
-        self.stats = {} if debug_mode else None
-        self.intermediates = {} if log_full_intermediates else None
-        
         # Individual GRNs for each variable (parallel processing)
+        # CRITICAL: Continuous variables should NOT receive context
+        # Context is only used by flattened_grn for computing selection weights
         self.single_variable_grns = nn.ModuleDict({
             name: GatedResidualNetwork(
                 input_size=size,
-                hidden_size=hidden_size,
+                hidden_size=min(size, hidden_size),  # Use min per pytorch-forecasting
                 output_size=hidden_size,
                 dropout=dropout,
-                context_size=context_size,
-                debug_mode=debug_mode,
-                log_full_intermediates=log_full_intermediates,
+                context_size=None,  # NO context for continuous variables
             )
             for name, size in input_sizes.items()
         })
         
         # Flattened GRN for variable selection weights
-        # Takes concatenation of all variables, produces selection weights
-        total_input_size = sum(input_sizes.values())
-        self.flattened_grn = GatedResidualNetwork(
-            input_size=total_input_size,
-            hidden_size=hidden_size,
-            output_size=self.num_inputs,  # One weight per variable
-            dropout=dropout,
-            context_size=context_size,
-            debug_mode=debug_mode,
-            log_full_intermediates=log_full_intermediates,
-        )
-        
-        # Softmax for selection weights (sum to 1)
-        self.softmax = nn.Softmax(dim=-1)
-    
-    def _track_stats(self, name: str, x: torch.Tensor):
-        """Helper to track tensor statistics during forward pass."""
-        if not self.debug_mode:
-            return
-        
-        self.stats[name] = {
-            'mean': x.mean().item(),
-            'std': x.std().item(),
-            'max': x.max().item(),
-            'min': x.min().item(),
-            'has_nan': torch.isnan(x).any().item(),
-            'has_inf': torch.isinf(x).any().item(),
-        }
-        
-        if self.log_full_intermediates:
-            self.intermediates[name] = x.detach().clone()
+        # Only create if we have inputs (avoid zero-size Linear layers)
+        if self.num_inputs > 0:
+            total_input_size = sum(input_sizes.values())
+            self.flattened_grn = GatedResidualNetwork(
+                input_size=total_input_size,
+                hidden_size=min(hidden_size, self.num_inputs),  # Use min per pytorch-forecasting
+                output_size=self.num_inputs,  # One weight per variable
+                dropout=dropout,
+                context_size=context_size,
+                residual=False,  # No residual connection for flattened_grn
+            )
+            # Softmax for selection weights (sum to 1)
+            self.softmax = nn.Softmax(dim=-1)
+        else:
+            self.flattened_grn = None
+            self.softmax = None
     
     def forward(
         self,
@@ -320,6 +260,27 @@ class VariableSelectionNetwork(nn.Module):
             outputs: Weighted combination of variables [batch, time, hidden_size]
             weights: Variable selection weights for interpretability [batch, time, num_vars]
         """
+        # Handle empty input case (e.g., no decoder features)
+        # This matches pytorch-forecasting's VSN behavior for empty input_sizes
+        if self.num_inputs == 0:
+            # Return zeros shaped by context
+            # Context is required when num_inputs == 0
+            assert context is not None, "Context is required when VSN has no inputs"
+            outputs = torch.zeros_like(context)
+            
+            # Sparse weights shape depends on context dimensionality
+            if outputs.ndim == 3:  # [batch, time, hidden_size]
+                sparse_weights = torch.zeros(
+                    outputs.size(0), outputs.size(1), 1, 0,
+                    device=outputs.device, dtype=outputs.dtype
+                )
+            else:  # [batch, hidden_size]
+                sparse_weights = torch.zeros(
+                    outputs.size(0), 1, 0,
+                    device=outputs.device, dtype=outputs.dtype
+                )
+            return outputs, sparse_weights
+        
         # Process each variable independently through its GRN
         var_outputs = []
         flat_inputs = []
@@ -331,23 +292,20 @@ class VariableSelectionNetwork(nn.Module):
             flat_inputs.append(var_embedding)
             
             # Transform through variable-specific GRN
-            var_processed = self.single_variable_grns[name](var_embedding, context)
+            # CRITICAL: Do NOT pass context to single_variable_grns
+            # Context is only used by flattened_grn for selection weights
+            var_processed = self.single_variable_grns[name](var_embedding)
             var_outputs.append(var_processed)
         
         # Stack processed variables: [batch, time, num_vars, hidden_size]
         var_outputs = torch.stack(var_outputs, dim=-2)
-        self._track_stats('stacked_var_outputs', var_outputs)
         
         # Flatten inputs for weight computation
         flat_embedding = torch.cat(flat_inputs, dim=-1)
-        self._track_stats('flat_embedding', flat_embedding)
         
         # Compute selection weights via flattened GRN + softmax
         sparse_weights = self.flattened_grn(flat_embedding, context)
-        self._track_stats('pre_softmax_weights', sparse_weights)
-        
         sparse_weights = self.softmax(sparse_weights)  # [batch, time, num_vars]
-        self._track_stats('selection_weights', sparse_weights)
         
         # Apply weights to processed variables
         # Expand weights for broadcasting: [batch, time, num_vars, 1]
@@ -355,7 +313,6 @@ class VariableSelectionNetwork(nn.Module):
         
         # Weighted sum: [batch, time, hidden_size]
         outputs = (var_outputs * sparse_weights_expanded).sum(dim=-2)
-        self._track_stats('weighted_output', outputs)
         
         return outputs, sparse_weights
 
@@ -388,8 +345,6 @@ class InterpretableMultiHeadAttention(nn.Module):
         embed_dim: int,
         num_heads: int = 4,
         dropout: float = 0.0,
-        debug_mode: bool = False,
-        log_full_intermediates: bool = False,
     ):
         super().__init__()
         assert embed_dim % num_heads == 0, "embed_dim must be divisible by num_heads"
@@ -397,12 +352,6 @@ class InterpretableMultiHeadAttention(nn.Module):
         self.embed_dim = embed_dim
         self.num_heads = num_heads
         self.head_dim = embed_dim // num_heads
-        
-        # Debug instrumentation
-        self.debug_mode = debug_mode
-        self.log_full_intermediates = log_full_intermediates
-        self.stats = {} if debug_mode else None
-        self.intermediates = {} if log_full_intermediates else None
         
         # Query, Key, Value projections  
         # Paper uses shared value projection across heads
@@ -437,23 +386,6 @@ class InterpretableMultiHeadAttention(nn.Module):
             if linear.bias is not None:
                 nn.init.zeros_(linear.bias)
     
-    def _track_stats(self, name: str, x: torch.Tensor):
-        """Helper to track tensor statistics during forward pass."""
-        if not self.debug_mode:
-            return
-        
-        self.stats[name] = {
-            'mean': x.mean().item(),
-            'std': x.std().item(),
-            'max': x.max().item(),
-            'min': x.min().item(),
-            'has_nan': torch.isnan(x).any().item(),
-            'has_inf': torch.isinf(x).any().item(),
-        }
-        
-        if self.log_full_intermediates:
-            self.intermediates[name] = x.detach().clone()
-    
     def forward(
         self,
         query: torch.Tensor,
@@ -483,10 +415,6 @@ class InterpretableMultiHeadAttention(nn.Module):
         K = self.w_k(key)    # [batch, seq_len_k, embed_dim]
         V = self.w_v(value)  # [batch, seq_len_k, embed_dim]
         
-        self._track_stats('projected_Q', Q)
-        self._track_stats('projected_K', K)
-        self._track_stats('projected_V', V)
-        
         # Reshape for multi-head attention
         # [batch, seq_len, embed_dim] -> [batch, num_heads, seq_len, head_dim]
         Q = Q.view(batch_size, seq_len_q, self.num_heads, self.head_dim).transpose(1, 2)
@@ -501,7 +429,6 @@ class InterpretableMultiHeadAttention(nn.Module):
         
         # Additive: Q + K [batch, heads, seq_q, seq_k, head_dim]
         attention_input = torch.tanh(Q_expanded + K_expanded)
-        self._track_stats('attention_input_tanh', attention_input)
         
         # Score: v^T * tanh(...) [batch, heads, seq_q, seq_k]
         # v shape: [heads, head_dim] -> [1, heads, 1, 1, head_dim]
@@ -512,37 +439,231 @@ class InterpretableMultiHeadAttention(nn.Module):
         
         # Scale scores (optional, for numerical stability)
         attention_scores = attention_scores / self.scale
-        self._track_stats('attention_scores_pre_mask', attention_scores)
         
         # Apply mask if provided (e.g., for causal attention)
         if mask is not None:
             attention_scores = attention_scores.masked_fill(mask == 0, float('-inf'))
-            self._track_stats('attention_scores_post_mask', attention_scores)
         
         # Softmax to get attention weights
         attention_weights = F.softmax(attention_scores, dim=-1)
-        self._track_stats('attention_weights_pre_dropout', attention_weights)
-        
         attention_weights = self.dropout(attention_weights)
-        self._track_stats('attention_weights_post_dropout', attention_weights)
         
         # Apply attention to values
         # attention_weights: [batch, heads, seq_q, seq_k]
         # V: [batch, heads, seq_k, head_dim]
         # output: [batch, heads, seq_q, head_dim]
         attended = torch.matmul(attention_weights, V)
-        self._track_stats('attended_values', attended)
         
         # Concatenate heads: [batch, seq_q, embed_dim]
         attended = attended.transpose(1, 2).contiguous()
         attended = attended.view(batch_size, seq_len_q, self.embed_dim)
-        self._track_stats('concatenated_heads', attended)
         
         # Final output projection
         output = self.w_o(attended)
-        self._track_stats('output', output)
         
         return output, attention_weights
+
+
+class GatedLinearUnit(nn.Module):
+    """
+    Gated Linear Unit (GLU) with optional dropout.
+    
+    GLU applies a gating mechanism where the input is split into two parts:
+    one is passed through, the other gates it via sigmoid activation.
+    
+    Output = a * sigmoid(b) where [a, b] = Linear(input)
+    
+    This provides a learned gating mechanism that can selectively pass or
+    block information flow.
+    
+    Args:
+        input_size: Dimension of input features
+        hidden_size: Dimension of output (default: same as input)
+        dropout: Dropout rate applied before linear layer
+    """
+    
+    def __init__(
+        self,
+        input_size: int,
+        hidden_size: int = None,
+        dropout: float = None,
+    ):
+        super().__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size or input_size
+        self.dropout = nn.Dropout(dropout) if dropout is not None else None
+        
+        # Linear layer outputs 2x hidden_size for GLU split
+        self.fc = nn.Linear(input_size, self.hidden_size * 2)
+        
+        self._init_weights()
+    
+    def _init_weights(self):
+        """Initialize weights with Xavier uniform, biases with zeros."""
+        for name, param in self.named_parameters():
+            if "bias" in name:
+                nn.init.zeros_(param)
+            elif "fc" in name:
+                nn.init.xavier_uniform_(param)
+    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Apply GLU.
+        
+        Args:
+            x: Input tensor [batch, time, input_size]
+            
+        Returns:
+            Output tensor [batch, time, hidden_size]
+        """
+        if self.dropout is not None:
+            x = self.dropout(x)
+        x = self.fc(x)
+        # PyTorch's F.glu splits on last dim and applies sigmoid gating
+        x = nn.functional.glu(x, dim=-1)
+        return x
+
+
+class AddNorm(nn.Module):
+    """
+    Add & Norm layer with optional trainable gating on skip connection.
+    
+    This is a component of GateAddNorm - applies residual connection with
+    optional learned gating, followed by LayerNorm.
+    
+    From pytorch-forecasting: The skip connection can be scaled by a trainable
+    sigmoid gate, allowing the model to learn how much of the skip to use.
+    
+    Args:
+        input_size: Dimension of input features
+        skip_size: Dimension of skip connection (will resample if different)
+        trainable_add: If True, learn a gate to scale the skip connection
+    """
+    
+    def __init__(
+        self,
+        input_size: int,
+        skip_size: int = None,
+        trainable_add: bool = True,
+    ):
+        super().__init__()
+        self.input_size = input_size
+        self.skip_size = skip_size or input_size
+        self.trainable_add = trainable_add
+        
+        # If skip has different size, would need resampling
+        # For TFT baseline, sizes always match so we don't implement this
+        if self.input_size != self.skip_size:
+            raise NotImplementedError(
+                "AddNorm with different input/skip sizes not implemented. "
+                "TFT baseline doesn't need this."
+            )
+        
+        # Trainable gate for skip connection
+        # Initialized to zeros -> sigmoid(0) = 0.5 -> initial scale = 1.0
+        if self.trainable_add:
+            self.mask = nn.Parameter(torch.zeros(self.input_size, dtype=torch.float))
+            self.gate = nn.Sigmoid()
+        
+        self.norm = nn.LayerNorm(self.input_size)
+    
+    def forward(self, x: torch.Tensor, skip: torch.Tensor) -> torch.Tensor:
+        """
+        Add skip connection with optional gating, then normalize.
+        
+        Args:
+            x: Input tensor [batch, time, input_size]
+            skip: Skip connection [batch, time, skip_size]
+            
+        Returns:
+            Output tensor [batch, time, input_size]
+        """
+        # Apply trainable gate to skip connection
+        # Gate ranges 0-1, multiplied by 2 gives range 0-2
+        # This allows learning to emphasize or de-emphasize the skip
+        if self.trainable_add:
+            skip = skip * self.gate(self.mask) * 2.0
+        
+        # Add and normalize
+        output = self.norm(x + skip)
+        return output
+
+
+class GateAddNorm(nn.Module):
+    """
+    Gated Add & Norm layer for skip connections in TFT.
+    
+    Implements the skip connection pattern used throughout TFT:
+        1. Apply GLU (Gated Linear Unit) to input
+        2. Add residual connection (with optional trainable gating)
+        3. Apply LayerNorm
+        
+    This is used for the three skip connections in TFT:
+        - Skip #1: LSTM output -> VSN output
+        - Skip #2: Attention output -> attention input (ÃŽÂ¸_decoder)
+        - Skip #3: FFN output -> post-attention output
+    
+    Architecture:
+        gated = GLU(Dropout(input))
+        output = AddNorm(gated, residual)
+    
+    Args:
+        input_size: Dimension of input features
+        hidden_size: Dimension of GLU hidden layer (optional, defaults to input_size)
+        skip_size: Dimension of skip connection (optional, defaults to hidden_size)
+        trainable_add: Whether to learn gating on skip connection (default: True)
+        dropout: Dropout rate
+    """
+    
+    def __init__(
+        self,
+        input_size: int,
+        hidden_size: int = None,
+        skip_size: int = None,
+        trainable_add: bool = False,  # Match pytorch-forecasting default
+        dropout: float = 0.1,
+    ):
+        super().__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size or input_size
+        self.skip_size = skip_size or self.hidden_size
+        
+        # GLU to gate the input
+        self.glu = GatedLinearUnit(
+            self.input_size,
+            hidden_size=self.hidden_size,
+            dropout=dropout,
+        )
+        
+        # Add & Norm with trainable skip gating
+        self.add_norm = AddNorm(
+            self.hidden_size,
+            skip_size=self.skip_size,
+            trainable_add=trainable_add,
+        )
+    
+    def forward(
+        self,
+        x: torch.Tensor,
+        skip: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Apply gated skip connection.
+        
+        Args:
+            x: Input tensor [batch, time, input_size]
+            skip: Skip connection [batch, time, skip_size]
+            
+        Returns:
+            Output tensor [batch, time, hidden_size]
+        """
+        # Gate the input with GLU
+        gated = self.glu(x)
+        
+        # Add skip connection (with trainable gating) and normalize
+        output = self.add_norm(gated, skip)
+        
+        return output
 
 
 class QuantileLoss(nn.Module):
@@ -554,7 +675,7 @@ class QuantileLoss(nn.Module):
     for financial forecasting where uncertainty quantification matters.
     
     Loss per quantile q:
-        L_q(y, Å·) = max(q * (y - Å·), (q - 1) * (y - Å·))
+        L_q(y, Ãƒâ€¦Ã‚Â·) = max(q * (y - Ãƒâ€¦Ã‚Â·), (q - 1) * (y - Ãƒâ€¦Ã‚Â·))
     
     Total loss is the mean across all quantiles.
     
@@ -592,7 +713,7 @@ class QuantileLoss(nn.Module):
         if targets.dim() == 2:
             targets = targets.unsqueeze(-1)  # [batch, time, 1]
         
-        # Compute errors: y - Å·
+        # Compute errors: y - Ãƒâ€¦Ã‚Â·
         errors = targets - predictions  # [batch, time, num_quantiles]
         
         # Quantile loss (pinball loss)
@@ -603,6 +724,9 @@ class QuantileLoss(nn.Module):
             quantiles * errors,
             (quantiles - 1) * errors
         )
+        
+        # Scale by 2 to match pytorch-forecasting convention
+        loss = 2 * loss
         
         # Mean across all dimensions
         return loss.mean()
@@ -789,168 +913,6 @@ def test_quantile_loss():
     assert not torch.isnan(predictions_random.grad).any(), "NaN in gradients"
     
     print("[ PASS ] QuantileLoss tests passed")
-    return True
-
-
-def test_debug_mode():
-    """Test debug instrumentation for all components."""
-    print("\nTesting debug mode instrumentation...")
-    
-    # Test GRN debug mode
-    print("  Testing GRN debug mode...")
-    batch_size, seq_len, input_dim = 4, 10, 8
-    hidden_dim, output_dim = 16, 8
-    
-    grn_debug = GatedResidualNetwork(
-        input_size=input_dim,
-        hidden_size=hidden_dim,
-        output_size=output_dim,
-        dropout=0.0,
-        debug_mode=True,
-        log_full_intermediates=False,
-    )
-    grn_debug.eval()
-    
-    x = torch.randn(batch_size, seq_len, input_dim)
-    output = grn_debug(x)
-    
-    # Verify stats were collected
-    assert grn_debug.stats is not None, "Stats dict should exist"
-    assert len(grn_debug.stats) > 0, "Stats should be populated"
-    
-    # Check expected keys
-    expected_keys = ['input', 'after_input_norm', 'after_fc1', 'after_elu', 
-                     'after_dropout', 'after_fc2', 'after_residual_add', 
-                     'gate_values', 'after_gating', 'output']
-    for key in expected_keys:
-        assert key in grn_debug.stats, f"Missing stats key: {key}"
-        
-        # Verify each stat has required fields
-        stat = grn_debug.stats[key]
-        required_fields = ['mean', 'std', 'max', 'min', 'has_nan', 'has_inf']
-        for field in required_fields:
-            assert field in stat, f"Missing field '{field}' in stats['{key}']"
-    
-    print(f"  [ PASS ] GRN collected {len(grn_debug.stats)} stat checkpoints")
-    
-    # Test GRN with full intermediates
-    print("  Testing GRN with full intermediates...")
-    grn_full = GatedResidualNetwork(
-        input_size=input_dim,
-        hidden_size=hidden_dim,
-        output_size=output_dim,
-        dropout=0.0,
-        debug_mode=True,
-        log_full_intermediates=True,
-    )
-    grn_full.eval()
-    
-    output_full = grn_full(x)
-    
-    assert grn_full.intermediates is not None, "Intermediates dict should exist"
-    assert len(grn_full.intermediates) == len(grn_full.stats), \
-        "Should have same number of intermediates as stats"
-    
-    # Verify tensors were stored
-    for key in expected_keys:
-        assert key in grn_full.intermediates, f"Missing intermediate: {key}"
-        intermediate = grn_full.intermediates[key]
-        assert isinstance(intermediate, torch.Tensor), f"Intermediate '{key}' is not a tensor"
-        assert intermediate.shape[0] == batch_size, "Batch dimension mismatch"
-    
-    print(f"  [ PASS ] GRN stored {len(grn_full.intermediates)} full tensors")
-    
-    # Test VSN debug mode
-    print("  Testing VSN debug mode...")
-    input_sizes = {'a': 3, 'b': 2, 'c': 1}
-    hidden_size = 16
-    
-    vsn_debug = VariableSelectionNetwork(
-        input_sizes=input_sizes,
-        hidden_size=hidden_size,
-        dropout=0.0,
-        debug_mode=True,
-        log_full_intermediates=False,
-    )
-    vsn_debug.eval()
-    
-    x_dict = {
-        'a': torch.randn(batch_size, seq_len, 3),
-        'b': torch.randn(batch_size, seq_len, 2),
-        'c': torch.randn(batch_size, seq_len, 1),
-    }
-    
-    output_vsn, weights_vsn = vsn_debug(x_dict)
-    
-    # Verify VSN stats
-    assert vsn_debug.stats is not None, "VSN stats dict should exist"
-    expected_vsn_keys = ['stacked_var_outputs', 'flat_embedding', 
-                         'pre_softmax_weights', 'selection_weights', 'weighted_output']
-    for key in expected_vsn_keys:
-        assert key in vsn_debug.stats, f"Missing VSN stats key: {key}"
-    
-    # Verify nested GRN stats were also collected
-    for name in input_sizes.keys():
-        grn = vsn_debug.single_variable_grns[name]
-        assert grn.stats is not None, f"GRN '{name}' should have stats"
-        assert len(grn.stats) > 0, f"GRN '{name}' stats should be populated"
-    
-    assert vsn_debug.flattened_grn.stats is not None, "Flattened GRN should have stats"
-    
-    print(f"  [ PASS ] VSN collected {len(vsn_debug.stats)} top-level stat checkpoints")
-    
-    # Test Attention debug mode
-    print("  Testing Attention debug mode...")
-    embed_dim, num_heads = 64, 4
-    
-    attn_debug = InterpretableMultiHeadAttention(
-        embed_dim=embed_dim,
-        num_heads=num_heads,
-        dropout=0.0,
-        debug_mode=True,
-        log_full_intermediates=True,
-    )
-    attn_debug.eval()
-    
-    x_attn = torch.randn(batch_size, seq_len, embed_dim)
-    output_attn, weights_attn = attn_debug(x_attn, x_attn, x_attn)
-    
-    # Verify attention stats
-    assert attn_debug.stats is not None, "Attention stats dict should exist"
-    expected_attn_keys = ['projected_Q', 'projected_K', 'projected_V', 
-                          'attention_input_tanh', 'attention_scores_pre_mask',
-                          'attention_weights_pre_dropout', 'attention_weights_post_dropout',
-                          'attended_values', 'concatenated_heads', 'output']
-    
-    for key in expected_attn_keys:
-        assert key in attn_debug.stats, f"Missing Attention stats key: {key}"
-    
-    # Verify intermediates for attention
-    assert attn_debug.intermediates is not None, "Attention intermediates should exist"
-    assert len(attn_debug.intermediates) == len(attn_debug.stats), \
-        "Should have same number of intermediates as stats"
-    
-    print(f"  [ PASS ] Attention collected {len(attn_debug.stats)} stat checkpoints")
-    
-    # Test that debug_mode=False doesn't collect stats
-    print("  Testing that debug_mode=False works correctly...")
-    grn_no_debug = GatedResidualNetwork(
-        input_size=input_dim,
-        hidden_size=hidden_dim,
-        output_size=output_dim,
-        dropout=0.0,
-        debug_mode=False,
-    )
-    grn_no_debug.eval()
-    
-    output_no_debug = grn_no_debug(x)
-    
-    assert grn_no_debug.stats is None, "Stats should be None when debug_mode=False"
-    assert grn_no_debug.intermediates is None, "Intermediates should be None"
-    
-    print("  [ PASS ] debug_mode=False correctly skips collection")
-    
-    print("[ PASS ] Debug mode instrumentation tests passed")
     return True
 
 
@@ -1145,12 +1107,6 @@ def run_all_tests():
         all_passed &= test_quantile_loss()
     except Exception as e:
         print(f"[ FAIL ] QuantileLoss test failed: {e}")
-        all_passed = False
-    
-    try:
-        all_passed &= test_debug_mode()
-    except Exception as e:
-        print(f"[ FAIL ] Debug mode test failed: {e}")
         all_passed = False
     
     # Numerical equivalence test (informational, doesn't affect pass/fail)
