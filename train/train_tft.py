@@ -291,7 +291,7 @@ def prepare_tft_data(train_df, val_df, args, features, add_staleness=True):
         
         for col in staleness_cols:
             # Log transform: log(1 + days) / log(1 + max_days)
-            # Maps [0, max_days] â†’ [0, 1] with compression of large values
+            # Maps [0, max_days] to [0, 1] with compression of large values
             train_df[col] = np.log1p(train_df[col]) / np.log1p(MAX_DAYS_STALE)
             val_df[col] = np.log1p(val_df[col]) / np.log1p(MAX_DAYS_STALE)
         
@@ -357,6 +357,21 @@ def prepare_tft_data(train_df, val_df, args, features, add_staleness=True):
 
 def create_model(training_dataset, args):
     """Initialize TFT model with standard QuantileLoss."""
+    
+    # DEBUG: Show what features the dataset has BEFORE model creation
+    print("\n" + "="*80)
+    print("BASELINE FEATURE INSPECTION (before model creation)")
+    print("="*80)
+    print(f"training_dataset.reals: {training_dataset.reals}")
+    print(f"  Count: {len(training_dataset.reals)}")
+    print(f"\ntraining_dataset.time_varying_reals_encoder: {training_dataset.time_varying_reals_encoder}")
+    print(f"  Count: {len(training_dataset.time_varying_reals_encoder)}")
+    print(f"\ntraining_dataset.time_varying_known_reals: {training_dataset.time_varying_known_reals}")
+    print(f"  Count: {len(training_dataset.time_varying_known_reals)}")
+    print(f"\ntraining_dataset.static_reals: {training_dataset.static_reals}")
+    print(f"  Count: {len(training_dataset.static_reals)}")
+    print("="*80 + "\n")
+    
     tft = TemporalFusionTransformer.from_dataset(
         training_dataset,
         learning_rate=args.learning_rate,
@@ -369,6 +384,31 @@ def create_model(training_dataset, args):
         log_interval=10,
         reduce_on_plateau_patience=4,
     )
+    
+    # DEBUG: Show what the model actually received
+    print("\n" + "="*80)
+    print("BASELINE MODEL FEATURE CONFIGURATION (after from_dataset)")
+    print("="*80)
+    print(f"tft.hparams.time_varying_reals_encoder: {tft.hparams.time_varying_reals_encoder}")
+    print(f"  Count: {len(tft.hparams.time_varying_reals_encoder)}")
+    print(f"\ntft.hparams.time_varying_reals_decoder: {tft.hparams.time_varying_reals_decoder}")
+    print(f"  Count: {len(tft.hparams.time_varying_reals_decoder)}")
+    print(f"\ntft.hparams.x_reals (all reals passed to model): {tft.hparams.x_reals}")
+    print(f"  Count: {len(tft.hparams.x_reals)}")
+    
+    # Show encoder VSN input size
+    if hasattr(tft, 'encoder_variable_selection'):
+        enc_vsn = tft.encoder_variable_selection
+        print(f"\nEncoder VSN configuration:")
+        print(f"  num_inputs: {enc_vsn.num_inputs}")
+        print(f"  input_sizes: {enc_vsn.input_sizes}")
+        if hasattr(enc_vsn, 'flattened_grn') and hasattr(enc_vsn.flattened_grn, 'fc1'):
+            fc1_in = enc_vsn.flattened_grn.fc1.in_features
+            fc1_out = enc_vsn.flattened_grn.fc1.out_features
+            print(f"  flattened_grn.fc1: in_features={fc1_in}, out_features={fc1_out}")
+            print(f"  → Params in fc1: {fc1_in * fc1_out} (should be 5*16*5=400 if 5 features)")
+    print("="*80 + "\n")
+    
     return tft
 
 # ============================================================================
