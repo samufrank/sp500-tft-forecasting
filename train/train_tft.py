@@ -359,18 +359,18 @@ def create_model(training_dataset, args):
     """Initialize TFT model with standard QuantileLoss."""
     
     # DEBUG: Show what features the dataset has BEFORE model creation
-    print("\n" + "="*80)
-    print("BASELINE FEATURE INSPECTION (before model creation)")
-    print("="*80)
-    print(f"training_dataset.reals: {training_dataset.reals}")
-    print(f"  Count: {len(training_dataset.reals)}")
-    print(f"\ntraining_dataset.time_varying_reals_encoder: {training_dataset.time_varying_reals_encoder}")
-    print(f"  Count: {len(training_dataset.time_varying_reals_encoder)}")
-    print(f"\ntraining_dataset.time_varying_known_reals: {training_dataset.time_varying_known_reals}")
-    print(f"  Count: {len(training_dataset.time_varying_known_reals)}")
-    print(f"\ntraining_dataset.static_reals: {training_dataset.static_reals}")
-    print(f"  Count: {len(training_dataset.static_reals)}")
-    print("="*80 + "\n")
+    #print("\n" + "="*80)
+    #print("BASELINE FEATURE INSPECTION (before model creation)")
+    #print("="*80)
+    #print(f"training_dataset.reals: {training_dataset.reals}")
+    #print(f"  Count: {len(training_dataset.reals)}")
+    #print(f"\ntraining_dataset.time_varying_reals_encoder: {training_dataset.time_varying_reals_encoder}")
+    #print(f"  Count: {len(training_dataset.time_varying_reals_encoder)}")
+    #print(f"\ntraining_dataset.time_varying_known_reals: {training_dataset.time_varying_known_reals}")
+    #print(f"  Count: {len(training_dataset.time_varying_known_reals)}")
+    #print(f"\ntraining_dataset.static_reals: {training_dataset.static_reals}")
+    #print(f"  Count: {len(training_dataset.static_reals)}")
+    #print("="*80 + "\n")
     
     tft = TemporalFusionTransformer.from_dataset(
         training_dataset,
