@@ -6,7 +6,7 @@ Compare GRN layer structure between baseline and custom to find param difference
 import torch
 
 BASELINE = 'experiments/00_baseline_exploration/sweep2_h16_drop_0.25/checkpoints/tft-epoch=47-val_loss=0.4023.ckpt'
-CUSTOM = 'experiments/test_exact_baseline/checkpoints/last.ckpt'
+CUSTOM = 'experiments/test_grn_fix_clean/checkpoints/last.ckpt'
 
 def compare_component(component_name, baseline_state, custom_state):
     """Compare a specific component between models."""

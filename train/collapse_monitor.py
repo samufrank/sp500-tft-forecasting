@@ -116,14 +116,18 @@ class CollapseMonitor(Callback):
                 x = {k: v.to(pl_module.device) if torch.is_tensor(v) else v 
                      for k, v in x.items()}
                 
-                # Get predictions - handle dict or namedtuple
+                # Get predictions - handle different output formats
                 output = pl_module(x)
                 if isinstance(output, dict):
+                    # pytorch-forecasting TFT model - returns dict with 'prediction' key
                     preds = output['prediction'][:, 0, 3]
                 elif hasattr(output, 'prediction'):
+                    # pytorch-forecasting namedtuple output
                     preds = output.prediction[:, 0, 3]
                 else:
-                    # Fallback - assume output is the prediction tensor
+                    # Custom TFT model - returns predictions tensor directly
+                    # Shape: [batch, max_prediction_length, num_quantiles]
+                    # Extract median quantile (index 3 for 7 quantiles) at first timestep
                     preds = output[:, 0, 3]
                     
                 all_predictions.append(preds.cpu().numpy())
@@ -223,15 +227,23 @@ class CollapseMonitor(Callback):
                 x = {k: v.to(pl_module.device) if torch.is_tensor(v) else v 
                      for k, v in x.items()}
                 
-                # Get output - could be dict or namedtuple
+                # Get output - could be dict, namedtuple, or plain tensor
                 output = pl_module(x)
                 
-                # Try to extract encoder_variables
+                # Try to extract encoder_variables using different methods
                 encoder_vsn = None
+                
+                # Method 1: Check if it's a dict with 'encoder_variables' key
                 if isinstance(output, dict) and 'encoder_variables' in output:
                     encoder_vsn = output['encoder_variables']
+                # Method 2: Check if it's a namedtuple with encoder_variables attribute
                 elif hasattr(output, 'encoder_variables'):
                     encoder_vsn = output.encoder_variables
+                # Method 3: Custom TFT model - use getter method
+                elif hasattr(pl_module, 'get_encoder_vsn_output'):
+                    vsn_result = pl_module.get_encoder_vsn_output()
+                    if vsn_result is not None:
+                        encoder_vsn, _ = vsn_result  # (output, weights) tuple
                 
                 if encoder_vsn is not None:
                     vsn_outputs['encoder'].append(encoder_vsn.cpu().numpy())
@@ -257,10 +269,10 @@ class CollapseMonitor(Callback):
                 
     def _log_attention_patterns(self, trainer, pl_module):
         """
-        Log attention weight entropy using interpret_output() method.
+        Log attention weight entropy.
         
-        TFT attention weights are not returned in standard forward() pass.
-        Must use model.interpret_output(predictions) to extract them.
+        For pytorch-forecasting TFT: Use interpret_output() method
+        For custom TFT: Use get_attention_weights() getter method
         """
         pl_module.eval()
         attention_entropies = []
@@ -277,27 +289,60 @@ class CollapseMonitor(Callback):
                 # Get predictions first
                 output = pl_module(x)
                 
-                # Use interpret_output to get attention weights
-                # reduction='none' keeps batch dimension
-                try:
-                    interpretation = pl_module.interpret_output(
-                        output, 
-                        reduction='none',
-                        attention_prediction_horizon=0  # Focus on first prediction step
-                    )
+                attn_weights = None
+                
+                # Method 1: Custom TFT model - use getter method
+                if hasattr(pl_module, 'get_attention_weights'):
+                    attn_weights = pl_module.get_attention_weights()
                     
-                    # Extract attention weights from interpretation dict
-                    if 'attention' in interpretation:
-                        attn = interpretation['attention'].cpu().numpy()
+                    if attn_weights is not None:
+                        # Shape: [batch, num_heads, max_prediction_length, encoder_length + max_prediction_length]
+                        # Average across heads: [batch, max_prediction_length, encoder_length + max_prediction_length]
+                        attn_weights = attn_weights.mean(dim=1)
+                        
+                        # For single-step prediction, extract first (only) prediction timestep
+                        # Shape: [batch, encoder_length + max_prediction_length]
+                        if attn_weights.size(1) == 1:
+                            attn_weights = attn_weights[:, 0, :]
+                        else:
+                            # If multiple prediction steps, use first one
+                            attn_weights = attn_weights[:, 0, :]
+                        
+                        # Move to CPU and convert to numpy
+                        attn = attn_weights.cpu().numpy()
+                        
                         # Compute entropy of attention distribution
-                        # attn shape: [batch, encoder_length] typically
-                        # Normalize if not already (attention should sum to 1)
+                        # attn shape: [batch, encoder_length + max_prediction_length]
+                        # Should already be normalized (sum to 1), but verify
                         attn_norm = attn / (attn.sum(axis=-1, keepdims=True) + 1e-10)
                         entropy = -np.sum(attn_norm * np.log(attn_norm + 1e-10), axis=-1)
                         attention_entropies.append(entropy)
-                except Exception as e:
-                    # interpret_output might fail for various reasons
-                    print(f"    (interpret_output failed: {type(e).__name__})")
+                        
+                # Method 2: pytorch-forecasting TFT model - use interpret_output
+                elif hasattr(pl_module, 'interpret_output'):
+                    try:
+                        interpretation = pl_module.interpret_output(
+                            output, 
+                            reduction='none',
+                            attention_prediction_horizon=0  # Focus on first prediction step
+                        )
+                        
+                        # Extract attention weights from interpretation dict
+                        if 'attention' in interpretation:
+                            attn = interpretation['attention'].cpu().numpy()
+                            # Compute entropy of attention distribution
+                            # attn shape: [batch, encoder_length] typically
+                            # Normalize if not already (attention should sum to 1)
+                            attn_norm = attn / (attn.sum(axis=-1, keepdims=True) + 1e-10)
+                            entropy = -np.sum(attn_norm * np.log(attn_norm + 1e-10), axis=-1)
+                            attention_entropies.append(entropy)
+                    except Exception as e:
+                        # interpret_output might fail for various reasons
+                        print(f"    (interpret_output failed: {type(e).__name__})")
+                        break
+                else:
+                    # No method available to extract attention
+                    print(f"    (no attention extraction method available)")
                     break
         
         if attention_entropies:

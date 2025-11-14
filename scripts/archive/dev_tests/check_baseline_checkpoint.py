@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """
-Extract feature configuration from an existing baseline checkpoint.
+extract feature configuration from an existing baseline checkpoint.
 
-This will tell us definitively what the baseline model uses.
-
-Usage:
+usage:
     python check_baseline_checkpoint.py
 """
 
@@ -12,7 +10,7 @@ import torch
 import sys
 from pathlib import Path
 
-# Checkpoint path - using best checkpoint from sweep2_h16_drop_0.25
+# ckeckpoint path - using best checkpoint from sweep2_h16_drop_0.25
 CHECKPOINT_PATH = 'experiments/00_baseline_exploration/sweep2_h16_drop_0.25/checkpoints/tft-epoch=47-val_loss=0.4023.ckpt'
 
 def main():
@@ -90,14 +88,14 @@ def main():
         # Each variable is embedded to hidden_continuous_size
         # So: in_features = num_encoder_variables * hidden_continuous_size
         num_encoder_variables = in_features // hidden_continuous_size
-        print(f"  → Inferred num_encoder_variables: {num_encoder_variables}")
+        print(f"  -> inferred num_encoder_variables: {num_encoder_variables}")
         print()
         
         if num_encoder_variables == 5:
-            print("✓ CONFIRMED: Baseline encoder VSN processes 5 features")
+            print(" CONFIRMED: Baseline encoder VSN processes 5 features")
             print("  This means encoder_length is NOT in encoder VSN")
         elif num_encoder_variables == 6:
-            print("⚠️  Baseline encoder VSN processes 6 features")
+            print(" Baseline encoder VSN processes 6 features")
             print("  This means encoder_length IS in encoder VSN")
         else:
             print(f"? Unexpected: {num_encoder_variables} features")
@@ -124,15 +122,15 @@ def main():
             print(f"Actual VSN processes: {num_vars} variables")
             
             if len(enc_reals) == num_vars:
-                print("✓ CONSISTENT: Hyperparameters match VSN architecture")
+                print(" CONSISTENT: hyperparameters match VSN architecture")
             else:
-                print(f"⚠️  MISMATCH: Hparams ({len(enc_reals)}) != VSN ({num_vars})")
+                print(f" MISMATCH: hparams ({len(enc_reals)}) != VSN ({num_vars})")
             
             if 'encoder_length' in enc_reals:
-                print("\n→ encoder_length IS in time_varying_reals_encoder")
+                print("\n-> encoder_length IS in time_varying_reals_encoder")
             else:
-                print("\n→ encoder_length is NOT in time_varying_reals_encoder")
-                print("  (It's static metadata, not a time-varying VSN input)")
+                print("\n-> encoder_length is not in time_varying_reals_encoder")
+                print("  (it is static metadata not a time-varying VSN input)")
 
 if __name__ == '__main__':
     main()

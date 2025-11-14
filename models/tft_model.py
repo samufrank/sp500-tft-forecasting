@@ -12,7 +12,7 @@ Architecture follows Lim et al. (2021) "Temporal Fusion Transformers for
 Interpretable Multi-horizon Time Series Forecasting" and is validated against
 pytorch-forecasting source code.
 
-Author: Sam (EEE598 Deep Learning Project)
+Author: Sam Ehrle 
 Date: November 2025
 """
 
@@ -787,8 +787,9 @@ class TemporalFusionTransformer(pl.LightningModule):
             print(f"  batch_loss: {loss.item():.6f}")
         
         # Log metrics
-        self.log('train_loss', loss, prog_bar=True)
-        
+        #self.log('train_loss', loss, prog_bar=True)
+        self.log('train_loss', loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+
         return loss
     
     def validation_step(self, batch, batch_idx):
@@ -832,12 +833,30 @@ class TemporalFusionTransformer(pl.LightningModule):
         return loss
     
     def configure_optimizers(self):
-        """Configure optimizer (Adam)."""
+        """Configure optimizer (Adam) and learning rate scheduler."""
         optimizer = torch.optim.Adam(
             self.parameters(),
             lr=self.learning_rate,
         )
-        return optimizer
+        
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer,
+            mode='min',
+            factor=0.5,
+            patience=4,
+            min_lr=1e-5,
+            cooldown=4,
+        )
+        
+        return {
+            'optimizer': optimizer,
+            'lr_scheduler': {
+                'scheduler': scheduler,
+                'monitor': 'val_loss',  # Metric to monitor
+                'interval': 'epoch',
+                'frequency': 1,
+            }
+        }
     
     def get_attention_weights(self) -> Optional[torch.Tensor]:
         """

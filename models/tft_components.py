@@ -4,7 +4,7 @@ Core TFT building blocks for custom implementation.
 This module implements the fundamental neural network components used in
 Temporal Fusion Transformers as specified in:
 
-    Lim, B., ArÃƒâ€žÃ‚Â±k, S. ÃƒÆ’Ã¢â‚¬â€œ., Loeff, N., & Pfister, T. (2021). 
+    Lim, B., Arik, S. O., Loeff, N., & Pfister, T. (2021). 
     "Temporal Fusion Transformers for Interpretable Multi-horizon Time Series Forecasting."
     International Journal of Forecasting, 37(4), 1748-1764.
 
@@ -28,22 +28,103 @@ import math
 from typing import Optional, Dict, Tuple
 
 
+class ResampleNorm(nn.Module):
+    """
+    Resample and normalize layer for handling dimension mismatches.
+    
+    Used in GRN when input_size != output_size. Uses linear interpolation
+    to resample features, then applies LayerNorm. Matches pytorch-forecasting's
+    implementation (sub_modules.py).
+    
+    Args:
+        input_size: Dimension of input features
+        output_size: Dimension of output features (if None, uses input_size)
+        trainable_add: Whether to add trainable gating (default: True in baseline)
+    """
+    
+    def __init__(
+        self,
+        input_size: int,
+        output_size: Optional[int] = None,
+        trainable_add: bool = True,
+    ):
+        super().__init__()
+        self.input_size = input_size
+        self.trainable_add = trainable_add
+        self.output_size = output_size or input_size
+        
+        # Trainable gating on resampled features
+        if self.trainable_add:
+            self.mask = nn.Parameter(torch.zeros(self.output_size, dtype=torch.float))
+            self.gate = nn.Sigmoid()
+        
+        # LayerNorm after resampling
+        self.norm = nn.LayerNorm(self.output_size)
+    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Resample input to output_size via linear interpolation, then normalize.
+        
+        Args:
+            x: Input tensor [batch, time, input_size] or [batch, input_size]
+            
+        Returns:
+            Resampled and normalized tensor [batch, time, output_size] or [batch, output_size]
+        """
+        # Resample if dimensions differ
+        if self.input_size != self.output_size:
+            # Handle both 2D [batch, features] and 3D [batch, time, features]
+            if x.dim() == 2:
+                # [batch, input_size] -> [batch, 1, input_size] -> interpolate -> [batch, output_size]
+                x = F.interpolate(
+                    x.unsqueeze(1),
+                    size=self.output_size,
+                    mode='linear',
+                    align_corners=True
+                ).squeeze(1)
+            else:
+                # [batch, time, input_size] -> [batch*time, input_size] -> interpolate -> [batch, time, output_size]
+                batch_size, time_steps, _ = x.shape
+                x = x.contiguous().view(batch_size * time_steps, self.input_size)
+                x = F.interpolate(
+                    x.unsqueeze(1),
+                    size=self.output_size,
+                    mode='linear',
+                    align_corners=True
+                ).squeeze(1)
+                x = x.view(batch_size, time_steps, self.output_size)
+        
+        # Apply trainable gating if enabled
+        if self.trainable_add:
+            x = x * self.gate(self.mask) * 2.0
+        
+        # Normalize
+        x = self.norm(x)
+        
+        return x
+
+
 class GatedResidualNetwork(nn.Module):
     """
     Gated Residual Network (GRN) from TFT paper Section 4.1.
+    
+    Matches pytorch-forecasting's implementation exactly (sub_modules.py).
     
     Applies non-linear processing with a gating mechanism to enable flexible
     suppression of unnecessary transformations. Provides skip connections
     with learnable gates for improved gradient flow.
     
-    Architecture per paper:
-        ÃƒÅ½Ã‚Â· = LayerNorm(a)
-        ÃƒÅ½Ã‚Â·1 = Linear_1(ÃƒÅ½Ã‚Â·)  
-        ÃƒÅ½Ã‚Â·2 = ELU(ÃƒÅ½Ã‚Â·1)
-        ÃƒÅ½Ã‚Â·2 = Dropout(ÃƒÅ½Ã‚Â·2)
-        ÃƒÅ½Ã‚Â·3 = Linear_2(ÃƒÅ½Ã‚Â·2) + skip_linear(a)  # Residual connection
-        ÃƒÅ½Ã‚Â·4 = GLU(ÃƒÅ½Ã‚Â·3) ÃƒÂ¢Ã…Â Ã¢â€žÂ¢ ÃƒÅ½Ã‚Â·3  # Gated Linear Unit
-        output = LayerNorm(ÃƒÅ½Ã‚Â·4)
+    Architecture (pytorch-forecasting implementation):
+        x = fc1(x)
+        if context: x = x + context_fc(context)
+        x = ELU(x)
+        x = fc2(x)
+        x = gate_norm(x, residual)  # GLU + AddNorm
+        return x
+    
+    The gate_norm combines:
+        - GatedLinearUnit (GLU): applies gating via Linear(hidden_size -> 2*output_size) + F.glu
+        - AddNorm: adds skip connection and applies LayerNorm
     
     Optional context vector c can be added before the second linear transformation
     for static covariate enrichment (not used in our financial forecasting setup).
@@ -54,8 +135,7 @@ class GatedResidualNetwork(nn.Module):
         output_size: Size of output features  
         dropout: Dropout probability for regularization (default: 0.1)
         context_size: Size of optional context vector (default: None)
-        batch_first: Whether batch dimension is first (default: True)
-        residual: Whether to use residual connection (default: True)
+        residual: Whether to use residual connection (default: False in baseline)
     """
     
     def __init__(
@@ -65,69 +145,79 @@ class GatedResidualNetwork(nn.Module):
         output_size: int,
         dropout: float = 0.1,
         context_size: Optional[int] = None,
-        batch_first: bool = True,
-        residual: bool = True,
+        residual: bool = False,
     ):
         super().__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.output_size = output_size
         self.context_size = context_size
-        self.batch_first = batch_first
+        self.dropout = dropout
         self.residual = residual
         
-        # First linear transformation
-        self.fc1 = nn.Linear(input_size, hidden_size)
-        
-        # Context processing if provided
-        if context_size is not None:
-            self.context_fc = nn.Linear(context_size, hidden_size, bias=False)
-        
-        # Second linear transformation  
-        self.fc2 = nn.Linear(hidden_size, output_size)
-        
-        # Skip connection (handles dimension change if needed)
-        # Only create if residual=True AND dimensions differ
-        if self.residual and input_size != output_size:
-            self.skip_linear = nn.Linear(input_size, output_size)
+        # Determine residual size for skip connection
+        # From baseline: if input != output and not residual, use input_size
+        # Otherwise use output_size
+        if self.input_size != self.output_size and not self.residual:
+            residual_size = self.input_size
         else:
-            self.skip_linear = None
-            
-        # Gating mechanism (Gated Linear Unit)
-        self.gate = nn.Linear(output_size, output_size)
+            residual_size = self.output_size
         
-        # Normalization layers per paper specification
-        self.input_norm = nn.LayerNorm(input_size)
-        self.output_norm = nn.LayerNorm(output_size)
+        # ResampleNorm if output_size != residual_size
+        if self.output_size != residual_size:
+            self.resample_norm = ResampleNorm(residual_size, self.output_size)
         
-        # Regularization
-        self.dropout = nn.Dropout(dropout)
+        # First linear transformation
+        self.fc1 = nn.Linear(self.input_size, self.hidden_size)
+        self.elu = nn.ELU()
         
-        # Initialize weights
-        self._init_weights()
+        # Context processing if provided (bias=False per baseline)
+        if self.context_size is not None:
+            self.context = nn.Linear(self.context_size, self.hidden_size, bias=False)
+        
+        # Second linear transformation
+        # NOTE: Baseline uses hidden_size -> hidden_size, not hidden_size -> output_size
+        self.fc2 = nn.Linear(self.hidden_size, self.hidden_size)
+        
+        # Initialize weights per baseline
+        self.init_weights()
+        
+        # GateAddNorm: combines GLU gating + skip connection + LayerNorm
+        # This is the key difference from the previous implementation
+        self.gate_norm = GateAddNorm(
+            input_size=self.hidden_size,
+            skip_size=self.output_size,
+            hidden_size=self.output_size,
+            dropout=self.dropout,
+            trainable_add=False,  # Baseline uses False
+        )
     
-    def _init_weights(self):
+    def init_weights(self):
         """
-        Initialize weights following TFT paper recommendations.
+        Initialize weights following baseline implementation.
         
-        Uses Xavier uniform initialization for linear layers and
-        initializes gating bias to -1 to initially favor skip connections
-        during early training (allows gradual learning).
+        Uses Kaiming normal for fc1/fc2 (leaky_relu mode),
+        Xavier uniform for context and GLU, zeros for all biases.
+        
+        CRITICAL: Must also initialize GateAddNorm's nested components
+        (GLU and LayerNorm) to match baseline initialization.
         """
         for name, p in self.named_parameters():
-            if 'weight' in name and p.dim() >= 2:
-                nn.init.xavier_uniform_(p)
-            elif 'bias' in name:
+            if "bias" in name:
                 nn.init.zeros_(p)
-        
-        # Initialize gate bias to negative value to favor skip connection initially
-        if hasattr(self.gate, 'bias') and self.gate.bias is not None:
-            nn.init.constant_(self.gate.bias, -1.0)
+            elif "fc1" in name or "fc2" in name:
+                nn.init.kaiming_normal_(p, a=0, mode="fan_in", nonlinearity="leaky_relu")
+            elif "context" in name:
+                nn.init.xavier_uniform_(p)
+            elif "gate_norm.glu.fc" in name:
+                # GLU uses Xavier uniform (matches baseline sub_modules.py line 109)
+                nn.init.xavier_uniform_(p)
     
     def forward(
         self, 
         x: torch.Tensor, 
-        context: Optional[torch.Tensor] = None
+        context: Optional[torch.Tensor] = None,
+        residual: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         """
         Forward pass through GRN.
@@ -135,42 +225,35 @@ class GatedResidualNetwork(nn.Module):
         Args:
             x: Input tensor of shape [batch, time, features] or [batch, features]
             context: Optional context tensor for enrichment
+            residual: Optional explicit residual (if None, uses x)
             
         Returns:
             Output tensor of same shape as input (with output_size features)
         """
-        # Store for residual connection
-        residual = x
+        # Store for residual connection (matches baseline logic)
+        if residual is None:
+            residual = x
         
-        # Input normalization
-        x = self.input_norm(x)
+        # Handle dimension mismatch in residual via ResampleNorm
+        if self.input_size != self.output_size and not self.residual:
+            residual = self.resample_norm(residual)
         
         # First transformation: Linear -> ELU
         x = self.fc1(x)
         
         # Add context if provided
-        if context is not None and self.context_size is not None:
-            x = x + self.context_fc(context)
+        if context is not None:
+            context = self.context(context)
+            x = x + context
         
-        x = F.elu(x)
-        x = self.dropout(x)
+        x = self.elu(x)
         
         # Second transformation
         x = self.fc2(x)
         
-        # Skip connection (only if residual=True)
-        if self.residual:
-            if self.skip_linear is not None:
-                residual = self.skip_linear(residual)
-            x = x + residual
-        
-        # Gated Linear Unit: gate ÃƒÂ¢Ã…Â Ã¢â€žÂ¢ x
-        # GLU allows network to suppress unnecessary transformations
-        gate = torch.sigmoid(self.gate(x))
-        x = x * gate
-        
-        # Output normalization
-        x = self.output_norm(x)
+        # Apply gating + skip connection + normalization via GateAddNorm
+        # This replaces the manual gate/norm from previous implementation
+        x = self.gate_norm(x, residual)
         
         return x
 
@@ -600,7 +683,7 @@ class GateAddNorm(nn.Module):
         
     This is used for the three skip connections in TFT:
         - Skip #1: LSTM output -> VSN output
-        - Skip #2: Attention output -> attention input (ÃŽÂ¸_decoder)
+        - Skip #2: Attention output -> attention input (theta_decoder)
         - Skip #3: FFN output -> post-attention output
     
     Architecture:
@@ -675,7 +758,7 @@ class QuantileLoss(nn.Module):
     for financial forecasting where uncertainty quantification matters.
     
     Loss per quantile q:
-        L_q(y, Ãƒâ€¦Ã‚Â·) = max(q * (y - Ãƒâ€¦Ã‚Â·), (q - 1) * (y - Ãƒâ€¦Ã‚Â·))
+        L_q(y, ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â·) = max(q * (y - ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â·), (q - 1) * (y - ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â·))
     
     Total loss is the mean across all quantiles.
     
@@ -713,7 +796,7 @@ class QuantileLoss(nn.Module):
         if targets.dim() == 2:
             targets = targets.unsqueeze(-1)  # [batch, time, 1]
         
-        # Compute errors: y - Ãƒâ€¦Ã‚Â·
+        # Compute errors: y - ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â·
         errors = targets - predictions  # [batch, time, num_quantiles]
         
         # Quantile loss (pinball loss)

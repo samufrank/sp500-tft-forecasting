@@ -15,6 +15,12 @@ Usage:
         --hidden-size 16 --debug
 """
 
+
+import warnings
+warnings.filterwarnings('ignore', category=UserWarning)
+warnings.filterwarnings('ignore', category=FutureWarning)
+warnings.filterwarnings('ignore', message='pkg_resources is deprecated')
+
 import os
 import sys
 import torch
@@ -29,10 +35,6 @@ import json
 import argparse
 from datetime import datetime
 from pathlib import Path
-
-import warnings
-warnings.filterwarnings('ignore', category=UserWarning)
-warnings.filterwarnings('ignore', category=FutureWarning)
 
 # Add project root to path for imports
 project_root = Path(__file__).parent.parent

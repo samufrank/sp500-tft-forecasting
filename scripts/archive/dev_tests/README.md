@@ -10,6 +10,8 @@ Checked specific date (2005-03-10) and t-252 to validate:
 - Inflation_YoY calculations were correct
 - Split CSVs matched their source datasets
 
-**Bug was fixed by adding --data-version to create_splits.py**
+Bug was fixed by adding --data-version to create_splits.py
 
 Kept for reference in case similar alignment issues arise.
+
+TODO: update with additional dev_test scripts
