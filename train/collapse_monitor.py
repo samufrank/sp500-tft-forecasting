@@ -62,6 +62,17 @@ class CollapseMonitor(Callback):
                     self._current_epoch_gradients[name] = []
                     
                 self._current_epoch_gradients[name].append(grad_norm)
+    
+    def on_validation_epoch_start(self, trainer, pl_module):
+        """Reset temporal state in loss function before validation epoch."""
+        # Reset directional penalty buffer and temporal consistency state
+        # This ensures validation statistics are computed on fresh, sequential data
+        print(f"[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch {trainer.current_epoch}")
+        if hasattr(pl_module, 'loss') and hasattr(pl_module.loss, 'reset_temporal_state'):
+            pl_module.loss.reset_temporal_state()
+            print(f"[DEBUG CollapseMonitor] reset_temporal_state() called on loss function")
+        else:
+            print(f"[DEBUG CollapseMonitor] WARNING: Could not find reset_temporal_state on loss")
         
     def on_train_epoch_end(self, trainer, pl_module):
         """Log metrics at end of each epoch."""
@@ -155,10 +166,39 @@ class CollapseMonitor(Callback):
         self.history['pct_negative'].append(float(pct_neg))
         self.history['num_unique_predictions'].append(int(n_unique))
         
+        # Compute anti-collapse penalty if model uses EnhancedQuantileLoss
+        collapse_penalty = None
+        if hasattr(pl_module.loss, 'collapse_weight') and hasattr(pl_module.loss, 'collapse_threshold'):
+            loss_fn = pl_module.loss
+            if pred_std < loss_fn.collapse_threshold:
+                collapse_penalty = loss_fn.collapse_weight * (loss_fn.collapse_threshold - pred_std) ** 2
+            else:
+                collapse_penalty = 0.0
+            self.history['collapse_penalty'] = self.history.get('collapse_penalty', [])
+            self.history['collapse_penalty'].append(float(collapse_penalty))
+        
         print(f"  Pred std: {pred_std:.6f}, range: {pred_range:.6f}, "
               f"mean: {pred_mean:.6f}")
         print(f"  Pos: {pct_pos:.1f}%, Neg: {pct_neg:.1f}%, "
               f"Unique: {n_unique}")
+        
+        # Print collapse penalty if computed
+        if collapse_penalty is not None:
+            print(f"  Collapse penalty: {collapse_penalty:.6f} "
+                  f"(threshold: {loss_fn.collapse_threshold:.6f})")
+        
+        # Print directional penalty if model uses it
+        if hasattr(pl_module.loss, 'directional_weight') and hasattr(pl_module.loss, 'last_directional_penalty'):
+            dir_weight = pl_module.loss.directional_weight
+            dir_penalty = pl_module.loss.last_directional_penalty
+            dir_threshold = pl_module.loss.directional_threshold
+            if dir_weight > 0:
+                if dir_penalty is not None:
+                    print(f"  Directional penalty: {dir_penalty:.6f} "
+                          f"(weight: {dir_weight:.2f}, threshold: {dir_threshold:.2f})")
+                else:
+                    print(f"  Directional penalty: not computed yet "
+                          f"(weight: {dir_weight:.2f}, threshold: {dir_threshold:.2f})")
             
         # Save actual predictions for debugging
         pred_save_path = self.log_dir / f'val_predictions_epoch{trainer.current_epoch}.npy'
@@ -168,6 +208,11 @@ class CollapseMonitor(Callback):
     def _log_gradient_flow(self, pl_module):
         """Log gradient magnitudes by layer using stored gradients from training."""
         epoch = len(self.history['epoch']) - 1
+        
+        # Debug: Print attention parameter names to verify pattern
+        attn_params = [n for n, p in pl_module.named_parameters() if 'attention' in n.lower()]
+        if epoch == 0 and attn_params:  # Only print on first epoch to avoid spam
+            print(f"  [DEBUG] Attention param names: {attn_params[:5]}")  # Show first 5
         
         # Use the gradients we captured during training
         for name, grad_norms in self._current_epoch_gradients.items():
@@ -180,7 +225,7 @@ class CollapseMonitor(Callback):
             self.history['gradient_norms'][name].append(float(avg_grad_norm))
         
         # Print summary of key layers
-        key_layers = ['lstm_encoder', 'lstm_decoder', 'multihead_attn', 
+        key_layers = ['lstm_encoder', 'lstm_decoder', 'multihead_attention', 
                       'output_layer']
         print("  Gradient norms:")
         for layer_name in key_layers:
@@ -297,26 +342,38 @@ class CollapseMonitor(Callback):
                     
                     if attn_weights is not None:
                         # Shape: [batch, num_heads, max_prediction_length, encoder_length + max_prediction_length]
-                        # Average across heads: [batch, max_prediction_length, encoder_length + max_prediction_length]
-                        attn_weights = attn_weights.mean(dim=1)
+                        # Compute per-head entropy instead of averaging heads first
                         
                         # For single-step prediction, extract first (only) prediction timestep
-                        # Shape: [batch, encoder_length + max_prediction_length]
-                        if attn_weights.size(1) == 1:
-                            attn_weights = attn_weights[:, 0, :]
+                        # Shape: [batch, num_heads, encoder_length + max_prediction_length]
+                        if attn_weights.size(2) == 1:
+                            attn_weights = attn_weights[:, :, 0, :]
                         else:
                             # If multiple prediction steps, use first one
-                            attn_weights = attn_weights[:, 0, :]
+                            attn_weights = attn_weights[:, :, 0, :]
                         
                         # Move to CPU and convert to numpy
                         attn = attn_weights.cpu().numpy()
                         
-                        # Compute entropy of attention distribution
-                        # attn shape: [batch, encoder_length + max_prediction_length]
-                        # Should already be normalized (sum to 1), but verify
-                        attn_norm = attn / (attn.sum(axis=-1, keepdims=True) + 1e-10)
-                        entropy = -np.sum(attn_norm * np.log(attn_norm + 1e-10), axis=-1)
-                        attention_entropies.append(entropy)
+                        # Compute entropy per head, then average
+                        # attn shape: [batch, num_heads, encoder_length + max_prediction_length]
+                        per_head_entropies = []
+                        num_heads = attn.shape[1]
+                        
+                        for h in range(num_heads):
+                            # Extract attention for this head: [batch, seq_len]
+                            head_attn = attn[:, h, :]
+                            
+                            # Normalize (should already be normalized, but verify)
+                            head_attn_norm = head_attn / (head_attn.sum(axis=-1, keepdims=True) + 1e-10)
+                            
+                            # Compute entropy: [batch]
+                            head_entropy = -np.sum(head_attn_norm * np.log(head_attn_norm + 1e-10), axis=-1)
+                            per_head_entropies.append(head_entropy)
+                        
+                        # Average entropy across heads: [batch]
+                        avg_entropy_per_batch = np.mean(per_head_entropies, axis=0)
+                        attention_entropies.append(avg_entropy_per_batch)
                         
                 # Method 2: pytorch-forecasting TFT model - use interpret_output
                 elif hasattr(pl_module, 'interpret_output'):
@@ -328,10 +385,13 @@ class CollapseMonitor(Callback):
                         )
                         
                         # Extract attention weights from interpretation dict
+                        # Note: interpret_output may already average across heads internally
+                        # We cannot change pytorch-forecasting's internal behavior, but keep
+                        # consistent structure with custom TFT branch above
                         if 'attention' in interpretation:
                             attn = interpretation['attention'].cpu().numpy()
                             # Compute entropy of attention distribution
-                            # attn shape: [batch, encoder_length] typically
+                            # attn shape: [batch, encoder_length] typically (already head-averaged)
                             # Normalize if not already (attention should sum to 1)
                             attn_norm = attn / (attn.sum(axis=-1, keepdims=True) + 1e-10)
                             entropy = -np.sum(attn_norm * np.log(attn_norm + 1e-10), axis=-1)
