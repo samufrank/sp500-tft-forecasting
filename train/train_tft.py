@@ -636,12 +636,37 @@ def train():
         log_every_n_epochs=args.monitor_every_n_epochs
     )
         
-    checkpoint = ModelCheckpoint(
+    # Multiple checkpoints tracking different metrics
+    checkpoint_val_loss = ModelCheckpoint(
         dirpath=os.path.join(output_dir, 'checkpoints'),
-        filename='tft-{epoch:02d}-{val_loss:.4f}',
+        filename='tft-epoch={epoch:02d}-valloss={val_loss:.4f}',
         monitor='val_loss',
         mode='min',
-        save_top_k=3,
+        save_top_k=1,
+        every_n_epochs=args.checkpoint_every_n_epochs,
+    )
+    
+    checkpoint_pred_std = ModelCheckpoint(
+        dirpath=os.path.join(output_dir, 'checkpoints'),
+        filename='tft-epoch={epoch:02d}-predstd={val_pred_std:.4f}',
+        monitor='val_pred_std',
+        mode='max',  # Higher std = better diversity
+        save_top_k=1,
+        every_n_epochs=args.checkpoint_every_n_epochs,
+    )
+    
+    checkpoint_unique = ModelCheckpoint(
+        dirpath=os.path.join(output_dir, 'checkpoints'),
+        filename='tft-epoch={epoch:02d}-unique={val_num_unique:.0f}',
+        monitor='val_num_unique',
+        mode='max',  # More unique predictions = better
+        save_top_k=1,
+        every_n_epochs=args.checkpoint_every_n_epochs,
+    )
+    
+    checkpoint_last = ModelCheckpoint(
+        dirpath=os.path.join(output_dir, 'checkpoints'),
+        filename='tft-last',
         save_last=True,
     )
     
@@ -655,7 +680,10 @@ def train():
     # build callback list
     callbacks = [
         early_stop,
-        checkpoint,
+        checkpoint_val_loss,
+        checkpoint_pred_std,
+        checkpoint_unique,
+        checkpoint_last,
         EpochSummaryCallback(),
         collapse_monitor
     ]
@@ -671,7 +699,7 @@ def train():
         devices=1,
         gradient_clip_val=args.gradient_clip,
         callbacks=callbacks,
-        deterministic=False,
+        deterministic=True,
         strategy="auto",
         enable_progress_bar=False,
         enable_model_summary=True,
@@ -728,8 +756,13 @@ def train():
     print("\n" + "="*70)
     print("Training complete")
     print("="*70)
-    print(f"\nBest model checkpoint: {checkpoint.best_model_path}")
-    print(f"Best validation loss: {checkpoint.best_model_score:.6f}")
+    print(f"\nBest val_loss checkpoint: {checkpoint_val_loss.best_model_path}")
+    print(f"Best validation loss: {checkpoint_val_loss.best_model_score:.6f}")
+    print(f"Checkpoints saved:")
+    print(f"  - Best val_loss: {checkpoint_val_loss.best_model_path}")
+    print(f"  - Best pred_std: {checkpoint_pred_std.best_model_path}")
+    print(f"  - Best unique: {checkpoint_unique.best_model_path}")
+    print(f"  - Last epoch: {checkpoint_last.best_model_path}")
     print(f"Completed at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"Log saved to: {log_file}")
     print("="*70)
@@ -746,8 +779,11 @@ def train():
     
     # Save final metrics
     metrics = {
-        'best_model_path': checkpoint.best_model_path,
-        'best_val_loss': float(checkpoint.best_model_score),
+        'best_val_loss_path': checkpoint_val_loss.best_model_path,
+        'best_val_loss': float(checkpoint_val_loss.best_model_score),
+        'best_pred_std_path': checkpoint_pred_std.best_model_path,
+        'best_unique_path': checkpoint_unique.best_model_path,
+        'last_path': checkpoint_last.best_model_path,
         'total_epochs': trainer.current_epoch,
         'early_stopped': stopped_early,
     }
