@@ -316,10 +316,50 @@ def prepare_test_dataset(train_df, test_df, config):
 # ============================================================================
 
 def load_model(checkpoint_path):
-    """Load trained TFT model from checkpoint."""
+    """Load trained TFT model from checkpoint (supports both pytorch-forecasting and custom)."""
     print(f"Loading model from: {checkpoint_path}")
-    model = TemporalFusionTransformer.load_from_checkpoint(checkpoint_path)
-    model.eval()
+    
+    # Try to determine model type from checkpoint
+    checkpoint = torch.load(checkpoint_path, map_location='cpu')
+    
+    # Check if this is a custom TFT model
+    is_custom = False
+    if 'state_dict' in checkpoint:
+        # Look for custom TFT signatures in state dict
+        state_dict_keys = checkpoint['state_dict'].keys()
+        if any('static_transform' in k or 'variable_selection' in k for k in state_dict_keys):
+            # Check if it has pytorch-forecasting specific keys
+            has_pf_keys = any('loss.quantiles' in k for k in state_dict_keys)
+            is_custom = not has_pf_keys
+    
+    if is_custom:
+        print("  Detected custom TFT model")
+        # Import custom TFT
+        import sys
+        from pathlib import Path
+        
+        # Add project root to path (script is in scripts/, need parent)
+        script_path = Path(__file__).resolve()
+        project_root = script_path.parent.parent  # Go up from scripts/ to project root
+        if str(project_root) not in sys.path:
+            sys.path.insert(0, str(project_root))
+        
+        from models.tft_model import TemporalFusionTransformer as CustomTFT
+        
+        # Load hyperparameters from checkpoint
+        hparams = checkpoint.get('hyper_parameters', {})
+        
+        # Create model instance
+        model = CustomTFT(**hparams)
+        
+        # Load state dict
+        model.load_state_dict(checkpoint['state_dict'])
+        model.eval()
+    else:
+        print("  Detected pytorch-forecasting TFT model")
+        # Use pytorch-forecasting loader
+        model = TemporalFusionTransformer.load_from_checkpoint(checkpoint_path)
+        model.eval()
     
     # Move model to appropriate device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -438,27 +478,49 @@ def extract_attention_patterns(model, test_dataset, batch_size=128):
             all_predictions.append(preds.cpu().numpy())
             all_actuals.append(y_actual[:, 0].cpu().numpy())
             
-            # Extract attention using interpret_output
+            # Extract attention using interpret_output or getter method
             # Note: interpret_output can be expensive, so we do it after storing preds/actuals
-            try:
-                interpretation = model.interpret_output(
-                    output,
-                    reduction='none',
-                    attention_prediction_horizon=0  # First prediction step
-                )
+            attn_weights = None
+            
+            # Method 1: Custom TFT model - use getter method
+            if hasattr(model, 'get_attention_weights'):
+                output_again = model(x)  # Need fresh forward pass for getter
+                attn_weights = model.get_attention_weights()
                 
-                if 'attention' in interpretation:
-                    attn = interpretation['attention'].cpu().numpy()
-                    all_attention.append(attn)
-                
-                if 'encoder_variables' in interpretation:
-                    enc_vars = interpretation['encoder_variables'].cpu().numpy()
-                    all_encoder_vars.append(enc_vars)
+                if attn_weights is not None:
+                    # Shape: [batch, num_heads, max_prediction_length, encoder_length + max_prediction_length]
+                    # Average across heads to match pytorch-forecasting format
+                    attn_weights = attn_weights.mean(dim=1)  # [batch, max_prediction_length, seq_len]
                     
-            except Exception as e:
-                print(f"\nWarning: interpret_output failed on batch {batch_idx}: {e}")
-                print("Continuing without attention extraction for this batch...")
-                # Still keep the predictions/actuals
+                    # Extract first prediction timestep
+                    if attn_weights.size(1) == 1:
+                        attn_weights = attn_weights[:, 0, :]  # [batch, seq_len]
+                    else:
+                        attn_weights = attn_weights[:, 0, :]  # [batch, seq_len]
+                    
+                    all_attention.append(attn_weights.cpu().numpy())
+                    
+            # Method 2: pytorch-forecasting TFT model - use interpret_output
+            elif hasattr(model, 'interpret_output'):
+                try:
+                    interpretation = model.interpret_output(
+                        output,
+                        reduction='none',
+                        attention_prediction_horizon=0  # First prediction step
+                    )
+                    
+                    if 'attention' in interpretation:
+                        attn = interpretation['attention'].cpu().numpy()
+                        all_attention.append(attn)
+                    
+                    if 'encoder_variables' in interpretation:
+                        enc_vars = interpretation['encoder_variables'].cpu().numpy()
+                        all_encoder_vars.append(enc_vars)
+                        
+                except Exception as e:
+                    print(f"\nWarning: interpret_output failed on batch {batch_idx}: {e}")
+                    print("Continuing without attention extraction for this batch...")
+                    # Still keep the predictions/actuals
             
             if (batch_idx + 1) % 10 == 0:
                 print(f"  Processed {batch_idx + 1}/{len(dataloader)} batches")
@@ -611,7 +673,7 @@ def plot_attention_heatmap(period_stats, feature_names, output_path):
     period_names = list(period_stats.keys())
     n_features = len(feature_names)
     
-    # Build matrix: periods Ã— features
+    # Build matrix: periods Ãƒâ€” features
     attention_matrix = np.zeros((len(period_names), n_features))
     for i, period in enumerate(period_names):
         attention_matrix[i] = period_stats[period]['mean_attention']
@@ -763,7 +825,7 @@ def print_summary(period_stats, comparisons):
     for period, stats in period_stats.items():
         print(f"\n{period}:")
         print(f"  Samples: {stats['n_samples']}")
-        print(f"  Entropy: {stats['entropy_mean']:.4f} Â± {stats['entropy_std']:.4f}")
+        print(f"  Entropy: {stats['entropy_mean']:.4f} Ã‚Â± {stats['entropy_std']:.4f}")
         print(f"  Concentration: {stats['attention_concentration']:.4f}")
         print(f"  Top 5 features:")
         for feat, weight in stats['top_features']:

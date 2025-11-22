@@ -22,10 +22,21 @@ plt.rcParams['font.size'] = 10
 
 def load_monitoring_log(experiment_name):
     """Load collapse monitoring data."""
+    # Try direct path first
     log_path = Path(f'experiments/{experiment_name}/collapse_monitoring/collapse_monitor_latest.json')
     
     if not log_path.exists():
-        return None
+        # Try searching in phase directories (00_, 01_, etc.)
+        phase_dirs = ['00_baseline_exploration', '01_staleness_features', 
+                      '01_staleness_features_fixed', '02_custom_tft']
+        for phase in phase_dirs:
+            alt_path = Path(f'experiments/{phase}/{experiment_name}/collapse_monitoring/collapse_monitor_latest.json')
+            if alt_path.exists():
+                log_path = alt_path
+                break
+        
+        if not log_path.exists():
+            return None
     
     with open(log_path, 'r') as f:
         return json.load(f)
@@ -71,6 +82,7 @@ def plot_prediction_diversity(experiments, output_path='prediction_diversity.png
     ax1.legend(loc='best', fontsize=8)
     ax1.grid(True, alpha=0.3)
     ax1.set_yscale('log')
+    ax1.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
     
     ax2.set_xlabel('Epoch', fontsize=12)
     ax2.set_ylabel('Prediction Range', fontsize=12)
@@ -78,6 +90,7 @@ def plot_prediction_diversity(experiments, output_path='prediction_diversity.png
     ax2.legend(loc='best', fontsize=8)
     ax2.grid(True, alpha=0.3)
     ax2.set_yscale('log')
+    ax2.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
     
     plt.tight_layout()
     plt.savefig(output_path, dpi=150, bbox_inches='tight')
@@ -87,59 +100,144 @@ def plot_prediction_diversity(experiments, output_path='prediction_diversity.png
 
 def plot_gradient_flow(experiments, output_path='gradient_flow.png'):
     """Plot gradient norms over training."""
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-    axes = axes.flatten()
+    # Check if any experiment has attention gradients (custom models)
+    has_attention_gradients = False
+    has_attention_entropy = False
     
-    # Key layers to track
-    layer_groups = {
-        'LSTM Encoder': 'lstm_encoder',
-        'LSTM Decoder': 'lstm_decoder',
-        'Attention': 'multihead_attn',
-        'Output Layer': 'output_layer',
-    }
+    for exp_name in experiments:
+        data = load_monitoring_log(exp_name)
+        if data is None:
+            continue
+        if any('multihead_attention' in k for k in data.get('gradient_norms', {}).keys()):
+            has_attention_gradients = True
+        if 'attention_entropy' in data and any(e is not None for e in data['attention_entropy']):
+            has_attention_entropy = True
+    
+    # Decide layout: 2x2 (standard) or 2x3 (with both attention metrics)
+    if has_attention_gradients and has_attention_entropy:
+        fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+        layer_groups = {
+            'LSTM Encoder': 'lstm_encoder',
+            'LSTM Decoder': 'lstm_decoder', 
+            'Attention (Gradients)': 'multihead_attention',
+            'Attention Entropy': 'attention_entropy',
+            'Output Layer': 'output_layer',
+        }
+    else:
+        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+        if has_attention_gradients:
+            layer_groups = {
+                'LSTM Encoder': 'lstm_encoder',
+                'LSTM Decoder': 'lstm_decoder',
+                'Attention (Gradients)': 'multihead_attention',
+                'Output Layer': 'output_layer',
+            }
+        else:
+            layer_groups = {
+                'LSTM Encoder': 'lstm_encoder',
+                'LSTM Decoder': 'lstm_decoder',
+                'Attention Entropy': 'attention_entropy',
+                'Output Layer': 'output_layer',
+            }
+    
+    axes = axes.flatten()
     
     for idx, (group_name, layer_key) in enumerate(layer_groups.items()):
         ax = axes[idx]
         
-        for exp_name in experiments:
-            data = load_monitoring_log(exp_name)
-            if data is None:
-                continue
+        # Special handling for attention entropy
+        if group_name == 'Attention Entropy':
+            ax.set_title('Attention Entropy', fontweight='bold')
+            ax.set_xlabel('Epoch')
+            ax.set_ylabel('Entropy (nats)')
             
-            epochs = data['epoch']
+            for exp_name in experiments:
+                data = load_monitoring_log(exp_name)
+                if data is None or 'attention_entropy' not in data:
+                    continue
+                
+                epochs = data['epoch']
+                entropy = data['attention_entropy']
+                
+                # Filter out None values
+                valid_data = [(e, ent) for e, ent in zip(epochs, entropy) if ent is not None]
+                if not valid_data:
+                    continue
+                
+                valid_epochs, valid_entropy = zip(*valid_data)
+                
+                collapsed = data['prediction_std'][-1] < 0.05
+                linestyle = '--' if collapsed else '-'
+                label = exp_name.replace('capacity_', '').replace('monitor_', '')
+                ax.plot(valid_epochs, valid_entropy, linestyle=linestyle,
+                       alpha=0.7, label=label)
             
-            # Find all gradient norms for this layer group
-            matching_layers = [k for k in data['gradient_norms'].keys() 
-                             if layer_key in k]
+            ax.legend(fontsize=8)
+            ax.grid(True, alpha=0.3)
             
-            if not matching_layers:
-                continue
+            # Force integer epoch labels
+            if len(experiments) > 0:
+                ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
             
-            # Average across all params in this layer
-            avg_norms = []
-            for epoch_idx in range(len(epochs)):
-                norms = [data['gradient_norms'][layer][epoch_idx] 
-                        for layer in matching_layers
-                        if epoch_idx < len(data['gradient_norms'][layer])]
-                if norms:
-                    avg_norms.append(np.mean(norms))
-                else:
-                    avg_norms.append(np.nan)
-            
-            # Determine if collapsed
-            collapsed = data['prediction_std'][-1] < 0.05
-            linestyle = '--' if collapsed else '-'
-            
-            label = exp_name.replace('capacity_', '').replace('monitor_', '')
-            ax.plot(epochs[:len(avg_norms)], avg_norms, linestyle=linestyle,
-                   alpha=0.7, label=label)
+            # Add note about methodology
+            if not has_attention_gradients:
+                ax.text(0.5, 0.95, '(Baseline: head-averaged)', 
+                       transform=ax.transAxes, ha='center', va='top',
+                       fontsize=8, style='italic', alpha=0.7)
+            else:
+                ax.text(0.5, 0.95, '(Custom: per-head averaged)', 
+                       transform=ax.transAxes, ha='center', va='top',
+                       fontsize=8, style='italic', alpha=0.7)
         
-        ax.set_xlabel('Epoch')
-        ax.set_ylabel('Gradient Norm')
-        ax.set_title(f'{group_name}', fontweight='bold')
-        ax.legend(fontsize=8)
-        ax.grid(True, alpha=0.3)
-        ax.set_yscale('log')
+        else:
+            # Standard gradient plotting
+            for exp_name in experiments:
+                data = load_monitoring_log(exp_name)
+                if data is None:
+                    continue
+                
+                epochs = data['epoch']
+                
+                # Find all gradient norms for this layer group
+                matching_layers = [k for k in data['gradient_norms'].keys() 
+                                 if layer_key in k]
+                
+                if not matching_layers:
+                    continue
+                
+                # Average across all params in this layer
+                avg_norms = []
+                for epoch_idx in range(len(epochs)):
+                    norms = [data['gradient_norms'][layer][epoch_idx] 
+                            for layer in matching_layers
+                            if epoch_idx < len(data['gradient_norms'][layer])]
+                    if norms:
+                        avg_norms.append(np.mean(norms))
+                    else:
+                        avg_norms.append(np.nan)
+                
+                # Determine if collapsed
+                collapsed = data['prediction_std'][-1] < 0.05
+                linestyle = '--' if collapsed else '-'
+                
+                label = exp_name.replace('capacity_', '').replace('monitor_', '')
+                ax.plot(epochs[:len(avg_norms)], avg_norms, linestyle=linestyle,
+                       alpha=0.7, label=label)
+            
+            ax.set_xlabel('Epoch')
+            ax.set_ylabel('Gradient Norm')
+            ax.set_title(f'{group_name}', fontweight='bold')
+            ax.legend(fontsize=8)
+            ax.grid(True, alpha=0.3)
+            ax.set_yscale('log')
+            
+            # Force integer epoch labels
+            if len(epochs) > 0:
+                ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
+    
+    # Hide unused subplot if 2x3 layout
+    if len(axes) > len(layer_groups):
+        axes[-1].axis('off')
     
     plt.suptitle('Gradient Flow Analysis', fontsize=16, fontweight='bold', y=1.00)
     plt.tight_layout()
@@ -186,6 +284,7 @@ def plot_sign_distribution(experiments, output_path='sign_distribution.png'):
     ax1.legend(fontsize=8)
     ax1.grid(True, alpha=0.3)
     ax1.set_ylim([0, 105])
+    ax1.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
     
     ax2.set_xlabel('Epoch', fontsize=12)
     ax2.set_ylabel('% Negative Predictions', fontsize=12)
@@ -193,6 +292,7 @@ def plot_sign_distribution(experiments, output_path='sign_distribution.png'):
     ax2.legend(fontsize=8)
     ax2.grid(True, alpha=0.3)
     ax2.set_ylim([0, 105])
+    ax2.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
     
     plt.tight_layout()
     plt.savefig(output_path, dpi=150, bbox_inches='tight')
@@ -345,4 +445,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
