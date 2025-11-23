@@ -316,50 +316,12 @@ def prepare_test_dataset(train_df, test_df, config):
 # ============================================================================
 
 def load_model(checkpoint_path):
-    """Load trained TFT model from checkpoint (supports both pytorch-forecasting and custom)."""
+    """Load trained TFT model from checkpoint (pytorch-forecasting)."""
     print(f"Loading model from: {checkpoint_path}")
     
-    # Try to determine model type from checkpoint
-    checkpoint = torch.load(checkpoint_path, map_location='cpu')
-    
-    # Check if this is a custom TFT model
-    is_custom = False
-    if 'state_dict' in checkpoint:
-        # Look for custom TFT signatures in state dict
-        state_dict_keys = checkpoint['state_dict'].keys()
-        if any('static_transform' in k or 'variable_selection' in k for k in state_dict_keys):
-            # Check if it has pytorch-forecasting specific keys
-            has_pf_keys = any('loss.quantiles' in k for k in state_dict_keys)
-            is_custom = not has_pf_keys
-    
-    if is_custom:
-        print("  Detected custom TFT model")
-        # Import custom TFT
-        import sys
-        from pathlib import Path
-        
-        # Add project root to path (script is in scripts/, need parent)
-        script_path = Path(__file__).resolve()
-        project_root = script_path.parent.parent  # Go up from scripts/ to project root
-        if str(project_root) not in sys.path:
-            sys.path.insert(0, str(project_root))
-        
-        from models.tft_model import TemporalFusionTransformer as CustomTFT
-        
-        # Load hyperparameters from checkpoint
-        hparams = checkpoint.get('hyper_parameters', {})
-        
-        # Create model instance
-        model = CustomTFT(**hparams)
-        
-        # Load state dict
-        model.load_state_dict(checkpoint['state_dict'])
-        model.eval()
-    else:
-        print("  Detected pytorch-forecasting TFT model")
-        # Use pytorch-forecasting loader
-        model = TemporalFusionTransformer.load_from_checkpoint(checkpoint_path)
-        model.eval()
+    # Use pytorch-forecasting loader
+    model = TemporalFusionTransformer.load_from_checkpoint(checkpoint_path)
+    model.eval()
     
     # Move model to appropriate device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

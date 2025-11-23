@@ -60,7 +60,7 @@ def find_attention_results(paths):
     """
     import re
     results = {}
-    phase_pattern = re.compile(r'^\d{2}_')  # Pattern for phase directories like 00_, 01_, etc.
+    phase_pattern = re.compile(r'^\d{2}[a-z]?_')  # Pattern for 00_, 01_, 02_, 02b_, etc.
     
     for path_pattern in paths:
         # Expand globs
@@ -431,6 +431,10 @@ def correlate_attention_collapse(summary_df, collapse_df):
     summary_df = summary_df.copy()
     summary_df['phase_prefix'] = summary_df['experiment_name'].str.split('/').str[0]
     
+    # Extract experiment name (without phase prefix) for matching
+    # e.g., "02b_vintage_sweep/baseline_h16_drop0.10" -> "baseline_h16_drop0.10"
+    summary_df['exp_name_only'] = summary_df['experiment_name'].str.split('/').str[-1]
+    
     # Check if collapse_df has a 'phase' column to merge on
     if 'phase' not in collapse_df.columns:
         print(f"\nWARNING: No 'phase' column in collapse data for merging")
@@ -440,11 +444,19 @@ def correlate_attention_collapse(summary_df, collapse_df):
     # Debug: Check experiment name formats
     print(f"\nDEBUG: Merging attention and collapse data")
     print(f"  Attention experiments (first 3): {summary_df['experiment_name'].head(3).tolist()}")
+    print(f"  Attention exp_name_only (first 3): {summary_df['exp_name_only'].head(3).tolist()}")
     print(f"  Attention phase prefixes (first 3): {summary_df['phase_prefix'].head(3).tolist()}")
+    print(f"  Collapse experiments (first 3): {collapse_df['experiment_name'].head(3).tolist()}")
     print(f"  Collapse phase values (first 3): {collapse_df['phase'].head(3).tolist()}")
     
-    # Merge on phase_prefix (attention) = phase (collapse)
-    merged = summary_df.merge(collapse_df, left_on='phase_prefix', right_on='phase', how='inner')
+    # Merge on BOTH phase and experiment name
+    merged = summary_df.merge(
+        collapse_df, 
+        left_on=['phase_prefix', 'exp_name_only'], 
+        right_on=['phase', 'experiment_name'], 
+        how='inner',
+        suffixes=('_attention', '_collapse')
+    )
     
     print(f"  Merge result: {len(merged)} rows (from {len(summary_df)} attention + {len(collapse_df)} collapse)")
     

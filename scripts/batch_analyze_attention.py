@@ -5,6 +5,9 @@ Usage:
     # Run on all experiments (skips existing results)
     python scripts/batch_analyze_attention.py
     
+    # Run on all experiments in a phase
+    python scripts/batch_analyze_attention.py --phase 02_vintage_baseline
+    
     # Run on specific experiment
     python scripts/batch_analyze_attention.py --experiment 00_baseline_exploration/sweep2_h16_drop_0.25
     
@@ -119,6 +122,8 @@ def main():
     
     parser.add_argument('--experiment', type=str, default=None,
                         help='Specific experiment to analyze (e.g., 00_baseline_exploration/sweep2_h16_drop_0.25)')
+    parser.add_argument('--phase', type=str, default=None,
+                        help='Process all experiments in a phase (e.g., 02_vintage_baseline)')
     parser.add_argument('--force', action='store_true',
                         help='Force re-run even if results exist')
     parser.add_argument('--output-subdir', type=str, default='attention_analysis_year',
@@ -132,6 +137,25 @@ def main():
     if args.experiment:
         experiments = [args.experiment]
         print(f"Processing single experiment: {args.experiment}")
+    elif args.phase:
+        # Process all experiment subdirs in specified phase
+        phase_path = Path(args.base_dir) / args.phase
+        if not phase_path.exists():
+            print(f"Error: Phase directory does not exist: {phase_path}")
+            return
+        
+        experiments = []
+        for exp_dir in sorted(phase_path.iterdir()):
+            if not exp_dir.is_dir():
+                continue
+            
+            # Check if it has checkpoints
+            checkpoints_dir = exp_dir / 'checkpoints'
+            if checkpoints_dir.exists() and list(checkpoints_dir.glob('*.ckpt')):
+                rel_path = exp_dir.relative_to(args.base_dir)
+                experiments.append(str(rel_path))
+        
+        print(f"Processing phase '{args.phase}': found {len(experiments)} experiments with checkpoints")
     else:
         experiments = find_all_experiments(args.base_dir)
         print(f"Found {len(experiments)} experiments with checkpoints")
@@ -154,7 +178,7 @@ def main():
         
         # Check if results already exist
         if not args.force and has_existing_results(exp_path, args.output_subdir):
-            print(f Skipping (results exist): {exp_path}")
+            print(f"Skipping (results exist): {exp_path}")
             results['skipped'].append(exp_path)
             continue
         
