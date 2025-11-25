@@ -18,7 +18,7 @@ h16d025_dirw2.0
 
 By prediction diversity:
 h16d015_dirw2.0_extremew10.0p90
-- Healthy: 75.7% (highest diversity), Sharpe: [data]
+- Healthy: 75.7% (highest diversity), Sharpe: 0.6250
 - Config: hidden_size=16, dropout=0.15, directional_weight=2.0, extreme_move_weight=10.0
 
 By statistical accuracy:
