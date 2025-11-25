@@ -35,9 +35,12 @@ import warnings
 warnings.filterwarnings('ignore', category=UserWarning)
 warnings.filterwarnings('ignore', category=FutureWarning)
 
+# Custom components
+from src.custom_losses import create_loss_from_args
+
 # in same /train dir
 from collapse_monitor import CollapseMonitor
-from callbacks import EpochSummaryCallback, DistributionLossLogger
+from callbacks import EpochSummaryCallback
     
 
 
@@ -73,7 +76,7 @@ def parse_args():
     # TFT architecture
     parser.add_argument('--max-encoder-length', type=int, default=20,
                         help='Lookback window length')
-    parser.add_argument('--hidden-size', type=int, default=32,
+    parser.add_argument('--hidden-size', type=int, default=16,
                         help='Hidden layer size')
     parser.add_argument('--attention-heads', type=int, default=2,
                         help='Number of attention heads')
@@ -110,12 +113,35 @@ def parse_args():
     parser.add_argument('--monitor-every-n-epochs', type=int, default=1,
                    help='How often to run collapse monitoring')
 
+    # Checkpointing
+    parser.add_argument('--checkpoint-every-n-epochs', type=int, default=1,
+                   help='How often to save checkpoints (1=every epoch including epoch 0)')
 
-    # anti-collapse loss
+    # Prediction diversity regularization (anti-collapse penalties)
     parser.add_argument('--dist-loss-mean-weight', type=float, default=0.0,
-                    help='Anti-drift penalty weight (0=disabled, typical: 0.1-0.2)')
+                    help='DEPRECATED: Anti-drift penalty weight (ignored)')
     parser.add_argument('--dist-loss-std-weight', type=float, default=0.0,
-                    help='Anti-collapse penalty weight (0=disabled, typical: 0.1-0.2)')
+                    help='Variance-based anti-collapse penalty weight (0=disabled, typical: 0.1-0.2)')
+    parser.add_argument('--collapse-threshold', type=float, default=0.005,
+                    help='Minimum variance threshold for collapse penalty (default: 0.005 = 0.5%%)')
+    parser.add_argument('--directional-weight', type=float, default=0.0,
+                    help='Directional diversity penalty weight (0=disabled, typical: 0.1-0.2)')
+    parser.add_argument('--directional-threshold', type=float, default=0.90,
+                    help='Maximum directional bias threshold (default: 0.90 = 90%%)')
+    parser.add_argument('--directional-window', type=int, default=30,
+                    help='Rolling window size for directional bias calculation (default: 30)')
+    parser.add_argument('--temporal-consistency-weight', type=float, default=0.0,
+                    help='Temporal smoothness penalty weight (0=disabled, typical: 0.05-0.1)')
+    
+    # Magnitude-aware loss weighting (encourage larger predictions)
+    parser.add_argument('--magnitude-weight-alpha', type=float, default=0.0,
+                    help='Linear magnitude weighting coefficient (0=disabled, typical: 0.5-2.0). '
+                         'Mutually exclusive with extreme-move-weight.')
+    parser.add_argument('--extreme-move-weight', type=float, default=1.0,
+                    help='Weight multiplier for extreme moves (1.0=disabled, typical: 2.0-5.0). '
+                         'Mutually exclusive with magnitude-weight-alpha.')
+    parser.add_argument('--extreme-move-percentile', type=int, default=95,
+                    help='Percentile threshold for extreme moves (default: 95 = top 5%%)')
     
     return parser.parse_args()
 
@@ -356,7 +382,30 @@ def prepare_tft_data(train_df, val_df, args, features, add_staleness=True):
 # ============================================================================
 
 def create_model(training_dataset, args):
-    """Initialize TFT model with standard QuantileLoss."""
+    """Initialize TFT model with EnhancedQuantileLoss."""
+    
+    # Create loss function with configured penalties
+    loss_fn = create_loss_from_args(args)
+    
+    # Log which penalties are active
+    active_penalties = []
+    if args.dist_loss_std_weight > 0:
+        threshold_pct = args.collapse_threshold * 100
+        active_penalties.append(f"variance_collapse={args.dist_loss_std_weight} (threshold={threshold_pct:.1f}%)")
+    if args.directional_weight > 0:
+        dir_threshold_pct = args.directional_threshold * 100
+        active_penalties.append(f"directional_diversity={args.directional_weight} (threshold={dir_threshold_pct:.0f}%)")
+    if args.temporal_consistency_weight > 0:
+        active_penalties.append(f"temporal_consistency={args.temporal_consistency_weight}")
+    
+    # Note: dist_loss_mean_weight is ignored (fixed distribution targets don't work with regime variation)
+    if args.dist_loss_mean_weight > 0:
+        print("\nNOTE: --dist-loss-mean-weight is ignored (use anti-collapse via --dist-loss-std-weight instead)")
+    
+    if active_penalties:
+        print(f"\nActive loss penalties: {', '.join(active_penalties)}")
+    else:
+        print("\nUsing standard QuantileLoss (no penalties)")
     
     # DEBUG: Show what features the dataset has BEFORE model creation
     #print("\n" + "="*80)
@@ -380,7 +429,7 @@ def create_model(training_dataset, args):
         dropout=args.dropout,
         hidden_continuous_size=args.hidden_continuous_size,
         output_size=7,
-        loss=QuantileLoss(),
+        loss=loss_fn,  # Use custom loss instead of QuantileLoss()
         log_interval=10,
         reduce_on_plateau_patience=4,
     )
@@ -406,7 +455,7 @@ def create_model(training_dataset, args):
             fc1_in = enc_vsn.flattened_grn.fc1.in_features
             fc1_out = enc_vsn.flattened_grn.fc1.out_features
             print(f"  flattened_grn.fc1: in_features={fc1_in}, out_features={fc1_out}")
-            print(f"  → Params in fc1: {fc1_in * fc1_out} (should be 5*16*5=400 if 5 features)")
+            print(f"  -> Params in fc1: {fc1_in * fc1_out} (should be 5*16*5=400 if 5 features)")
     print("="*80 + "\n")
     
     return tft
@@ -458,6 +507,18 @@ def save_config(args, features, output_dir):
             'learning_rate': args.learning_rate,
             'gradient_clip_val': args.gradient_clip,
             'early_stop_patience': args.early_stop_patience,
+        },
+        'loss': {
+            'type': 'EnhancedQuantileLoss',
+            'dist_loss_mean_weight': args.dist_loss_mean_weight,
+            'dist_loss_std_weight': args.dist_loss_std_weight,
+            'collapse_threshold': getattr(args, 'collapse_threshold', 0.005),
+            'directional_weight': getattr(args, 'directional_weight', 0.0),
+            'directional_threshold': getattr(args, 'directional_threshold', 0.90),
+            'temporal_consistency_weight': args.temporal_consistency_weight,
+            'magnitude_weight_alpha': getattr(args, 'magnitude_weight_alpha', 0.0),
+            'extreme_move_weight': getattr(args, 'extreme_move_weight', 1.0),
+            'extreme_move_percentile': getattr(args, 'extreme_move_percentile', 95),
         },
         'features': features,
         'pytorch_version': torch.__version__,
@@ -604,21 +665,8 @@ def train():
     print("\nInitializing model...")
     tft = create_model(training, args)
     
-    # Optionally add distribution penalties
-    if args.dist_loss_mean_weight > 0 or args.dist_loss_std_weight > 0:
-        from loss_wrapper import add_distribution_penalties
-        tft = add_distribution_penalties(
-            tft,
-            mean_weight=args.dist_loss_mean_weight,
-            std_weight=args.dist_loss_std_weight,
-            target_mean=0.0003,
-            target_std=0.01
-        )
-        print(f"\n>>> Distribution penalties enabled:")
-        print(f"    mean_weight={args.dist_loss_mean_weight}")
-        print(f"    std_weight={args.dist_loss_std_weight}")
-    else:
-        print("\n>>> Using standard QuantileLoss (no distribution penalties)")
+    # Distribution penalties are now handled in create_model() via EnhancedQuantileLoss
+    # Old monkey-patching code (Phase 3) removed - see loss_wrapper.py for reference
     
     print(f"Model parameters: {sum(p.numel() for p in tft.parameters()):,}")
     
@@ -668,6 +716,7 @@ def train():
         dirpath=os.path.join(output_dir, 'checkpoints'),
         filename='tft-last',
         save_last=True,
+        every_n_epochs=args.checkpoint_every_n_epochs,
     )
     
     from pytorch_lightning.loggers import CSVLogger, TensorBoardLogger
@@ -688,9 +737,7 @@ def train():
         collapse_monitor
     ]
 
-    # add distribution loss logger if using custom loss
-    if args.dist_loss_mean_weight > 0 or args.dist_loss_std_weight > 0:
-        callbacks.append(DistributionLossLogger())
+    # Note: Anti-collapse penalty logging is integrated into CollapseMonitor
     
     trainer = pl.Trainer(
         logger=logger,

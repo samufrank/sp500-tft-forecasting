@@ -315,18 +315,153 @@ def prepare_test_dataset(train_df, test_df, config):
 # MODEL LOADING
 # ============================================================================
 
-def load_model(checkpoint_path):
-    """Load trained TFT model from checkpoint (pytorch-forecasting)."""
+def load_model(checkpoint_path, config):
+    """Load trained TFT model from checkpoint (supports regime output)."""
     print(f"Loading model from: {checkpoint_path}")
     
-    # Use pytorch-forecasting loader
-    model = TemporalFusionTransformer.load_from_checkpoint(checkpoint_path)
+    # Check if this model used regime output
+    regime_config = config.get('regime_output', {})
+    use_regime_output = regime_config.get('enabled', False)
+    
+    # Check if this model used distribution loss
+    training_config = config.get('training', {})
+    mean_weight = training_config.get('dist_loss_mean_weight', 0.0)
+    std_weight = training_config.get('dist_loss_std_weight', 0.0)
+    uses_dist_loss = mean_weight > 0 or std_weight > 0
+    
+    # Case 1: Baseline model (no regime output, no dist loss)
+    if not uses_dist_loss and not use_regime_output:
+        model = TemporalFusionTransformer.load_from_checkpoint(checkpoint_path)
+        model.eval()
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        model = model.to(device)
+        print(f"  Loaded baseline model, moved to device: {device}")
+        return model
+    
+    # Case 2: Regime output without dist loss
+    if use_regime_output and not uses_dist_loss:
+        print(f"  Detected regime output checkpoint, applying architecture modification...")
+        
+        # Load checkpoint dict first
+        checkpoint = torch.load(checkpoint_path, map_location='cpu')
+        
+        # Extract hparams from checkpoint
+        hparams = checkpoint['hyper_parameters']
+        
+        # Create model with baseline architecture (no weights loaded)
+        model = TemporalFusionTransformer(**hparams)
+        
+        # Apply regime output architecture before loading weights
+        from regime_output import replace_output_layer
+        
+        num_regimes = regime_config.get('num_regimes', 2)
+        routing_mode = regime_config.get('routing_mode', 'learned')
+        routing_strategy = regime_config.get('routing_strategy', 'learned')
+        vix_threshold = regime_config.get('vix_threshold', 25.0)
+        
+        model = replace_output_layer(
+            model,
+            num_regimes=num_regimes,
+            routing_mode=routing_mode,
+            routing_strategy=routing_strategy,
+            vix_threshold=vix_threshold
+        )
+        
+        # NOW load the MoE weights
+        model.load_state_dict(checkpoint['state_dict'])
+        print(f"  Successfully loaded regime output state_dict")
+        
+        model.eval()
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        model = model.to(device)
+        print(f"  Model moved to device: {device}")
+        return model
+    
+    # Case 3: Distribution loss (with or without regime output)
+    print(f"  Loading distribution loss checkpoint (bypassing corrupted loss)...")
+    
+    import pickle
+    import tempfile
+    
+    # Custom unpickler for dist loss
+    class FixedUnpickler(pickle.Unpickler):
+        def find_class(self, module, name):
+            if name == 'QuantileLoss' and 'pytorch_forecasting' in module:
+                from pytorch_forecasting.metrics import QuantileLoss
+                return QuantileLoss
+            return super().find_class(module, name)
+    
+    try:
+        with open(checkpoint_path, 'rb') as f:
+            checkpoint = FixedUnpickler(f).load()
+    except Exception as e:
+        print(f"  Direct unpickling failed: {e}")
+        raise RuntimeError(
+            f"Cannot load checkpoint with monkey-patched loss. "
+            f"Recommendation: Retrain without distribution loss."
+        )
+    
+    # Fix hyperparameters if loss object exists
+    if 'hyper_parameters' in checkpoint and 'loss' in checkpoint['hyper_parameters']:
+        from pytorch_forecasting.metrics import QuantileLoss
+        checkpoint['hyper_parameters']['loss'] = QuantileLoss()
+    
+    # Save fixed checkpoint temporarily
+    with tempfile.NamedTemporaryFile(suffix='.ckpt', delete=False) as tmp:
+        tmp_path = tmp.name
+    
+    try:
+        if use_regime_output:
+            print(f"  Detected regime output checkpoint, applying architecture modification...")
+            
+            # Create model from hyperparameters (no weights loaded)
+            hparams = checkpoint['hyper_parameters']
+            model = TemporalFusionTransformer(**hparams)
+            
+            # Apply regime output architecture before loading weights
+            from regime_output import replace_output_layer
+            
+            num_regimes = regime_config.get('num_regimes', 2)
+            routing_mode = regime_config.get('routing_mode', 'learned')
+            routing_strategy = regime_config.get('routing_strategy', 'learned')
+            vix_threshold = regime_config.get('vix_threshold', 25.0)
+            
+            model = replace_output_layer(
+                model,
+                num_regimes=num_regimes,
+                routing_mode=routing_mode,
+                routing_strategy=routing_strategy,
+                vix_threshold=vix_threshold
+            )
+            
+            # Now load the state dict with MoE architecture
+            model.load_state_dict(checkpoint['state_dict'])
+            print(f"  Successfully loaded regime output state_dict")
+        else:
+            # No regime output - use standard checkpoint loading
+            torch.save(checkpoint, tmp_path)
+            model = TemporalFusionTransformer.load_from_checkpoint(tmp_path)
+        
+    finally:
+        import os
+        os.unlink(tmp_path)
+    
     model.eval()
     
-    # Move model to appropriate device
+    # Re-apply distribution penalties
+    from loss_wrapper import add_distribution_penalties
+    model = add_distribution_penalties(
+        model,
+        mean_weight=mean_weight,
+        std_weight=std_weight,
+        target_mean=training_config.get('dist_loss_target_mean', 0.0003),
+        target_std=training_config.get('dist_loss_target_std', 0.01)
+    )
+    print(f"  Re-applied distribution penalties: mean_weight={mean_weight}, std_weight={std_weight}")
+    
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = model.to(device)
-    print(f"Model moved to device: {device}")
+    print(f"  Model moved to device: {device}")
     
     return model
 
@@ -846,7 +981,7 @@ def main():
     
     # Load model
     print("\nLoading model...")
-    model = load_model(checkpoint_path)
+    model = load_model(checkpoint_path, config)
     
     # Extract attention patterns
     print("\nExtracting attention patterns...")

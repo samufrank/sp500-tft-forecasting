@@ -4,20 +4,33 @@ Evaluate trained Temporal Fusion Transformer on test set.
 Comprehensive evaluation including statistical metrics, financial metrics,
 and diagnostic outputs with full experiment logging.
 
+Supports both baseline TFT models (pytorch-forecasting) and custom TFT models
+(models/tft_model.py) with automatic detection from checkpoint hyperparameters.
+
 Usage:
     # Basic evaluation (automatically uses best checkpoint)
     python evaluate_tft.py --experiment-name exp004
     python evaluate_tft.py --experiment-name 00_baseline_exploration/exp004
     
-    # Specific checkpoint
+    # Specific checkpoint (works with both custom and baseline models)
     python evaluate_tft.py \\
         --experiment-name 00_baseline_exploration/exp004 \\
         --checkpoint experiments/00_baseline_exploration/exp004/checkpoints/tft-epoch=00-val_loss=0.1191.ckpt
+    
+    # Custom model from Phase 2+
+    python evaluate_tft.py \\
+        --experiment-name attn_test \\
+        --checkpoint experiments/attn_test/checkpoints/tft-epoch=epoch=41-val_loss=val_loss=0.3948.ckpt
     
     # Custom test split (for fixed vs vintage comparison)
     python evaluate_tft.py \\
         --experiment-name exp004 \\
         --test-split data/splits/fixed/core_proposal_daily_fixed_test.csv
+
+Model Detection:
+    - Custom models: Identified by 'num_encoder_features' in checkpoint hyperparameters
+    - Baseline models: pytorch-forecasting models (legacy Phase 0/1 experiments)
+    - Both work identically - no manual specification required
 """
 import warnings
 warnings.filterwarnings('ignore', category=UserWarning)
@@ -322,86 +335,82 @@ def prepare_test_dataset(train_df, test_df, config):
 # MODEL LOADING
 # ============================================================================
 
-def load_model(checkpoint_path, config):
-    """Load trained TFT model from checkpoint."""
+def load_model(checkpoint_path):
+    """
+    Load trained TFT model from checkpoint.
+    
+    Automatically detects model type (custom vs baseline) by inspecting
+    checkpoint hyperparameters and loads from appropriate module.
+    
+    Detection logic:
+    - If 'num_encoder_features' in hparams → Custom TFT (models/tft_model.py)
+    - Otherwise → Baseline TFT (pytorch_forecasting)
+    
+    Both models have identical prediction interfaces, so downstream evaluation
+    code works unchanged.
+    """
     if not os.path.exists(checkpoint_path):
         raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
     
-    # Check if this model used distribution loss
-    training_config = config.get('training', {})
-    mean_weight = training_config.get('dist_loss_mean_weight', 0.0)
-    std_weight = training_config.get('dist_loss_std_weight', 0.0)
-    uses_dist_loss = mean_weight > 0 or std_weight > 0
-    
-    if not uses_dist_loss:
-        # Normal loading for models without distribution loss
-        model = TemporalFusionTransformer.load_from_checkpoint(checkpoint_path)
+    # Inspect checkpoint to determine model type
+    print(f"  Inspecting checkpoint: {os.path.basename(checkpoint_path)}")
+    try:
+        checkpoint = torch.load(checkpoint_path, map_location='cpu')
+        hparams = checkpoint.get('hyper_parameters', {})
+        
+        if not hparams:
+            raise ValueError("Checkpoint missing 'hyper_parameters' - cannot determine model type")
+        
+        # Detect model type by hyperparameter signature
+        is_custom_model = 'num_encoder_features' in hparams
+        
+        if is_custom_model:
+            print(f"  Detected: CUSTOM TFT model (has 'num_encoder_features')")
+            print(f"    - num_encoder_features: {hparams['num_encoder_features']}")
+            print(f"    - hidden_size: {hparams.get('hidden_size', 'N/A')}")
+            print(f"    - max_encoder_length: {hparams.get('max_encoder_length', 'N/A')}")
+            
+            # Check if checkpoint has post-FF gate
+            state_dict = checkpoint.get('state_dict', {})
+            has_post_ff_gate = any('post_ff_gate_norm' in key for key in state_dict.keys())
+            
+            if has_post_ff_gate:
+                print(f"    - Architecture: Full custom TFT (with post-FF gate)")
+                from models.tft_model import TemporalFusionTransformer as CustomTFT
+            else:
+                print(f"    - Architecture: Custom TFT without post-FF gate")
+                from models.tft_model_no_post_ff import TemporalFusionTransformer as CustomTFT
+            
+            model = CustomTFT.load_from_checkpoint(checkpoint_path)
+            
+        else:
+            print(f"  Detected: BASELINE TFT model (pytorch-forecasting)")
+            print(f"    - hidden_size: {hparams.get('hidden_size', 'N/A')}")
+            print(f"    - max_encoder_length: {hparams.get('max_encoder_length', 'N/A')}")
+            print(f"    - output_size: {hparams.get('output_size', 'N/A')}")
+            
+            # Use baseline TFT (already imported at top)
+            # Note: TemporalFusionTransformer imported from pytorch_forecasting at line 35
+            model = TemporalFusionTransformer.load_from_checkpoint(checkpoint_path)
+        
         model.eval()
+        print(f"  Model loaded successfully and set to eval mode")
         return model
-    
-    # Distribution loss models: need custom unpickling
-    print(f"  Loading distribution loss checkpoint (bypassing corrupted loss)...")
-    
-    import torch
-    import pickle
-    import io
-    import zipfile
-    import tempfile
-    
-    # PyTorch 1.x uses different checkpoint structure - check format
-    # Try to load as regular pickle first, fall back to ZIP if needed
-    
-    # Custom unpickler that creates fresh QuantileLoss instances
-    class FixedUnpickler(pickle.Unpickler):
-        def find_class(self, module, name):
-            if name == 'QuantileLoss' and 'pytorch_forecasting' in module:
-                from pytorch_forecasting.metrics import QuantileLoss
-                return QuantileLoss
-            return super().find_class(module, name)
-    
-    try:
-        # Try loading as direct pickle (PyTorch 1.x format)
-        with open(checkpoint_path, 'rb') as f:
-            checkpoint = FixedUnpickler(f).load()
-    except (pickle.UnpicklingError, zipfile.BadZipFile, Exception) as e:
-        # Might be ZIP format or different structure
-        print(f"  Direct unpickling failed, checkpoint may be unfixable: {e}")
-        raise RuntimeError(
-            f"Cannot load checkpoint with monkey-patched loss. "
-            f"The checkpoint is corrupted beyond repair. "
-            f"Recommendation: Retrain this experiment without distribution loss, "
-            f"or skip distribution loss analysis for Phase 3."
-        )
-    
-    # Fix hyperparameters if loss object exists
-    if 'hyper_parameters' in checkpoint and 'loss' in checkpoint['hyper_parameters']:
-        from pytorch_forecasting.metrics import QuantileLoss
-        checkpoint['hyper_parameters']['loss'] = QuantileLoss()
-    
-    # Save fixed checkpoint temporarily
-    with tempfile.NamedTemporaryFile(suffix='.ckpt', delete=False) as tmp:
-        tmp_path = tmp.name
-    
-    try:
-        torch.save(checkpoint, tmp_path)
-        model = TemporalFusionTransformer.load_from_checkpoint(tmp_path)
-    finally:
-        os.unlink(tmp_path)
-    
-    model.eval()
-    
-    # Re-apply distribution penalties
-    from loss_wrapper import add_distribution_penalties
-    model = add_distribution_penalties(
-        model,
-        mean_weight=mean_weight,
-        std_weight=std_weight,
-        target_mean=training_config.get('dist_loss_target_mean', 0.0003),
-        target_std=training_config.get('dist_loss_target_std', 0.01)
-    )
-    print(f"  Re-applied distribution penalties: mean_weight={mean_weight}, std_weight={std_weight}")
-    
-    return model
+        
+    except Exception as e:
+        print(f"\nERROR loading checkpoint: {checkpoint_path}")
+        print(f"  Error type: {type(e).__name__}")
+        print(f"  Error message: {str(e)}")
+        print(f"\nCheckpoint structure:")
+        try:
+            checkpoint = torch.load(checkpoint_path, map_location='cpu')
+            print(f"  Available keys: {list(checkpoint.keys())}")
+            if 'hyper_parameters' in checkpoint:
+                print(f"  Hyperparameter keys: {list(checkpoint['hyper_parameters'].keys())[:10]}...")
+        except:
+            print("  Could not inspect checkpoint")
+        raise
+
 
 # ============================================================================
 # PREDICTION
@@ -413,8 +422,7 @@ def generate_predictions(model, test_dataset, batch_size=128):
     test_dataloader = test_dataset.to_dataloader(
         train=False,
         batch_size=batch_size,
-        num_workers=4,
-        persistent_workers=True
+        num_workers=0
     )
     
     # DEBUG
@@ -1091,7 +1099,7 @@ def create_regression_diagnostic_plots(predictions, actuals, dates, output_dir):
     # Overlay normal distribution
     mu, sigma = errors.mean(), errors.std()
     x = np.linspace(errors.min(), errors.max(), 100)
-    axes[1, 0].plot(x, stats.norm.pdf(x, mu, sigma), 'r-', linewidth=2, label=f'Normal(μ={mu:.3f}, σ={sigma:.3f})')
+    axes[1, 0].plot(x, stats.norm.pdf(x, mu, sigma), 'r-', linewidth=2, label=f'Normal(Î¼={mu:.3f}, Ïƒ={sigma:.3f})')
     axes[1, 0].set_xlabel('Prediction Error (%)')
     axes[1, 0].set_ylabel('Density')
     axes[1, 0].set_title('Residual Distribution')
@@ -1246,13 +1254,13 @@ def create_performance_plots(actuals, strategy_returns, dates, output_dir, colla
         # Plot markers (reverse order so most severe is on top)
         if first_degraded:
             axes[0].axvline(x=first_degraded, color='gold', linewidth=2, linestyle='--',
-                           label=f'→ Degraded: {first_degraded.strftime("%Y-%m")}', alpha=0.7)
+                           label=f'↑ Degraded: {first_degraded.strftime("%Y-%m")}', alpha=0.7)
         if first_weak:
             axes[0].axvline(x=first_weak, color='orange', linewidth=2, linestyle='--',
-                           label=f'→ Weak collapse: {first_weak.strftime("%Y-%m")}', alpha=0.7)
+                           label=f'↑ Weak collapse: {first_weak.strftime("%Y-%m")}', alpha=0.7)
         if first_strong:
             axes[0].axvline(x=first_strong, color='red', linewidth=2, linestyle='--',
-                           label=f'→ Strong collapse: {first_strong.strftime("%Y-%m")}', alpha=0.7)
+                           label=f'↑ Strong collapse: {first_strong.strftime("%Y-%m")}', alpha=0.7)
     
     axes[0].set_ylabel('Cumulative Return (Growth of $1)')
     axes[0].set_title('Strategy Performance (shaded by quality mode)')
@@ -1567,7 +1575,7 @@ def evaluate():
     
     # Load model
     print(f"Loading model from checkpoint...")
-    model = load_model(checkpoint_path, config)
+    model = load_model(checkpoint_path)
     
     # Generate predictions
     print("Generating predictions...")
