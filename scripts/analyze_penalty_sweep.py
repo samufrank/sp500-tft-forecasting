@@ -118,16 +118,16 @@ def main():
     print("="*80)
     print()
     
-    # Find all penalty sweep experiments (both original and refined)
+    # Find all Phase 4 experiments (new h16d* naming scheme + old penalty_* naming)
     exp_dir = Path('experiments/04_custom_losses')
     sweep_experiments = sorted([d.name for d in exp_dir.iterdir() 
-                                if d.is_dir() and (d.name.startswith('penalty_sweep_') or 
+                                if d.is_dir() and (d.name.startswith('h16d') or 
+                                                   d.name.startswith('penalty_sweep_') or 
                                                    d.name.startswith('penalty_refined_') or
                                                    d.name.startswith('magnitude_test_'))])
-
     
     if not sweep_experiments:
-        print("No penalty_sweep or penalty_refined experiments found in experiments/04_custom_losses/")
+        print("No Phase 4 experiments found in experiments/04_custom_losses/")
         return
     
     print(f"Found {len(sweep_experiments)} experiments:")
@@ -242,9 +242,17 @@ def main():
     print("="*80)
     print()
     
-    baseline = df[df['experiment'] == 'penalty_sweep_baseline']
+    baseline = df[df['experiment'].str.endswith('_baseline') | (df['experiment'] == 'penalty_sweep_baseline')]
     if len(baseline) > 0:
-        baseline = baseline.iloc[0]
+        # If multiple baselines, use h16d015_baseline as reference (matches Phase 4 experiments)
+        if len(baseline) > 1:
+            h16d015_baseline = df[df['experiment'] == 'h16d015_baseline']
+            if len(h16d015_baseline) > 0:
+                baseline = h16d015_baseline.iloc[0]
+            else:
+                baseline = baseline.iloc[0]
+        else:
+            baseline = baseline.iloc[0]
         
         print("Baseline performance:")
         healthy_pct = baseline.get('healthy_pct')

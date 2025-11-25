@@ -4,8 +4,20 @@ Plotting utility for collapse monitoring data.
 Creates publication-quality figures from monitoring logs.
 
 Usage:
-    python scripts/plot_monitoring_data.py monitor_h16 monitor_h24
-    python scripts/plot_monitoring_data.py --output-dir figures/ monitor_*
+    # Single experiment (auto-saves to experiments/{exp}/monitoring/)
+    python scripts/plot_monitoring_data.py experiment_name
+    
+    # Single experiment with custom output
+    python scripts/plot_monitoring_data.py experiment_name --output-dir figures/
+    
+    # Multiple experiments (comparison)
+    python scripts/plot_monitoring_data.py exp1 exp2 exp3
+    
+    # All experiments in a phase (each saved to its own monitoring/ subdir)
+    python scripts/plot_monitoring_data.py --phase 02b_vintage_sweep
+    
+    # Comprehensive summary
+    python scripts/plot_monitoring_data.py --phase 02b_vintage_sweep --comprehensive
 """
 
 import json
@@ -402,45 +414,137 @@ def plot_comprehensive_summary(experiments, output_path='comprehensive_summary.p
 
 def main():
     parser = argparse.ArgumentParser(description='Plot collapse monitoring data')
-    parser.add_argument('experiments', nargs='+', help='Experiment names')
-    parser.add_argument('--output-dir', type=str, default='experiments',
-                       help='Directory for output plots')
+    parser.add_argument('experiments', nargs='*', help='Experiment names (or use --phase)')
+    parser.add_argument('--phase', type=str, default=None,
+                       help='Process all experiments in a phase directory (e.g., 02b_vintage_sweep)')
+    parser.add_argument('--output-dir', type=str, default=None,
+                       help='Directory for output plots (default: experiments/{experiment}/monitoring/)')
     parser.add_argument('--comprehensive', action='store_true',
                        help='Generate comprehensive summary figure')
     
     args = parser.parse_args()
     
-    # Expand wildcards
-    experiments = []
-    for pattern in args.experiments:
-        if '*' in pattern:
-            exp_dir = Path('experiments')
-            matches = [p.name for p in exp_dir.glob(pattern) if p.is_dir()]
-            experiments.extend(sorted(matches))
-        else:
-            experiments.append(pattern)
-    
-    if not experiments:
-        print("No experiments found")
-        return
-    
-    print(f"Plotting {len(experiments)} experiments...")
-    output_dir = Path(args.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Generate plots
-    if args.comprehensive:
-        plot_comprehensive_summary(experiments, 
-                                   output_dir / 'collapse_comprehensive.png')
+    # Determine experiments to process
+    if args.phase:
+        # Process all experiments in phase directory
+        phase_path = Path('experiments') / args.phase
+        if not phase_path.exists():
+            print(f"Error: Phase directory not found: {phase_path}")
+            return
+        
+        experiments = []
+        for exp_dir in sorted(phase_path.iterdir()):
+            if not exp_dir.is_dir():
+                continue
+            
+            # Check if it has monitoring data
+            monitor_path = exp_dir / 'collapse_monitoring' / 'collapse_monitor_latest.json'
+            if monitor_path.exists():
+                # Store as phase/experiment format
+                experiments.append(f"{args.phase}/{exp_dir.name}")
+        
+        if not experiments:
+            print(f"No experiments with monitoring data found in {phase_path}")
+            return
+        
+        print(f"Found {len(experiments)} experiments with monitoring data in {args.phase}")
+        
+        # Process each individually (save to their own monitoring/ subdirs)
+        for exp_full_path in experiments:
+            exp_name = exp_full_path.split('/')[-1]  # Get just the experiment name
+            print(f"\nProcessing: {exp_name}")
+            
+            # Auto-generate output directory
+            exp_output_dir = Path('experiments') / exp_full_path / 'monitoring'
+            exp_output_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Generate plots for this single experiment
+            try:
+                if args.comprehensive:
+                    plot_comprehensive_summary([exp_full_path], 
+                                             exp_output_dir / 'collapse_comprehensive.png')
+                else:
+                    plot_prediction_diversity([exp_full_path], 
+                                            exp_output_dir / 'collapse_diversity.png')
+                    plot_sign_distribution([exp_full_path], 
+                                         exp_output_dir / 'collapse_signs.png')
+                    plot_gradient_flow([exp_full_path], 
+                                     exp_output_dir / 'collapse_gradients.png')
+                
+                print(f"  Saved plots to: {exp_output_dir}")
+            except Exception as e:
+                print(f"  Error plotting {exp_name}: {e}")
+        
+        print(f"\nProcessed {len(experiments)} experiments")
+        
     else:
-        plot_prediction_diversity(experiments, 
-                                 output_dir / 'collapse_diversity.png')
-        plot_sign_distribution(experiments, 
-                             output_dir / 'collapse_signs.png')
-        plot_gradient_flow(experiments, 
-                         output_dir / 'collapse_gradients.png')
-    
-    print("\nDone! Check output in:", output_dir)
+        # Original behavior: process specified experiments
+        if not args.experiments:
+            print("Error: Must specify experiments or use --phase")
+            parser.print_help()
+            return
+        
+        # Expand wildcards
+        experiments = []
+        for pattern in args.experiments:
+            if '*' in pattern:
+                exp_dir = Path('experiments')
+                matches = [p.name for p in exp_dir.glob(pattern) if p.is_dir()]
+                experiments.extend(sorted(matches))
+            else:
+                experiments.append(pattern)
+        
+        if not experiments:
+            print("No experiments found")
+            return
+        
+        print(f"Plotting {len(experiments)} experiments...")
+        
+        # Determine output directory
+        if args.output_dir:
+            # User specified output directory
+            output_dir = Path(args.output_dir)
+        elif len(experiments) == 1:
+            # Single experiment: auto-save to its monitoring/ subdir
+            exp_path = experiments[0]
+            
+            # Handle both "experiment_name" and "phase/experiment_name" formats
+            if '/' in exp_path:
+                output_dir = Path('experiments') / exp_path / 'monitoring'
+            else:
+                # Try to find it in phase directories
+                found = False
+                for phase_dir in ['00_baseline_exploration', '01_staleness_features',
+                                 '01_staleness_features_fixed', '02_custom_tft',
+                                 '02_vintage_baseline', '02b_vintage_sweep']:
+                    test_path = Path('experiments') / phase_dir / exp_path
+                    if test_path.exists():
+                        output_dir = test_path / 'monitoring'
+                        found = True
+                        break
+                
+                if not found:
+                    # Assume it's directly under experiments/
+                    output_dir = Path('experiments') / exp_path / 'monitoring'
+        else:
+            # Multiple experiments: use experiments/ as default
+            output_dir = Path('experiments')
+        
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate plots
+        if args.comprehensive:
+            plot_comprehensive_summary(experiments, 
+                                       output_dir / 'collapse_comprehensive.png')
+        else:
+            plot_prediction_diversity(experiments, 
+                                     output_dir / 'collapse_diversity.png')
+            plot_sign_distribution(experiments, 
+                                 output_dir / 'collapse_signs.png')
+            plot_gradient_flow(experiments, 
+                             output_dir / 'collapse_gradients.png')
+        
+        print("\nDone! Check output in:", output_dir)
 
 
 if __name__ == '__main__':

@@ -315,56 +315,153 @@ def prepare_test_dataset(train_df, test_df, config):
 # MODEL LOADING
 # ============================================================================
 
-def load_model(checkpoint_path):
-    """Load trained TFT model from checkpoint (supports both pytorch-forecasting and custom)."""
+def load_model(checkpoint_path, config):
+    """Load trained TFT model from checkpoint (supports regime output)."""
     print(f"Loading model from: {checkpoint_path}")
     
-    # Try to determine model type from checkpoint
-    checkpoint = torch.load(checkpoint_path, map_location='cpu')
+    # Check if this model used regime output
+    regime_config = config.get('regime_output', {})
+    use_regime_output = regime_config.get('enabled', False)
     
-    # Check if this is a custom TFT model
-    is_custom = False
-    if 'state_dict' in checkpoint:
-        # Look for custom TFT signatures in state dict
-        state_dict_keys = checkpoint['state_dict'].keys()
-        if any('static_transform' in k or 'variable_selection' in k for k in state_dict_keys):
-            # Check if it has pytorch-forecasting specific keys
-            has_pf_keys = any('loss.quantiles' in k for k in state_dict_keys)
-            is_custom = not has_pf_keys
+    # Check if this model used distribution loss
+    training_config = config.get('training', {})
+    mean_weight = training_config.get('dist_loss_mean_weight', 0.0)
+    std_weight = training_config.get('dist_loss_std_weight', 0.0)
+    uses_dist_loss = mean_weight > 0 or std_weight > 0
     
-    if is_custom:
-        print("  Detected custom TFT model")
-        # Import custom TFT
-        import sys
-        from pathlib import Path
-        
-        # Add project root to path (script is in scripts/, need parent)
-        script_path = Path(__file__).resolve()
-        project_root = script_path.parent.parent  # Go up from scripts/ to project root
-        if str(project_root) not in sys.path:
-            sys.path.insert(0, str(project_root))
-        
-        from models.tft_model import TemporalFusionTransformer as CustomTFT
-        
-        # Load hyperparameters from checkpoint
-        hparams = checkpoint.get('hyper_parameters', {})
-        
-        # Create model instance
-        model = CustomTFT(**hparams)
-        
-        # Load state dict
-        model.load_state_dict(checkpoint['state_dict'])
-        model.eval()
-    else:
-        print("  Detected pytorch-forecasting TFT model")
-        # Use pytorch-forecasting loader
+    # Case 1: Baseline model (no regime output, no dist loss)
+    if not uses_dist_loss and not use_regime_output:
         model = TemporalFusionTransformer.load_from_checkpoint(checkpoint_path)
         model.eval()
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        model = model.to(device)
+        print(f"  Loaded baseline model, moved to device: {device}")
+        return model
     
-    # Move model to appropriate device
+    # Case 2: Regime output without dist loss
+    if use_regime_output and not uses_dist_loss:
+        print(f"  Detected regime output checkpoint, applying architecture modification...")
+        
+        # Load checkpoint dict first
+        checkpoint = torch.load(checkpoint_path, map_location='cpu')
+        
+        # Extract hparams from checkpoint
+        hparams = checkpoint['hyper_parameters']
+        
+        # Create model with baseline architecture (no weights loaded)
+        model = TemporalFusionTransformer(**hparams)
+        
+        # Apply regime output architecture before loading weights
+        from regime_output import replace_output_layer
+        
+        num_regimes = regime_config.get('num_regimes', 2)
+        routing_mode = regime_config.get('routing_mode', 'learned')
+        routing_strategy = regime_config.get('routing_strategy', 'learned')
+        vix_threshold = regime_config.get('vix_threshold', 25.0)
+        
+        model = replace_output_layer(
+            model,
+            num_regimes=num_regimes,
+            routing_mode=routing_mode,
+            routing_strategy=routing_strategy,
+            vix_threshold=vix_threshold
+        )
+        
+        # NOW load the MoE weights
+        model.load_state_dict(checkpoint['state_dict'])
+        print(f"  Successfully loaded regime output state_dict")
+        
+        model.eval()
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        model = model.to(device)
+        print(f"  Model moved to device: {device}")
+        return model
+    
+    # Case 3: Distribution loss (with or without regime output)
+    print(f"  Loading distribution loss checkpoint (bypassing corrupted loss)...")
+    
+    import pickle
+    import tempfile
+    
+    # Custom unpickler for dist loss
+    class FixedUnpickler(pickle.Unpickler):
+        def find_class(self, module, name):
+            if name == 'QuantileLoss' and 'pytorch_forecasting' in module:
+                from pytorch_forecasting.metrics import QuantileLoss
+                return QuantileLoss
+            return super().find_class(module, name)
+    
+    try:
+        with open(checkpoint_path, 'rb') as f:
+            checkpoint = FixedUnpickler(f).load()
+    except Exception as e:
+        print(f"  Direct unpickling failed: {e}")
+        raise RuntimeError(
+            f"Cannot load checkpoint with monkey-patched loss. "
+            f"Recommendation: Retrain without distribution loss."
+        )
+    
+    # Fix hyperparameters if loss object exists
+    if 'hyper_parameters' in checkpoint and 'loss' in checkpoint['hyper_parameters']:
+        from pytorch_forecasting.metrics import QuantileLoss
+        checkpoint['hyper_parameters']['loss'] = QuantileLoss()
+    
+    # Save fixed checkpoint temporarily
+    with tempfile.NamedTemporaryFile(suffix='.ckpt', delete=False) as tmp:
+        tmp_path = tmp.name
+    
+    try:
+        if use_regime_output:
+            print(f"  Detected regime output checkpoint, applying architecture modification...")
+            
+            # Create model from hyperparameters (no weights loaded)
+            hparams = checkpoint['hyper_parameters']
+            model = TemporalFusionTransformer(**hparams)
+            
+            # Apply regime output architecture before loading weights
+            from regime_output import replace_output_layer
+            
+            num_regimes = regime_config.get('num_regimes', 2)
+            routing_mode = regime_config.get('routing_mode', 'learned')
+            routing_strategy = regime_config.get('routing_strategy', 'learned')
+            vix_threshold = regime_config.get('vix_threshold', 25.0)
+            
+            model = replace_output_layer(
+                model,
+                num_regimes=num_regimes,
+                routing_mode=routing_mode,
+                routing_strategy=routing_strategy,
+                vix_threshold=vix_threshold
+            )
+            
+            # Now load the state dict with MoE architecture
+            model.load_state_dict(checkpoint['state_dict'])
+            print(f"  Successfully loaded regime output state_dict")
+        else:
+            # No regime output - use standard checkpoint loading
+            torch.save(checkpoint, tmp_path)
+            model = TemporalFusionTransformer.load_from_checkpoint(tmp_path)
+        
+    finally:
+        import os
+        os.unlink(tmp_path)
+    
+    model.eval()
+    
+    # Re-apply distribution penalties
+    from loss_wrapper import add_distribution_penalties
+    model = add_distribution_penalties(
+        model,
+        mean_weight=mean_weight,
+        std_weight=std_weight,
+        target_mean=training_config.get('dist_loss_target_mean', 0.0003),
+        target_std=training_config.get('dist_loss_target_std', 0.01)
+    )
+    print(f"  Re-applied distribution penalties: mean_weight={mean_weight}, std_weight={std_weight}")
+    
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = model.to(device)
-    print(f"Model moved to device: {device}")
+    print(f"  Model moved to device: {device}")
     
     return model
 
@@ -884,7 +981,7 @@ def main():
     
     # Load model
     print("\nLoading model...")
-    model = load_model(checkpoint_path)
+    model = load_model(checkpoint_path, config)
     
     # Extract attention patterns
     print("\nExtracting attention patterns...")
