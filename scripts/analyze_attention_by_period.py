@@ -331,7 +331,8 @@ def load_model(checkpoint_path):
             # Check if it has pytorch-forecasting specific keys
             has_pf_keys = any('loss.quantiles' in k for k in state_dict_keys)
             is_custom = not has_pf_keys
-    
+   
+    """
     if is_custom:
         print("  Detected custom TFT model")
         # Import custom TFT
@@ -360,7 +361,11 @@ def load_model(checkpoint_path):
         # Use pytorch-forecasting loader
         model = TemporalFusionTransformer.load_from_checkpoint(checkpoint_path)
         model.eval()
+    """
     
+    model = TemporalFusionTransformer.load_from_checkpoint(checkpoint_path)
+    model.eval()
+
     # Move model to appropriate device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = model.to(device)
