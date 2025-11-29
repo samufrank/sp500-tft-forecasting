@@ -1032,7 +1032,6 @@ def train():
     print(f"  - Best unique: {checkpoint_unique.best_model_path}")
     print(f"  - Best dir_acc: {checkpoint_dir_acc.best_model_path}")
     print(f"  - Best sharpe: {checkpoint_sharpe.best_model_path}")
-    print(f"  - Last epoch: {checkpoint_last.best_model_path}")
     print(f"Completed at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"Log saved to: {log_file}")
     print("="*70)
