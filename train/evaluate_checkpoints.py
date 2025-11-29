@@ -186,7 +186,10 @@ def extract_key_metrics(eval_metrics: dict, ckpt_info: dict) -> dict:
     row['pred_std'] = pred_stats.get('std', np.nan)
     row['pred_mean'] = pred_stats.get('mean', np.nan)
     row['pct_positive'] = pred_stats.get('pct_positive', np.nan)
-    row['num_negative'] = pred_stats.get('num_negative', np.nan)
+    # Compute num_negative from percentage (backwards compatible - num_negative not in older JSONs)
+    num_preds = pred_stats.get('num_predictions', 0)
+    pct_neg = pred_stats.get('pct_negative', 0)
+    row['num_negative'] = int(pct_neg * num_preds / 100) if num_preds > 0 else np.nan
     
     return row
 
