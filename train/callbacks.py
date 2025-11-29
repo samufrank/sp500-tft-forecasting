@@ -51,3 +51,37 @@ class DistributionLossLogger(pl.Callback):
                   f"(target={pl_module.target_mean:.6f}), "
                   f"pred_std={pl_module.last_pred_std:.6f} "
                   f"(target={pl_module.target_std:.6f})")
+
+class GradientMonitorCallback(pl.Callback):
+    """Monitor gradient norms for regime output diagnostics."""
+    
+    def __init__(self, log_every_n_steps=50):
+        self.log_every_n_steps = log_every_n_steps
+        self.step_count = 0
+    
+    def on_after_backward(self, trainer, pl_module):
+        self.step_count += 1
+        if self.step_count % self.log_every_n_steps != 0:
+            return
+        
+        grad_norms = {}
+        for name, param in pl_module.named_parameters():
+            if param.grad is not None:
+                grad_norms[name] = param.grad.norm().item()
+        
+        # Log output layer gradients specifically
+        output_grads = {k: v for k, v in grad_norms.items() if 'output_layer' in k}
+        if output_grads:
+            expert_grads = [v for k, v in output_grads.items() if 'experts' in k]
+            router_grads = [v for k, v in output_grads.items() if 'router' in k]
+            
+            if expert_grads:
+                trainer.logger.log_metrics({
+                    'grad/expert_mean': sum(expert_grads) / len(expert_grads),
+                    'grad/expert_max': max(expert_grads),
+                }, step=trainer.global_step)
+            
+            if router_grads:
+                trainer.logger.log_metrics({
+                    'grad/router_mean': sum(router_grads) / len(router_grads),
+                }, step=trainer.global_step)

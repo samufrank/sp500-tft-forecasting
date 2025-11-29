@@ -364,14 +364,26 @@ def load_model(checkpoint_path, config):
         num_regimes = regime_config.get('num_regimes', 2)
         routing_mode = regime_config.get('routing_mode', 'learned')
         routing_strategy = regime_config.get('routing_strategy', 'learned')
-        vix_threshold = regime_config.get('vix_threshold', 15.0)
+        vix_threshold = regime_config.get('vix_threshold', 25.0)
+        vix_threshold_low = regime_config.get('vix_threshold_low', None)
+        vix_threshold_high = regime_config.get('vix_threshold_high', None)
+        load_balance_weight = regime_config.get('load_balance_weight', 0.5)
+        expert_hidden_size = regime_config.get('expert_hidden_size', 0)
+        # Note: hard_routing_train only affects training, but we pass False for eval
+        # to ensure soft routing is used during evaluation
+        hard_routing_train = False  # Always soft routing during evaluation
         
         model = replace_output_layer(
             model,
             num_regimes=num_regimes,
             routing_mode=routing_mode,
             routing_strategy=routing_strategy,
-            vix_threshold=vix_threshold
+            vix_threshold=vix_threshold,
+            vix_threshold_low=vix_threshold_low,
+            vix_threshold_high=vix_threshold_high,
+            load_balance_weight=load_balance_weight,
+            expert_hidden_size=expert_hidden_size,
+            hard_routing_train=hard_routing_train
         )
         
         # NOW load the MoE weights
@@ -436,14 +448,25 @@ def load_model(checkpoint_path, config):
             num_regimes = regime_config.get('num_regimes', 2)
             routing_mode = regime_config.get('routing_mode', 'learned')
             routing_strategy = regime_config.get('routing_strategy', 'learned')
-            vix_threshold = regime_config.get('vix_threshold', 15.0)
+            vix_threshold = regime_config.get('vix_threshold', 25.0)
+            vix_threshold_low = regime_config.get('vix_threshold_low', None)
+            vix_threshold_high = regime_config.get('vix_threshold_high', None)
+            load_balance_weight = regime_config.get('load_balance_weight', 0.5)
+            expert_hidden_size = regime_config.get('expert_hidden_size', 0)
+            # Note: hard_routing_train only affects training, use False for eval
+            hard_routing_train = False  # Always soft routing during evaluation
             
             model = replace_output_layer(
                 model,
                 num_regimes=num_regimes,
                 routing_mode=routing_mode,
                 routing_strategy=routing_strategy,
-                vix_threshold=vix_threshold
+                vix_threshold=vix_threshold,
+                vix_threshold_low=vix_threshold_low,
+                vix_threshold_high=vix_threshold_high,
+                load_balance_weight=load_balance_weight,
+                expert_hidden_size=expert_hidden_size,
+                hard_routing_train=hard_routing_train
             )
             
             # Now load the state dict with MoE architecture
@@ -1087,7 +1110,7 @@ def create_diagnostic_plots(predictions, actuals, dates, output_dir):
     axes[2].fill_between(dates_dt, 
                          rolling_mean_mag - rolling_std_mag, 
                          rolling_mean_mag + rolling_std_mag,
-                         alpha=0.2, color='blue', label='Â±1 std')
+                         alpha=0.2, color='blue', label='Ã‚Â±1 std')
     axes[2].axhline(y=0.01, color='orange', linestyle='--', alpha=0.5, label='1% threshold')
     axes[2].set_xlabel('Date')
     axes[2].set_ylabel('|Prediction| (%)')
@@ -1315,13 +1338,13 @@ def create_performance_plots(actuals, strategy_returns, dates, output_dir, colla
         # Plot markers (reverse order so most severe is on top)
         if first_degraded:
             axes[0].axvline(x=first_degraded, color='gold', linewidth=2, linestyle='--',
-                           label=f'â†’ Degraded: {first_degraded.strftime("%Y-%m")}', alpha=0.7)
+                           label=f'Ã¢â€ â€™ Degraded: {first_degraded.strftime("%Y-%m")}', alpha=0.7)
         if first_weak:
             axes[0].axvline(x=first_weak, color='orange', linewidth=2, linestyle='--',
-                           label=f'â†’ Weak collapse: {first_weak.strftime("%Y-%m")}', alpha=0.7)
+                           label=f'Ã¢â€ â€™ Weak collapse: {first_weak.strftime("%Y-%m")}', alpha=0.7)
         if first_strong:
             axes[0].axvline(x=first_strong, color='red', linewidth=2, linestyle='--',
-                           label=f'â†’ Strong collapse: {first_strong.strftime("%Y-%m")}', alpha=0.7)
+                           label=f'Ã¢â€ â€™ Strong collapse: {first_strong.strftime("%Y-%m")}', alpha=0.7)
     
     axes[0].set_ylabel('Cumulative Return (Growth of $1)')
     axes[0].set_title('Strategy Performance (shaded by quality mode)')
@@ -1436,9 +1459,23 @@ def save_results(predictions, actuals, dates, metrics_stat, metrics_fin,
     
     results_df.to_csv(os.path.join(output_dir, 'predictions.csv'), index=False)
     
+    # Compute prediction statistics
+    prediction_stats = {
+        'min': float(np.min(predictions)),
+        'max': float(np.max(predictions)),
+        'mean': float(np.mean(predictions)),
+        'std': float(np.std(predictions)),
+        'range': float(np.ptp(predictions)),
+        'num_unique': int(len(np.unique(np.round(predictions, 6)))),
+        'pct_positive': float((predictions > 0).mean() * 100),
+        'pct_negative': float((predictions < 0).mean() * 100),
+        'num_predictions': int(len(predictions)),
+    }
+    
     # Combine all metrics
     all_metrics = {
         'evaluation_timestamp': datetime.now().isoformat(),
+        'prediction_stats': prediction_stats,
         'statistical_metrics': metrics_stat,
         'financial_metrics': metrics_fin,
         'residual_diagnostics': diagnostics,
@@ -1464,7 +1501,7 @@ def print_summary(metrics_stat, metrics_fin):
     print(f"  MSE:              {metrics_stat['mse']:.6f}")
     print(f"  RMSE:             {metrics_stat['rmse']:.6f}")
     print(f"  MAE:              {metrics_stat['mae']:.6f}")
-    print(f"  Out-of-sample R²: {metrics_stat['r2']:.4f}")
+    print(f"  Out-of-sample RÂ²: {metrics_stat['r2']:.4f}")
     
     print("\nFINANCIAL METRICS:")
     print(f"  Directional Acc:  {metrics_fin['directional_accuracy']:.2%}")
@@ -1563,7 +1600,7 @@ def evaluate():
                     checkpoint_path = corrected_checkpoint_path
                 else:
                     print(f"WARNING: Could not find checkpoint at:")
-                    print(f"  Original: {metrics[ckpt_Type]}")
+                    print(f"  Original: {metrics[ckpt_type]}")
                     print(f"  Corrected: {corrected_checkpoint_path}")
             else:
                 print(f"WARNING: Checkpoint path doesn't start with 'experiments/': {checkpoint_path}")

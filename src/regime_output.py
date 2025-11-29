@@ -37,32 +37,57 @@ class RegimeConditionalOutput(nn.Module):
     output_size : int
         Number of quantiles (typically 7 for QuantileLoss)
     num_regimes : int, default=2
-        Number of expert heads (e.g., 2 for normal/volatile regimes)
+        Number of expert heads (e.g., 2 for normal/volatile regimes, 3 for low/med/high)
     routing_mode : str, default='learned'
         Routing strategy:
         - 'learned': Learn regime detection from hidden state
         - 'disabled': Single expert (equivalent to baseline)
+    routing_strategy : str, default='learned'
+        - 'learned': MLP router learns routing from hidden state
+        - 'vix_threshold': Deterministic routing based on VIX level
+    vix_threshold : float, default=25.0
+        VIX threshold for 2-regime routing (VIX > threshold -> regime 1)
+    vix_threshold_low : float, optional
+        Lower VIX threshold for 3-regime routing (VIX <= low -> regime 0)
+    vix_threshold_high : float, optional  
+        Upper VIX threshold for 3-regime routing (VIX > high -> regime 2)
+    load_balance_weight : float, default=0.5
+        Weight for load balancing auxiliary loss (prevents winner-takes-all)
+    expert_hidden_size : int, default=0
+        Hidden layer size for MLP experts. 0 = linear experts (recommended default),
+        >0 = 2-layer MLP with ReLU activation
+    hard_routing_train : bool, default=False
+        If True, use hard routing during training: each sample's loss only backprops
+        through its assigned expert based on VIX threshold. This encourages expert
+        specialization by preventing gradient mixing. Requires routing_strategy='vix_threshold'.
+        Validation/test always uses soft routing regardless of this setting.
     
     Notes
     -----
     - Input shape: [batch, seq_len, hidden_size]
     - Output shape: [batch, seq_len, output_size]
     - Routing happens per timestep in sequence (supports multi-horizon)
+    - For 3 regimes with VIX routing:
+        - regime 0: VIX <= vix_threshold_low (low volatility)
+        - regime 1: vix_threshold_low < VIX <= vix_threshold_high (medium)
+        - regime 2: VIX > vix_threshold_high (high volatility)
+    - Hard routing during training prevents gradient flow to non-assigned experts,
+      encouraging each expert to specialize on its regime's samples.
     
     Examples
     --------
-    >>> # Replace TFT's output layer
-    >>> model = TemporalFusionTransformer.from_dataset(dataset)
+    >>> # 2-regime linear experts (recommended baseline)
     >>> model.output_layer = RegimeConditionalOutput(
-    ...     hidden_size=16,
-    ...     output_size=7,
-    ...     num_regimes=2
+    ...     hidden_size=16, output_size=7, num_regimes=2, expert_hidden_size=0
     ... )
     
-    >>> # Extract diagnostics during evaluation
-    >>> pred, diagnostics = model.output_layer(hidden_state, return_diagnostics=True)
-    >>> routing_weights = diagnostics['routing_weights']  # [batch, seq_len, num_regimes]
-    >>> expert_preds = diagnostics['expert_preds']  # List of [batch, seq_len, output_size]
+    >>> # 3-regime with VIX thresholds and hard routing
+    >>> model.output_layer = RegimeConditionalOutput(
+    ...     hidden_size=16, output_size=7, num_regimes=3,
+    ...     routing_strategy='vix_threshold',
+    ...     vix_threshold_low=15.0, vix_threshold_high=23.0,
+    ...     hard_routing_train=True
+    ... )
     """
     
     def __init__(
@@ -72,7 +97,12 @@ class RegimeConditionalOutput(nn.Module):
         num_regimes: int = 2,
         routing_mode: str = 'learned',
         routing_strategy: str = 'learned',
-        vix_threshold: float = 25.0
+        vix_threshold: float = 25.0,
+        vix_threshold_low: Optional[float] = None,
+        vix_threshold_high: Optional[float] = None,
+        load_balance_weight: float = 0.5,
+        expert_hidden_size: int = 0,
+        hard_routing_train: bool = False
     ):
         super().__init__()
         
@@ -94,15 +124,37 @@ class RegimeConditionalOutput(nn.Module):
                 f"routing_mode='disabled' requires num_regimes=1, got {num_regimes}"
             )
         
+        # Validate 3-regime VIX threshold configuration
+        if num_regimes == 3 and routing_strategy == 'vix_threshold':
+            if vix_threshold_low is None or vix_threshold_high is None:
+                raise ValueError(
+                    "3-regime VIX routing requires both --vix-threshold-low and "
+                    "--vix-threshold-high to be specified"
+                )
+            if vix_threshold_low >= vix_threshold_high:
+                raise ValueError(
+                    f"vix_threshold_low ({vix_threshold_low}) must be < "
+                    f"vix_threshold_high ({vix_threshold_high})"
+                )
+        
+        # Validate hard routing configuration
+        if hard_routing_train and routing_strategy != 'vix_threshold':
+            raise ValueError(
+                "hard_routing_train requires routing_strategy='vix_threshold'"
+            )
+        
         self.hidden_size = hidden_size
         self.output_size = output_size
         self.num_regimes = num_regimes
         self.routing_mode = routing_mode
         self.routing_strategy = routing_strategy
         self.vix_threshold = vix_threshold
+        self.vix_threshold_low = vix_threshold_low
+        self.vix_threshold_high = vix_threshold_high
+        self.load_balance_weight = load_balance_weight
+        self.expert_hidden_size = expert_hidden_size
+        self.hard_routing_train = hard_routing_train
         
-        # Load balancing parameters
-        self.load_balance_weight = 2.0  # Auxiliary loss weight (tunable)
         self.register_buffer('_routing_history', None, persistent=False)  # For loss computation
         
         # Create expert heads
@@ -112,15 +164,28 @@ class RegimeConditionalOutput(nn.Module):
                 nn.Linear(hidden_size, output_size)
             ])
         else:
-            # Multiple experts (one per regime)
-            self.experts = nn.ModuleList([
-                nn.Linear(hidden_size, output_size)
-                for _ in range(num_regimes)
-            ])
+            # Multiple experts - architecture depends on expert_hidden_size
+            if expert_hidden_size > 0:
+                # MLP experts with hidden layer
+                self.experts = nn.ModuleList([
+                    nn.Sequential(
+                        nn.Linear(hidden_size, expert_hidden_size),
+                        nn.ReLU(),
+                        nn.Linear(expert_hidden_size, output_size)
+                    )
+                    for _ in range(num_regimes)
+                ])
+            else:
+                # Linear experts (default, recommended)
+                self.experts = nn.ModuleList([
+                    nn.Linear(hidden_size, output_size)
+                    for _ in range(num_regimes)
+                ])
             
             # Router: learns regime from hidden state
             if routing_mode == 'learned':
                 self.router = nn.Linear(hidden_size, num_regimes)
+
                 # Initialize to zero for balanced routing at start
                 # This prevents random initialization bias that causes winner-takes-all
                 nn.init.zeros_(self.router.weight)
@@ -129,12 +194,8 @@ class RegimeConditionalOutput(nn.Module):
         # Diagnostic caches (non-persistent - not saved to checkpoint)
         # These store detached tensors on CPU for monitoring without memory buildup
         self.register_buffer('_cached_routing_weights', None, persistent=False)
-        self.register_buffer('_cached_expert_preds_0', None, persistent=False)
-        if num_regimes > 1:
-            self.register_buffer('_cached_expert_preds_1', None, persistent=False)
-        if num_regimes > 2:
-            for i in range(2, num_regimes):
-                self.register_buffer(f'_cached_expert_preds_{i}', None, persistent=False)
+        for i in range(num_regimes):
+            self.register_buffer(f'_cached_expert_preds_{i}', None, persistent=False)
         
         # Cache for load balancing loss (computed during forward pass)
         self.register_buffer('_cached_lb_loss', None, persistent=False)
@@ -182,14 +243,9 @@ class RegimeConditionalOutput(nn.Module):
         expert_preds = [expert(hidden_state) for expert in self.experts]
         
         # Compute routing weights based on strategy
-        """
-        if self.routing_strategy == 'vix_threshold':
-            # Check for VIX values (passed as parameter or cached)
-            vix = vix_values
-        """
         if self.routing_strategy == 'vix_threshold':
             vix = vix_values or getattr(self, '_vix_for_forward', None)
-            if vix is not None and not hasattr(self, '_vix_logged_this_epoch'):
+            if vix is not None and not getattr(self, '_vix_logged_this_epoch', False):
                 print(f"[DEBUG] VIX routing - batch vix: min={vix.min().item():.1f}, max={vix.max().item():.1f}, mean={vix.mean().item():.1f}")
                 self._vix_logged_this_epoch = True
 
@@ -201,14 +257,26 @@ class RegimeConditionalOutput(nn.Module):
                 batch_size = hidden_state.size(0)
                 seq_len = hidden_state.size(1)
                 
-                # VIX threshold routing: high VIX → regime 1, low VIX → regime 0
-                # vix shape: [batch]
-                is_high_vol = (vix > self.vix_threshold).float()  # [batch]
+                if self.num_regimes == 2:
+                    # 2-regime routing: high VIX -> regime 1, low VIX -> regime 0
+                    is_high_vol = (vix > self.vix_threshold).float()  # [batch]
+                    routing_weights_2d = torch.stack([1 - is_high_vol, is_high_vol], dim=1)
                 
-                # Create routing weights: [batch, num_regimes]
-                routing_weights_2d = torch.stack([1 - is_high_vol, is_high_vol], dim=1)
-
-                #print(f"[DEBUG] VIX routing - first sample: vix={vix[0].item():.1f}, weights={routing_weights_2d[0].cpu().numpy()}")
+                elif self.num_regimes == 3:
+                    # 3-regime routing: low/medium/high volatility
+                    # regime 0: VIX <= threshold_low
+                    # regime 1: threshold_low < VIX <= threshold_high
+                    # regime 2: VIX > threshold_high
+                    is_low = (vix <= self.vix_threshold_low).float()
+                    is_high = (vix > self.vix_threshold_high).float()
+                    is_medium = 1.0 - is_low - is_high  # Everything else
+                    
+                    routing_weights_2d = torch.stack([is_low, is_medium, is_high], dim=1)
+                
+                else:
+                    raise ValueError(
+                        f"VIX threshold routing only supports 2 or 3 regimes, got {self.num_regimes}"
+                    )
                 
                 # Expand to [batch, seq_len, num_regimes] for multi-step predictions
                 routing_weights = routing_weights_2d.unsqueeze(1).expand(-1, seq_len, -1)
@@ -234,15 +302,75 @@ class RegimeConditionalOutput(nn.Module):
             lb_loss = F.mse_loss(avg_routing, target) * self.load_balance_weight
             self._cached_lb_loss = lb_loss  # Store for loss function to add
         
-        # Weighted combination of expert predictions
-        # Stack: [batch, seq_len, num_regimes, output_size]
-        stacked_preds = torch.stack(expert_preds, dim=2)
-        
-        # Expand routing weights: [batch, seq_len, num_regimes, 1]
-        weights_expanded = routing_weights.unsqueeze(-1)
-        
-        # Weighted sum: [batch, seq_len, output_size]
-        final_pred = torch.sum(stacked_preds * weights_expanded, dim=2)
+        # Compute final predictions - hard vs soft routing
+        if self.training and self.hard_routing_train and self.routing_strategy == 'vix_threshold':
+            # HARD ROUTING: Each sample's loss only backprops through assigned expert
+            # This encourages expert specialization by preventing gradient mixing
+            vix = vix_values or getattr(self, '_vix_for_forward', None)
+            
+            if vix is not None:
+                batch_size = hidden_state.size(0)
+                seq_len = hidden_state.size(1)
+                output_size = expert_preds[0].size(-1)
+                
+                # Log hard routing activation once per epoch
+                if not getattr(self, '_hard_routing_logged_this_epoch', False):
+                    if self.num_regimes == 2:
+                        n_expert0 = (vix <= self.vix_threshold).sum().item()
+                        n_expert1 = (vix > self.vix_threshold).sum().item()
+                        print(f"[DEBUG] HARD routing APPLIED: {n_expert0} samples -> expert0, {n_expert1} samples -> expert1")
+                    elif self.num_regimes == 3:
+                        n_expert0 = (vix <= self.vix_threshold_low).sum().item()
+                        n_expert2 = (vix > self.vix_threshold_high).sum().item()
+                        n_expert1 = batch_size - n_expert0 - n_expert2
+                        print(f"[DEBUG] HARD routing APPLIED: {n_expert0} -> exp0, {n_expert1} -> exp1, {n_expert2} -> exp2")
+                    self._hard_routing_logged_this_epoch = True
+                
+                if self.num_regimes == 2:
+                    # 2-regime hard routing: select expert based on VIX threshold
+                    is_high_vol = (vix > self.vix_threshold)  # [batch] bool
+                    
+                    # Expand for broadcasting: [batch, 1, 1] -> broadcast to [batch, seq_len, output_size]
+                    mask = is_high_vol.view(-1, 1, 1).expand(-1, seq_len, output_size)
+                    
+                    # Select: high vol -> expert 1, low vol -> expert 0
+                    final_pred = torch.where(mask, expert_preds[1], expert_preds[0])
+                
+                elif self.num_regimes == 3:
+                    # 3-regime hard routing using gather
+                    # Compute regime index: 0 (low), 1 (medium), 2 (high)
+                    regime_idx = (vix > self.vix_threshold_low).long() + (vix > self.vix_threshold_high).long()
+                    # regime_idx: [batch], values in {0, 1, 2}
+                    
+                    # Stack experts: [batch, seq_len, num_regimes, output_size]
+                    stacked_preds = torch.stack(expert_preds, dim=2)
+                    
+                    # Expand regime_idx for gather: [batch, seq_len, 1, output_size]
+                    idx_expanded = regime_idx.view(-1, 1, 1, 1).expand(-1, seq_len, 1, output_size)
+                    
+                    # Gather along regime dimension: [batch, seq_len, 1, output_size] -> squeeze -> [batch, seq_len, output_size]
+                    final_pred = stacked_preds.gather(dim=2, index=idx_expanded).squeeze(2)
+                
+                else:
+                    raise ValueError(f"Hard routing only supports 2 or 3 regimes, got {self.num_regimes}")
+            else:
+                # Fallback to soft routing if VIX not available
+                if not getattr(self, '_soft_fallback_logged', False):
+                    print(f"[DEBUG] HARD routing FALLBACK to soft (VIX is None)")
+                    self._soft_fallback_logged = True
+                stacked_preds = torch.stack(expert_preds, dim=2)
+                weights_expanded = routing_weights.unsqueeze(-1)
+                final_pred = torch.sum(stacked_preds * weights_expanded, dim=2)
+        else:
+            # SOFT ROUTING: Weighted combination of expert predictions (default)
+            # Stack: [batch, seq_len, num_regimes, output_size]
+            stacked_preds = torch.stack(expert_preds, dim=2)
+            
+            # Expand routing weights: [batch, seq_len, num_regimes, 1]
+            weights_expanded = routing_weights.unsqueeze(-1)
+            
+            # Weighted sum: [batch, seq_len, output_size]
+            final_pred = torch.sum(stacked_preds * weights_expanded, dim=2)
         
         if return_diagnostics:
             return final_pred, {
@@ -294,7 +422,7 @@ class RegimeConditionalOutput(nn.Module):
         Returns
         -------
         dict
-            Parameter counts: {'total', 'experts', 'router'}
+            Parameter counts: {'total', 'experts', 'router', 'expert_type'}
         """
         expert_params = sum(
             p.numel() for expert in self.experts for p in expert.parameters()
@@ -304,19 +432,25 @@ class RegimeConditionalOutput(nn.Module):
         if hasattr(self, 'router'):
             router_params = sum(p.numel() for p in self.router.parameters())
         
+        expert_type = 'mlp' if self.expert_hidden_size > 0 else 'linear'
+        
         return {
             'total': expert_params + router_params,
             'experts': expert_params,
-            'router': router_params
+            'router': router_params,
+            'expert_type': expert_type,
+            'expert_hidden_size': self.expert_hidden_size
         }
     
     def extra_repr(self) -> str:
         """String representation for print/debug."""
+        expert_type = f"mlp({self.expert_hidden_size})" if self.expert_hidden_size > 0 else "linear"
         return (
             f"hidden_size={self.hidden_size}, "
             f"output_size={self.output_size}, "
             f"num_regimes={self.num_regimes}, "
-            f"routing_mode='{self.routing_mode}'"
+            f"routing_mode='{self.routing_mode}', "
+            f"expert_type={expert_type}"
         )
 
 
@@ -325,7 +459,12 @@ def replace_output_layer(
     num_regimes: int = 2,
     routing_mode: str = 'learned',
     routing_strategy: str = 'learned',
-    vix_threshold: float = 25.0
+    vix_threshold: float = 25.0,
+    vix_threshold_low: Optional[float] = None,
+    vix_threshold_high: Optional[float] = None,
+    load_balance_weight: float = 0.5,
+    expert_hidden_size: int = 0,
+    hard_routing_train: bool = False
 ) -> nn.Module:
     """
     Replace TFT's output layer with RegimeConditionalOutput.
@@ -341,7 +480,18 @@ def replace_output_layer(
     routing_strategy : str, default='learned'
         'learned' (MLP router) or 'vix_threshold' (deterministic VIX routing)
     vix_threshold : float, default=25.0
-        VIX threshold for deterministic routing (only used if routing_strategy='vix_threshold')
+        VIX threshold for 2-regime deterministic routing
+    vix_threshold_low : float, optional
+        Lower VIX threshold for 3-regime routing
+    vix_threshold_high : float, optional
+        Upper VIX threshold for 3-regime routing
+    load_balance_weight : float, default=0.5
+        Weight for load balancing auxiliary loss
+    expert_hidden_size : int, default=0
+        Expert hidden layer size (0=linear, >0=MLP)
+    hard_routing_train : bool, default=False
+        If True, use hard routing during training (each sample only trains its assigned expert).
+        Requires routing_strategy='vix_threshold'.
     
     Returns
     -------
@@ -350,12 +500,15 @@ def replace_output_layer(
     
     Examples
     --------
-    >>> # Learned routing
-    >>> model = TemporalFusionTransformer.from_dataset(dataset)
-    >>> model = replace_output_layer(model, num_regimes=2, routing_strategy='learned')
+    >>> # 2-regime learned routing with linear experts
+    >>> model = replace_output_layer(model, num_regimes=2, expert_hidden_size=0)
     >>> 
-    >>> # VIX-based routing
-    >>> model = replace_output_layer(model, num_regimes=2, routing_strategy='vix_threshold', vix_threshold=25.0)
+    >>> # 3-regime VIX routing with MLP experts and hard routing
+    >>> model = replace_output_layer(
+    ...     model, num_regimes=3, routing_strategy='vix_threshold',
+    ...     vix_threshold_low=15.0, vix_threshold_high=23.0,
+    ...     expert_hidden_size=16, hard_routing_train=True
+    ... )
     """
     if not hasattr(model, 'output_layer'):
         raise ValueError("Model must have 'output_layer' attribute")
@@ -377,15 +530,28 @@ def replace_output_layer(
         num_regimes=num_regimes,
         routing_mode=routing_mode,
         routing_strategy=routing_strategy,
-        vix_threshold=vix_threshold
+        vix_threshold=vix_threshold,
+        vix_threshold_low=vix_threshold_low,
+        vix_threshold_high=vix_threshold_high,
+        load_balance_weight=load_balance_weight,
+        expert_hidden_size=expert_hidden_size,
+        hard_routing_train=hard_routing_train
     )
+    
+    expert_type = f"MLP({expert_hidden_size})" if expert_hidden_size > 0 else "Linear"
+    routing_type = "HARD" if hard_routing_train else "soft"
     
     print(f"\n[REGIME OUTPUT] Replaced output layer:")
     print(f"  Mode: {routing_mode}")
     print(f"  Strategy: {routing_strategy}")
     if routing_strategy == 'vix_threshold':
-        print(f"  VIX threshold: {vix_threshold}")
-    print(f"  Experts: {num_regimes}")
+        if num_regimes == 2:
+            print(f"  VIX threshold: {vix_threshold}")
+        elif num_regimes == 3:
+            print(f"  VIX thresholds: low={vix_threshold_low}, high={vix_threshold_high}")
+    print(f"  Experts: {num_regimes} x {expert_type}")
+    print(f"  Training routing: {routing_type}")
+    print(f"  Load balance weight: {load_balance_weight}")
     print(f"  Parameters: {model.output_layer.get_expert_parameters()}")
     
     return model

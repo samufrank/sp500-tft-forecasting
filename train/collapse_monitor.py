@@ -99,6 +99,9 @@ class CollapseMonitor(Callback):
         # 6. Regime diagnostics (if regime output enabled)
         self._log_regime_diagnostics(trainer, pl_module)
         
+        # 7. Expert weight divergence (if regime output enabled)
+        self._log_expert_weight_divergence(pl_module)
+        
         # Save to disk
         self._save_history(trainer.current_epoch)
         
@@ -107,9 +110,12 @@ class CollapseMonitor(Callback):
         if hasattr(pl_module, '_current_fx_name'):
             pl_module._current_fx_name = None
 
-        # Reset VIX debug flag  <-- ADD THIS
-        if hasattr(pl_module, 'output_layer') and hasattr(pl_module.output_layer, '_vix_logged_this_epoch'):
-            pl_module.output_layer._vix_logged_this_epoch = False
+        # Reset debug flags for next epoch
+        if hasattr(pl_module, 'output_layer'):
+            if hasattr(pl_module.output_layer, '_vix_logged_this_epoch'):
+                pl_module.output_layer._vix_logged_this_epoch = False
+            if hasattr(pl_module.output_layer, '_hard_routing_logged_this_epoch'):
+                pl_module.output_layer._hard_routing_logged_this_epoch = False
         
     def _log_prediction_diversity(self, trainer, pl_module):
         """
@@ -664,6 +670,98 @@ class CollapseMonitor(Callback):
             print(f"    VIX correlation (regime_1): {vix_corr:.3f}")
         else:
             print(f"    VIX correlation: (VIX not found in batch)")
+    
+    def _log_expert_weight_divergence(self, pl_module):
+        """
+        Track if expert weights are diverging (learning different functions).
+        
+        Monitors weight differences between experts to detect:
+        - Experts learning identical functions (no divergence = routing doesn't matter)
+        - Healthy specialization (moderate divergence)
+        - Extreme divergence (potential training instability)
+        
+        Metrics logged:
+        - weight_diff: L2 norm of weight difference between expert pairs
+        - weight_cosine: Cosine similarity (1.0 = identical, 0.0 = orthogonal)
+        """
+        import torch.nn.functional as F
+        
+        if not hasattr(pl_module, 'output_layer'):
+            return
+        if not hasattr(pl_module.output_layer, 'experts'):
+            return
+        
+        experts = pl_module.output_layer.experts
+        num_experts = len(experts)
+        
+        if num_experts < 2:
+            return
+        
+        # Helper to extract first layer weights from Linear or Sequential experts
+        def get_first_layer_weight(expert):
+            if isinstance(expert, torch.nn.Sequential):
+                return expert[0].weight
+            return expert.weight
+        
+        # Initialize history keys if needed
+        if 'expert_weight_diff' not in self.history:
+            self.history['expert_weight_diff'] = []
+        if 'expert_weight_cosine' not in self.history:
+            self.history['expert_weight_cosine'] = []
+        
+        # For >2 experts, track pairwise metrics as dict
+        if num_experts > 2:
+            if 'expert_weight_diff_pairs' not in self.history:
+                self.history['expert_weight_diff_pairs'] = {}
+            if 'expert_weight_cosine_pairs' not in self.history:
+                self.history['expert_weight_cosine_pairs'] = {}
+        
+        # Compute metrics for first two experts (backward compatible)
+        w0 = get_first_layer_weight(experts[0])
+        w1 = get_first_layer_weight(experts[1])
+        
+        weight_diff = (w0 - w1).norm().item()
+        weight_cosine = F.cosine_similarity(
+            w0.flatten().unsqueeze(0), 
+            w1.flatten().unsqueeze(0)
+        ).item()
+        
+        self.history['expert_weight_diff'].append(weight_diff)
+        self.history['expert_weight_cosine'].append(weight_cosine)
+        
+        print(f"  Expert weight divergence (0 vs 1): diff={weight_diff:.4f}, cosine={weight_cosine:.4f}")
+        
+        # For 3+ experts, also track all pairwise comparisons
+        if num_experts > 2:
+            for i in range(num_experts):
+                for j in range(i + 1, num_experts):
+                    if i == 0 and j == 1:
+                        continue  # Already computed above
+                    
+                    pair_key = f"{i}_vs_{j}"
+                    wi = get_first_layer_weight(experts[i])
+                    wj = get_first_layer_weight(experts[j])
+                    
+                    diff = (wi - wj).norm().item()
+                    cos = F.cosine_similarity(
+                        wi.flatten().unsqueeze(0),
+                        wj.flatten().unsqueeze(0)
+                    ).item()
+                    
+                    if pair_key not in self.history['expert_weight_diff_pairs']:
+                        self.history['expert_weight_diff_pairs'][pair_key] = []
+                        self.history['expert_weight_cosine_pairs'][pair_key] = []
+                    
+                    self.history['expert_weight_diff_pairs'][pair_key].append(diff)
+                    self.history['expert_weight_cosine_pairs'][pair_key].append(cos)
+                    
+                    print(f"  Expert weight divergence ({i} vs {j}): diff={diff:.4f}, cosine={cos:.4f}")
+        
+        # Interpretation guidance
+        if weight_cosine > 0.99:
+            print(f"    WARNING: Experts nearly identical (cosine > 0.99) - routing may be ineffective")
+        elif weight_cosine < 0.5:
+            print(f"    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions")
             
     def _save_history(self, epoch):
         """Save monitoring history to disk."""
