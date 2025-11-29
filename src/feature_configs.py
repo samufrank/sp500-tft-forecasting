@@ -65,6 +65,23 @@ FEATURE_SETS = {
         'description': 'All available features',
         'min_date': '1997-01-01',  # Most restrictive constraint
     },
+    
+    'core_dynamics': {
+        'features': [
+            # Levels (original core)
+            'SP500_Returns',      # Target
+            'VIX',                # Market volatility level
+            'Treasury_10Y',       # Long-term rate level
+            'Yield_Spread',       # Yield curve slope
+            'Inflation_YoY',      # CPI year-over-year
+            # Dynamics (regime indicators)
+            'VIX_relative',       # Fear relative to recent norm
+            'VIX_spike',          # Acute fear event (binary)
+            'Treasury_10Y_change',  # Rate momentum
+        ],
+        'description': 'Core levels + regime dynamics indicators (requires enhanced dataset)',
+        'min_date': None,
+    },
 }
 
 # Define target variable

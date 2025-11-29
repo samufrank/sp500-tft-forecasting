@@ -4,33 +4,20 @@ Evaluate trained Temporal Fusion Transformer on test set.
 Comprehensive evaluation including statistical metrics, financial metrics,
 and diagnostic outputs with full experiment logging.
 
-Supports both baseline TFT models (pytorch-forecasting) and custom TFT models
-(models/tft_model.py) with automatic detection from checkpoint hyperparameters.
-
 Usage:
     # Basic evaluation (automatically uses best checkpoint)
     python evaluate_tft.py --experiment-name exp004
     python evaluate_tft.py --experiment-name 00_baseline_exploration/exp004
     
-    # Specific checkpoint (works with both custom and baseline models)
+    # Specific checkpoint
     python evaluate_tft.py \\
         --experiment-name 00_baseline_exploration/exp004 \\
         --checkpoint experiments/00_baseline_exploration/exp004/checkpoints/tft-epoch=00-val_loss=0.1191.ckpt
-    
-    # Custom model from Phase 2+
-    python evaluate_tft.py \\
-        --experiment-name attn_test \\
-        --checkpoint experiments/attn_test/checkpoints/tft-epoch=epoch=41-val_loss=val_loss=0.3948.ckpt
     
     # Custom test split (for fixed vs vintage comparison)
     python evaluate_tft.py \\
         --experiment-name exp004 \\
         --test-split data/splits/fixed/core_proposal_daily_fixed_test.csv
-
-Model Detection:
-    - Custom models: Identified by 'num_encoder_features' in checkpoint hyperparameters
-    - Baseline models: pytorch-forecasting models (legacy Phase 0/1 experiments)
-    - Both work identically - no manual specification required
 """
 import warnings
 warnings.filterwarnings('ignore', category=UserWarning)
@@ -53,6 +40,74 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 from scipy import stats
 from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix, roc_auc_score
+
+
+# ============================================================================
+# FREQUENCY-AWARE CONSTANTS
+# ============================================================================
+
+FREQUENCY_CONFIG = {
+    'daily': {
+        'annualization_factor': 252,      # Trading days per year
+        'rolling_window': 60,             # ~3 months of daily data
+        'range_threshold': 0.02,          # 2% range for daily returns
+        'change_threshold': 0.001,        # 0.1% daily change threshold
+        'periods_per_year': 252,
+        'period_label': 'days',
+    },
+    'weekly': {
+        'annualization_factor': 52,       # Weeks per year
+        'rolling_window': 13,             # ~3 months of weekly data
+        'range_threshold': 0.05,          # 5% range for weekly returns (higher volatility)
+        'change_threshold': 0.005,        # 0.5% weekly change threshold
+        'periods_per_year': 52,
+        'period_label': 'weeks',
+    },
+    'monthly': {
+        'annualization_factor': 12,       # Months per year
+        'rolling_window': 6,              # 6 months (need more for stability)
+        'range_threshold': 0.10,          # 10% range for monthly returns
+        'change_threshold': 0.01,         # 1% monthly change threshold
+        'periods_per_year': 12,
+        'period_label': 'months',
+    },
+}
+
+
+def infer_frequency(dates):
+    """
+    Infer data frequency from date spacing.
+    
+    Parameters:
+    -----------
+    dates : array-like
+        Array of dates (datetime or string)
+        
+    Returns:
+    --------
+    str
+        'daily', 'weekly', or 'monthly'
+    """
+    dates_series = pd.to_datetime(pd.Series(dates))
+    date_diffs = dates_series.diff().dropna()
+    
+    # Use median to be robust to holidays/gaps
+    median_diff_days = date_diffs.median().days
+    
+    if median_diff_days <= 3:
+        return 'daily'
+    elif median_diff_days <= 10:
+        return 'weekly'
+    else:
+        return 'monthly'
+
+
+def get_frequency_config(frequency):
+    """Get configuration dict for a frequency, with fallback to daily."""
+    if frequency not in FREQUENCY_CONFIG:
+        print(f"WARNING: Unknown frequency '{frequency}', defaulting to 'daily'")
+        frequency = 'daily'
+    return FREQUENCY_CONFIG[frequency]
 
 
 # ============================================================================
@@ -366,7 +421,6 @@ def load_model(checkpoint_path, config):
     if not uses_dist_loss and not use_regime_output:
         model = TemporalFusionTransformer.load_from_checkpoint(checkpoint_path)
         model.eval()
-        print(f"  Model loaded successfully and set to eval mode")
         return model
     
     # Case 2: Regime output without dist loss (clean loading path)
@@ -395,8 +449,6 @@ def load_model(checkpoint_path, config):
         vix_threshold_high = regime_config.get('vix_threshold_high', None)
         load_balance_weight = regime_config.get('load_balance_weight', 0.5)
         expert_hidden_size = regime_config.get('expert_hidden_size', 0)
-        # Note: hard_routing_train only affects training, but we pass False for eval
-        # to ensure soft routing is used during evaluation
         hard_routing_train = False  # Always soft routing during evaluation
         
         model = replace_output_layer(
@@ -420,7 +472,6 @@ def load_model(checkpoint_path, config):
         return model
     
     # Case 3: Distribution loss (with or without regime output)
-    # Need custom unpickling to bypass corrupted loss functions
     print(f"  Loading distribution loss checkpoint (bypassing corrupted loss)...")
     
     import torch
@@ -429,7 +480,6 @@ def load_model(checkpoint_path, config):
     import zipfile
     import tempfile
     
-    # Custom unpickler that creates fresh QuantileLoss instances
     class FixedUnpickler(pickle.Unpickler):
         def find_class(self, module, name):
             if name == 'QuantileLoss' and 'pytorch_forecasting' in module:
@@ -438,7 +488,6 @@ def load_model(checkpoint_path, config):
             return super().find_class(module, name)
     
     try:
-        # Try loading as direct pickle (PyTorch 1.x format)
         with open(checkpoint_path, 'rb') as f:
             checkpoint = FixedUnpickler(f).load()
     except (pickle.UnpicklingError, zipfile.BadZipFile, Exception) as e:
@@ -450,25 +499,20 @@ def load_model(checkpoint_path, config):
             f"or skip distribution loss analysis for Phase 3."
         )
     
-    # Fix hyperparameters if loss object exists
     if 'hyper_parameters' in checkpoint and 'loss' in checkpoint['hyper_parameters']:
         from pytorch_forecasting.metrics import QuantileLoss
         checkpoint['hyper_parameters']['loss'] = QuantileLoss()
     
-    # Save fixed checkpoint temporarily
     with tempfile.NamedTemporaryFile(suffix='.ckpt', delete=False) as tmp:
         tmp_path = tmp.name
     
     try:
-        # If regime output was used, we need to create model with hparams, apply MoE, then load
         if use_regime_output:
             print(f"  Detected regime output checkpoint, applying architecture modification...")
             
-            # Create model from hyperparameters (no weights loaded)
             hparams = checkpoint['hyper_parameters']
             model = TemporalFusionTransformer(**hparams)
             
-            # Apply regime output architecture before loading weights
             from src.regime_output import replace_output_layer
             
             num_regimes = regime_config.get('num_regimes', 2)
@@ -479,8 +523,7 @@ def load_model(checkpoint_path, config):
             vix_threshold_high = regime_config.get('vix_threshold_high', None)
             load_balance_weight = regime_config.get('load_balance_weight', 0.5)
             expert_hidden_size = regime_config.get('expert_hidden_size', 0)
-            # Note: hard_routing_train only affects training, use False for eval
-            hard_routing_train = False  # Always soft routing during evaluation
+            hard_routing_train = False
             
             model = replace_output_layer(
                 model,
@@ -495,11 +538,9 @@ def load_model(checkpoint_path, config):
                 hard_routing_train=hard_routing_train
             )
             
-            # Now load the state dict with MoE architecture
             model.load_state_dict(checkpoint['state_dict'])
             print(f"  Successfully loaded regime output state_dict")
         else:
-            # No regime output - use standard checkpoint loading
             torch.save(checkpoint, tmp_path)
             model = TemporalFusionTransformer.load_from_checkpoint(tmp_path)
         
@@ -508,7 +549,6 @@ def load_model(checkpoint_path, config):
     
     model.eval()
     
-    # Re-apply distribution penalties
     from loss_wrapper import add_distribution_penalties
     model = add_distribution_penalties(
         model,
@@ -520,7 +560,7 @@ def load_model(checkpoint_path, config):
     print(f"  Re-applied distribution penalties: mean_weight={mean_weight}, std_weight={std_weight}")
     
     return model
-    
+
 # ============================================================================
 # PREDICTION
 # ============================================================================
@@ -531,7 +571,8 @@ def generate_predictions(model, test_dataset, batch_size=128):
     test_dataloader = test_dataset.to_dataloader(
         train=False,
         batch_size=batch_size,
-        num_workers=0
+        num_workers=4,
+        persistent_workers=True
     )
     
     # DEBUG
@@ -624,8 +665,22 @@ def compute_statistical_metrics(predictions, actuals):
 # FINANCIAL METRICS
 # ============================================================================
 
-def compute_financial_metrics(predictions, actuals):
-    """Compute financial performance metrics."""
+def compute_financial_metrics(predictions, actuals, frequency='daily'):
+    """
+    Compute financial performance metrics.
+    
+    Parameters:
+    -----------
+    predictions : np.array
+        Model predictions
+    actuals : np.array
+        Actual returns
+    frequency : str
+        Data frequency for annualization ('daily', 'weekly', 'monthly')
+    """
+    freq_config = get_frequency_config(frequency)
+    annualization_factor = freq_config['annualization_factor']
+    
     # Directional accuracy
     pred_direction = np.sign(predictions)
     actual_direction = np.sign(actuals)
@@ -635,11 +690,11 @@ def compute_financial_metrics(predictions, actuals):
     strategy_returns = np.where(predictions > 0, actuals, 0)
     cumulative_returns = np.cumprod(1 + strategy_returns / 100) - 1
     
-    # Sharpe ratio (annualized, assuming daily data)
+    # Sharpe ratio (annualized using frequency-appropriate factor)
     if len(strategy_returns) > 1:
         mean_return = np.mean(strategy_returns)
         std_return = np.std(strategy_returns)
-        sharpe = float((mean_return / std_return) * np.sqrt(252) if std_return > 0 else 0)
+        sharpe = float((mean_return / std_return) * np.sqrt(annualization_factor) if std_return > 0 else 0)
     else:
         sharpe = 0.0
     
@@ -731,14 +786,14 @@ def compute_residual_diagnostics(predictions, actuals):
     return diagnostics
 
 
-def detect_model_collapse(predictions, actuals, dates, window=60):
+def detect_model_collapse(predictions, actuals, dates, window=None, frequency='daily'):
     """
     Four-mode financial collapse detection with prediction quality analysis.
     
     Structural methods (3):
     1. Variance-based: Low rolling variance vs baseline (20% threshold)
-    2. Range-based: Tight min-max bounds over windows (2% threshold)
-    3. Consecutive-similarity: Minimal step-to-step changes (0.1% threshold)
+    2. Range-based: Tight min-max bounds over windows (frequency-adjusted threshold)
+    3. Consecutive-similarity: Minimal step-to-step changes (frequency-adjusted threshold)
     
     Quality metrics (2):
     4. Correlation: Predictions vs actuals correlation
@@ -750,8 +805,30 @@ def detect_model_collapse(predictions, actuals, dates, window=60):
     - DEGRADED: Predictions vary but poor quality (low correlation OR low directional acc)
     - HEALTHY: Predictions vary and accurate
     
+    Parameters:
+    -----------
+    predictions : np.array
+        Model predictions
+    actuals : np.array
+        Actual returns
+    dates : array-like
+        Dates for temporal summary
+    window : int, optional
+        Rolling window size. If None, uses frequency-appropriate default.
+    frequency : str
+        Data frequency ('daily', 'weekly', 'monthly')
+    
     Returns comprehensive assessment with temporal breakdown.
     """
+    # Get frequency-specific configuration
+    freq_config = get_frequency_config(frequency)
+    
+    if window is None:
+        window = freq_config['rolling_window']
+    
+    range_threshold = freq_config['range_threshold']
+    change_threshold = freq_config['change_threshold']
+    period_label = freq_config['period_label']
     
     # ========================================================================
     # STRUCTURAL METHOD 1: VARIANCE-BASED
@@ -764,20 +841,20 @@ def detect_model_collapse(predictions, actuals, dates, window=60):
     variance_collapsed = rolling_std.values**2 < collapse_threshold_var
     
     # ========================================================================
-    # STRUCTURAL METHOD 2: RANGE-BASED
+    # STRUCTURAL METHOD 2: RANGE-BASED (frequency-adjusted threshold)
     # ========================================================================
     rolling_max = pd.Series(predictions).rolling(window=window, min_periods=window//2).max()
     rolling_min = pd.Series(predictions).rolling(window=window, min_periods=window//2).min()
     rolling_range = rolling_max - rolling_min
-    range_collapsed = rolling_range.values < 0.02  # 2% range threshold
+    range_collapsed = rolling_range.values < range_threshold
     
     # ========================================================================
-    # STRUCTURAL METHOD 3: CONSECUTIVE-SIMILARITY
+    # STRUCTURAL METHOD 3: CONSECUTIVE-SIMILARITY (frequency-adjusted threshold)
     # ========================================================================
     pred_changes = np.abs(np.diff(predictions))
     pred_changes = np.concatenate([[np.nan], pred_changes])
     rolling_mean_change = pd.Series(pred_changes).rolling(window=window, min_periods=window//2).mean()
-    consecutive_collapsed = rolling_mean_change.values < 0.001  # 0.1% change threshold
+    consecutive_collapsed = rolling_mean_change.values < change_threshold
     
     # ========================================================================
     # QUALITY METRIC 1: CORRELATION
@@ -927,7 +1004,7 @@ def detect_model_collapse(predictions, actuals, dates, window=60):
                     symbol = "[FAIL]"
                 
                 temporal_summary.append(
-                    f"{symbol} {start_date} to {end_date} ({duration_days:4d} days): "
+                    f"{symbol} {start_date} to {end_date} ({duration_days:4d} {period_label}): "
                     f"{current_mode:20s} - std={period_std:.4f}, corr={avg_corr:+.3f}, "
                     f"dir_acc={avg_dir_acc:.3f}"
                 )
@@ -935,7 +1012,8 @@ def detect_model_collapse(predictions, actuals, dates, window=60):
                 method_details.append({
                     'start_date': start_date,
                     'end_date': end_date,
-                    'duration_days': duration_days,
+                    'duration_periods': duration_days,
+                    'period_label': period_label,
                     'mode': current_mode,
                     'structural_methods_flagged': avg_structural_methods,
                     'std': float(period_std),
@@ -981,7 +1059,7 @@ def detect_model_collapse(predictions, actuals, dates, window=60):
             symbol = "[FAIL]"
         
         temporal_summary.append(
-            f"{symbol} {start_date} to {end_date} ({duration_days:4d} days): "
+            f"{symbol} {start_date} to {end_date} ({duration_days:4d} {period_label}): "
             f"{current_mode:20s} - std={period_std:.4f}, corr={avg_corr:+.3f}, "
             f"dir_acc={avg_dir_acc:.3f}"
         )
@@ -989,7 +1067,8 @@ def detect_model_collapse(predictions, actuals, dates, window=60):
         method_details.append({
             'start_date': start_date,
             'end_date': end_date,
-            'duration_days': duration_days,
+            'duration_periods': duration_days,
+            'period_label': period_label,
             'mode': current_mode,
             'structural_methods_flagged': avg_structural_methods,
             'std': float(period_std),
@@ -1000,12 +1079,12 @@ def detect_model_collapse(predictions, actuals, dates, window=60):
         })
     
     # Calculate summary statistics by mode
-    healthy_days = int(np.sum(modes == 'HEALTHY'))
-    degraded_days = int(np.sum(modes == 'DEGRADED'))
-    unidirectional_days = int(np.sum(modes == 'UNIDIRECTIONAL'))
-    weak_collapse_days = int(np.sum(modes == 'WEAK_COLLAPSE'))
-    strong_collapse_days = int(np.sum(modes == 'STRONG_COLLAPSE'))
-    total_days = len(modes)
+    healthy_periods = int(np.sum(modes == 'HEALTHY'))
+    degraded_periods = int(np.sum(modes == 'DEGRADED'))
+    unidirectional_periods = int(np.sum(modes == 'UNIDIRECTIONAL'))
+    weak_collapse_periods = int(np.sum(modes == 'WEAK_COLLAPSE'))
+    strong_collapse_periods = int(np.sum(modes == 'STRONG_COLLAPSE'))
+    total_periods = len(modes)
     
     # Individual method statistics
     method_stats = {
@@ -1019,26 +1098,28 @@ def detect_model_collapse(predictions, actuals, dates, window=60):
     }
     
     # Determine overall status
-    collapse_detected = strong_collapse_days > 0 or weak_collapse_days > 0
-    degradation_detected = degraded_days > 0 or unidirectional_days > 0
+    collapse_detected = strong_collapse_periods > 0 or weak_collapse_periods > 0
+    degradation_detected = degraded_periods > 0 or unidirectional_periods > 0
     
     return {
         'collapse_detected': collapse_detected,
         'degradation_detected': degradation_detected,
         'temporal_summary': temporal_summary,
         'method_details': method_details,
+        'frequency': frequency,
+        'period_label': period_label,
         'mode_stats': {
-            'healthy_days': healthy_days,
-            'degraded_days': degraded_days,
-            'unidirectional_days': unidirectional_days,
-            'weak_collapse_days': weak_collapse_days,
-            'strong_collapse_days': strong_collapse_days,
-            'total_days': total_days,
-            'healthy_pct': healthy_days / total_days * 100,
-            'degraded_pct': degraded_days / total_days * 100,
-            'unidirectional_pct': unidirectional_days / total_days * 100,
-            'weak_collapse_pct': weak_collapse_days / total_days * 100,
-            'strong_collapse_pct': strong_collapse_days / total_days * 100,
+            'healthy_periods': healthy_periods,
+            'degraded_periods': degraded_periods,
+            'unidirectional_periods': unidirectional_periods,
+            'weak_collapse_periods': weak_collapse_periods,
+            'strong_collapse_periods': strong_collapse_periods,
+            'total_periods': total_periods,
+            'healthy_pct': healthy_periods / total_periods * 100,
+            'degraded_pct': degraded_periods / total_periods * 100,
+            'unidirectional_pct': unidirectional_periods / total_periods * 100,
+            'weak_collapse_pct': weak_collapse_periods / total_periods * 100,
+            'strong_collapse_pct': strong_collapse_periods / total_periods * 100,
         },
         'method_stats': method_stats,
         'global_stats': {
@@ -1048,17 +1129,19 @@ def detect_model_collapse(predictions, actuals, dates, window=60):
         },
     }
 
-def create_diagnostic_plots(predictions, actuals, dates, output_dir):
+def create_diagnostic_plots(predictions, actuals, dates, output_dir, frequency='daily'):
     """
     Create comprehensive diagnostic plots showing prediction quality over time.
     
     Creates a 3-panel figure:
-    1. Rolling correlation (60-day window)
-    2. Rolling directional accuracy (60-day window)
+    1. Rolling correlation (frequency-appropriate window)
+    2. Rolling directional accuracy (frequency-appropriate window)
     3. Prediction magnitude over time
     """
+    freq_config = get_frequency_config(frequency)
+    window = freq_config['rolling_window']
+    
     dates_dt = pd.to_datetime(dates)
-    window = 60
     
     fig, axes = plt.subplots(3, 1, figsize=(14, 10), sharex=True)
     
@@ -1363,13 +1446,13 @@ def create_performance_plots(actuals, strategy_returns, dates, output_dir, colla
         # Plot markers (reverse order so most severe is on top)
         if first_degraded:
             axes[0].axvline(x=first_degraded, color='gold', linewidth=2, linestyle='--',
-                           label=f'↑ Degraded: {first_degraded.strftime("%Y-%m")}', alpha=0.7)
+                           label=f'Ã¢â€ â€™ Degraded: {first_degraded.strftime("%Y-%m")}', alpha=0.7)
         if first_weak:
             axes[0].axvline(x=first_weak, color='orange', linewidth=2, linestyle='--',
-                           label=f'↑ Weak collapse: {first_weak.strftime("%Y-%m")}', alpha=0.7)
+                           label=f'Ã¢â€ â€™ Weak collapse: {first_weak.strftime("%Y-%m")}', alpha=0.7)
         if first_strong:
             axes[0].axvline(x=first_strong, color='red', linewidth=2, linestyle='--',
-                           label=f'↑ Strong collapse: {first_strong.strftime("%Y-%m")}', alpha=0.7)
+                           label=f'Ã¢â€ â€™ Strong collapse: {first_strong.strftime("%Y-%m")}', alpha=0.7)
     
     axes[0].set_ylabel('Cumulative Return (Growth of $1)')
     axes[0].set_title('Strategy Performance (shaded by quality mode)')
@@ -1651,6 +1734,11 @@ def evaluate():
     print("\nLoading configuration...")
     config = load_config(args.experiment_name)
     
+    # Extract frequency from config, or infer from data later
+    data_frequency = config.get('frequency', None)
+    if data_frequency:
+        print(f"Data frequency (from config): {data_frequency}")
+    
     # Set output directory
     if args.output_dir is None:
         # Use the same base path we found for metrics/checkpoint
@@ -1741,15 +1829,28 @@ def evaluate():
         f"Length mismatch: dates={len(dates)}, predictions={len(predictions)}, actuals={len(actuals)}"
     
     print(f"\nPrediction period: {dates[0]} to {dates[-1]} ({len(predictions)} samples)")
+    
+    # Infer or confirm frequency
+    if data_frequency is None:
+        data_frequency = infer_frequency(dates)
+        print(f"Data frequency (inferred): {data_frequency}")
+    else:
+        inferred = infer_frequency(dates)
+        if inferred != data_frequency:
+            print(f"WARNING: Config frequency ({data_frequency}) differs from inferred ({inferred})")
+    
+    freq_config = get_frequency_config(data_frequency)
+    period_label = freq_config['period_label']
+    
     # Compute metrics
     print("Computing metrics...")
     metrics_stat = compute_statistical_metrics(predictions, actuals)
-    metrics_fin, strategy_returns = compute_financial_metrics(predictions, actuals)
+    metrics_fin, strategy_returns = compute_financial_metrics(predictions, actuals, frequency=data_frequency)
     diagnostics = compute_residual_diagnostics(predictions, actuals)
     
     # Detect model collapse
     print("Analyzing prediction behavior for collapse...")
-    collapse_diagnostics = detect_model_collapse(predictions, actuals, dates)
+    collapse_diagnostics = detect_model_collapse(predictions, actuals, dates, frequency=data_frequency)
     
     # Print collapse diagnostics
     print("\n" + "="*70)
@@ -1766,11 +1867,11 @@ def evaluate():
     }
     
     for method_key, method_name in structural_methods.items():
-        days_flagged = collapse_diagnostics['method_stats'][method_key]
-        total_days = collapse_diagnostics['mode_stats']['total_days']
-        pct = days_flagged / total_days * 100 if total_days > 0 else 0
+        periods_flagged = collapse_diagnostics['method_stats'][method_key]
+        total_periods = collapse_diagnostics['mode_stats']['total_periods']
+        pct = periods_flagged / total_periods * 100 if total_periods > 0 else 0
         symbol = "[WARN]" if pct > 10 else "[ OK ]"
-        print(f"{method_name:30s} {symbol} {days_flagged:4d} days ({pct:5.1f}%)")
+        print(f"{method_name:30s} {symbol} {periods_flagged:4d} {period_label} ({pct:5.1f}%)")
     
     print("\nQuality Metrics:")
     print("-" * 70)
@@ -1780,17 +1881,17 @@ def evaluate():
     dir_flagged = collapse_diagnostics['method_stats']['low_directional_acc']
     combined_flagged = collapse_diagnostics['method_stats']['quality_degraded']
     unidirectional_flagged = collapse_diagnostics['method_stats']['unidirectional']
-    total_days = collapse_diagnostics['mode_stats']['total_days']
+    total_periods = collapse_diagnostics['mode_stats']['total_periods']
     
-    corr_pct = corr_flagged / total_days * 100 if total_days > 0 else 0
-    dir_pct = dir_flagged / total_days * 100 if total_days > 0 else 0
-    combined_pct = combined_flagged / total_days * 100 if total_days > 0 else 0
-    unidirectional_pct = unidirectional_flagged / total_days * 100 if total_days > 0 else 0
+    corr_pct = corr_flagged / total_periods * 100 if total_periods > 0 else 0
+    dir_pct = dir_flagged / total_periods * 100 if total_periods > 0 else 0
+    combined_pct = combined_flagged / total_periods * 100 if total_periods > 0 else 0
+    unidirectional_pct = unidirectional_flagged / total_periods * 100 if total_periods > 0 else 0
     
-    print(f"{'  Correlation < 0.0':30s}        {corr_flagged:4d} days ({corr_pct:5.1f}%)")
-    print(f"{'  Directional acc < 52%':30s}        {dir_flagged:4d} days ({dir_pct:5.1f}%)")
-    print(f"{'  Combined (BOTH poor)':30s}        {combined_flagged:4d} days ({combined_pct:5.1f}%)")
-    print(f"{'  Unidirectional (>98%)':30s} {('[WARN]' if unidirectional_pct > 10 else '[ OK ]'):7s} {unidirectional_flagged:4d} days ({unidirectional_pct:5.1f}%)")
+    print(f"{'  Correlation < 0.0':30s}        {corr_flagged:4d} {period_label} ({corr_pct:5.1f}%)")
+    print(f"{'  Directional acc < 52%':30s}        {dir_flagged:4d} {period_label} ({dir_pct:5.1f}%)")
+    print(f"{'  Combined (BOTH poor)':30s}        {combined_flagged:4d} {period_label} ({combined_pct:5.1f}%)")
+    print(f"{'  Unidirectional (>98%)':30s} {('[WARN]' if unidirectional_pct > 10 else '[ OK ]'):7s} {unidirectional_flagged:4d} {period_label} ({unidirectional_pct:5.1f}%)")
     
     # Print temporal summary
     print("\n" + "-" * 70)
@@ -1803,16 +1904,16 @@ def evaluate():
     # Print mode statistics
     ms = collapse_diagnostics['mode_stats']
     print("\nMode Distribution:")
-    print(f"  HEALTHY:          {ms['healthy_days']:4d} days ({ms['healthy_pct']:5.1f}%)")
-    print(f"  DEGRADED:         {ms['degraded_days']:4d} days ({ms['degraded_pct']:5.1f}%)")
-    print(f"  UNIDIRECTIONAL:   {ms['unidirectional_days']:4d} days ({ms['unidirectional_pct']:5.1f}%)")
-    print(f"  WEAK_COLLAPSE:    {ms['weak_collapse_days']:4d} days ({ms['weak_collapse_pct']:5.1f}%)")
-    print(f"  STRONG_COLLAPSE:  {ms['strong_collapse_days']:4d} days ({ms['strong_collapse_pct']:5.1f}%)")
+    print(f"  HEALTHY:          {ms['healthy_periods']:4d} {period_label} ({ms['healthy_pct']:5.1f}%)")
+    print(f"  DEGRADED:         {ms['degraded_periods']:4d} {period_label} ({ms['degraded_pct']:5.1f}%)")
+    print(f"  UNIDIRECTIONAL:   {ms['unidirectional_periods']:4d} {period_label} ({ms['unidirectional_pct']:5.1f}%)")
+    print(f"  WEAK_COLLAPSE:    {ms['weak_collapse_periods']:4d} {period_label} ({ms['weak_collapse_pct']:5.1f}%)")
+    print(f"  STRONG_COLLAPSE:  {ms['strong_collapse_periods']:4d} {period_label} ({ms['strong_collapse_pct']:5.1f}%)")
     
-    problematic_days = ms['degraded_days'] + ms['unidirectional_days'] + ms['weak_collapse_days'] + ms['strong_collapse_days']
+    problematic_periods = ms['degraded_periods'] + ms['unidirectional_periods'] + ms['weak_collapse_periods'] + ms['strong_collapse_periods']
     problematic_pct = ms['degraded_pct'] + ms['unidirectional_pct'] + ms['weak_collapse_pct'] + ms['strong_collapse_pct']
     
-    print(f"\n  Total problematic: {problematic_days:4d} days ({problematic_pct:.1f}%)")
+    print(f"\n  Total problematic: {problematic_periods:4d} {period_label} ({problematic_pct:.1f}%)")
     
     if collapse_diagnostics['collapse_detected']:
         print(f"\n[WARN] STRUCTURAL COLLAPSE DETECTED")
@@ -1826,7 +1927,7 @@ def evaluate():
     # Create plots (pass collapse diagnostics for visual markers)
     print("Creating diagnostic plots...")
     create_regression_diagnostic_plots(predictions, actuals, dates, output_dir)  # Classic 4-panel regression diagnostics
-    create_diagnostic_plots(predictions, actuals, dates, output_dir)  # Financial quality diagnostics
+    create_diagnostic_plots(predictions, actuals, dates, output_dir, frequency=data_frequency)  # Financial quality diagnostics
     create_performance_plots(actuals, strategy_returns, dates, output_dir, 
                            collapse_diagnostics=collapse_diagnostics)
     
@@ -1835,8 +1936,9 @@ def evaluate():
     all_metrics = save_results(predictions, actuals, dates, metrics_stat, 
                                 metrics_fin, diagnostics, collapse_diagnostics, output_dir)
     
-    # Add checkpoint info to saved metrics
+    # Add checkpoint and frequency info to saved metrics
     all_metrics['checkpoint_used'] = checkpoint_path
+    all_metrics['frequency'] = data_frequency
     with open(os.path.join(output_dir, 'evaluation_metrics.json'), 'w') as f:
         json.dump(all_metrics, f, indent=2)
     

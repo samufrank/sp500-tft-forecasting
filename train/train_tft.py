@@ -59,10 +59,10 @@ def parse_args():
                         help='Name for this experiment (creates output directory)')
     parser.add_argument('--feature-set', type=str, default='core_proposal',
                         choices=['core_proposal', 'core_plus_credit', 'macro_heavy', 
-                                 'market_only', 'kitchen_sink'],
+                                 'market_only', 'kitchen_sink', 'core_dynamics'],
                         help='Feature set configuration')
     parser.add_argument('--frequency', type=str, default='daily',
-                        choices=['daily', 'monthly'],
+                        choices=['daily', 'weekly', 'monthly'],
                         help='Data frequency')
     parser.add_argument('--alignment', type=str, default='vintage',
                         choices=['fixed', 'vintage'],

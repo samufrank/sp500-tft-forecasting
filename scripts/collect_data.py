@@ -426,32 +426,63 @@ def preprocess_data(df: pd.DataFrame, use_vintage: bool, api_key: str, logger: l
 
 
 def resample_to_frequency(df: pd.DataFrame, freq: str, logger: logging.Logger) -> pd.DataFrame:
-    """Resample daily data to weekly or monthly frequency"""
+    """Resample daily data to weekly or monthly frequency.
+    
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        Daily frequency data with DatetimeIndex
+    freq : str
+        Target frequency: 'W', 'W-FRI', 'weekly', 'M', 'ME', 'monthly'
+    logger : logging.Logger
+        Logger instance
+        
+    Returns:
+    --------
+    pd.DataFrame
+        Resampled data at target frequency
+    """
     logger.info("-"*70)
     logger.info(f"Resampling to {freq} frequency")
     logger.info("-"*70)
     
-    # Handle pandas version compatibility for month-end frequency
-    if freq == 'ME':
-        freq = 'M'  # Use 'M' for older pandas versions
+    # Normalize frequency codes
+    if freq in ['W', 'W-FRI', 'weekly']:
+        freq_code = 'W-FRI'  # Week ending Friday (aligns with trading week)
+        freq_label = 'weekly'
+    elif freq in ['M', 'ME', 'monthly']:
+        freq_code = 'M'  # Month-end
+        freq_label = 'monthly'
+    else:
+        freq_code = freq
+        freq_label = freq
     
-    # Define aggregation rules
+    # Define aggregation rules by feature type
     agg_rules = {}
     
     for col in df.columns:
         if 'Volume' in col:
-            agg_rules[col] = 'mean'  # Average daily volume
+            agg_rules[col] = 'sum'       # Total period volume
+        elif col == 'SP500_Returns':
+            agg_rules[col] = 'sum'       # Placeholder; will recalculate from close
+        elif 'Volatility' in col:
+            agg_rules[col] = 'mean'      # Average realized volatility
+        elif col == 'VIX':
+            agg_rules[col] = 'mean'      # Average fear over period
         else:
-            agg_rules[col] = 'last'  # End-of-period value
+            agg_rules[col] = 'last'      # End-of-period value (prices, macro)
     
     # Resample
-    df_resampled = df.resample(freq).agg(agg_rules)
+    df_resampled = df.resample(freq_code).agg(agg_rules)
     
-    # Recalculate returns from resampled prices
+    # Recalculate returns from resampled prices (more accurate than summing daily returns)
     if 'SP500_Close' in df_resampled.columns:
         df_resampled['SP500_Returns'] = df_resampled['SP500_Close'].pct_change() * 100
     
-    logger.info(f"✓ Resampled shape: {df_resampled.shape}")
+    # Drop incomplete first period
+    df_resampled = df_resampled.iloc[1:]
+    
+    logger.info(f"✓ Resampled to {freq_label}: {df_resampled.shape}")
     logger.info(f"✓ Date range: {df_resampled.index[0]} to {df_resampled.index[-1]}")
     
     return df_resampled
@@ -831,7 +862,8 @@ def save_data(df: pd.DataFrame, filename: str, output_dir: Path, logger: logging
     return filepath
 
 
-def save_metadata(args: argparse.Namespace, output_dir: Path, daily_path: Path, monthly_path: Path,
+def save_metadata(args: argparse.Namespace, output_dir: Path, daily_path: Path, 
+                  weekly_path: Path, monthly_path: Path,
                   enhanced_daily_path: Path, gold_source: str, feature_counts: dict):
     """Save run metadata to JSON"""
     metadata = {
@@ -843,6 +875,7 @@ def save_metadata(args: argparse.Namespace, output_dir: Path, daily_path: Path, 
         },
         'outputs': {
             'daily_baseline': str(daily_path.name),
+            'weekly_baseline': str(weekly_path.name),
             'monthly_baseline': str(monthly_path.name),
             'daily_enhanced': str(enhanced_daily_path.name),
         },
@@ -925,6 +958,10 @@ def main():
         # Save baseline daily version
         daily_path = save_data(final_data, 'financial_dataset_daily.csv', args.output_dir, logger)
         
+        # Create and save baseline weekly version
+        weekly_data = resample_to_frequency(final_data, freq='W-FRI', logger=logger)
+        weekly_path = save_data(weekly_data, 'financial_dataset_weekly.csv', args.output_dir, logger)
+        
         # Create and save baseline monthly version
         monthly_data = resample_to_frequency(final_data, freq='M', logger=logger)
         monthly_path = save_data(monthly_data, 'financial_dataset_monthly.csv', args.output_dir, logger)
@@ -936,7 +973,7 @@ def main():
         enhanced_daily_path = save_data(enhanced_data, 'financial_dataset_daily_enhanced.csv', args.output_dir, logger)
         
         # Save metadata with enhanced info
-        metadata_path = save_metadata(args, args.output_dir, daily_path, monthly_path, 
+        metadata_path = save_metadata(args, args.output_dir, daily_path, weekly_path, monthly_path, 
                                      enhanced_daily_path, gold_source, feature_counts)
         logger.info(f"Saved metadata to '{metadata_path}'")
         
@@ -947,6 +984,7 @@ def main():
         logger.info("Generated files:")
         logger.info(f"  Baseline datasets:")
         logger.info(f"    - {daily_path}")
+        logger.info(f"    - {weekly_path}")
         logger.info(f"    - {monthly_path}")
         logger.info(f"  Enhanced dataset:")
         logger.info(f"    - {enhanced_daily_path}")

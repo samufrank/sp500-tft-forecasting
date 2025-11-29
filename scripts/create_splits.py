@@ -5,8 +5,13 @@ This script ensures all experiments use identical data splits.
 Run once after data preprocessing is complete.
 
 Usage:
+    # Percentage-based split (default)
     python create_splits.py --feature-set core_proposal --frequency daily
     python create_splits.py --feature-set macro_heavy --frequency monthly
+    
+    # Date-based split (for rolling/walk-forward evaluation)
+    python create_splits.py --feature-set core_proposal --frequency daily \\
+        --train-end 2015-12-31 --val-end 2017-12-31 --test-end 2019-12-31
 """
 
 import os
@@ -14,7 +19,7 @@ import json
 import argparse
 import pandas as pd
 from datetime import datetime
-from src.data_utils import load_feature_set, create_train_val_test_split
+from src.data_utils import load_feature_set, create_train_val_test_split, create_split_by_dates
 
 def parse_args():
     """Parse command line arguments."""
@@ -25,27 +30,63 @@ def parse_args():
         '--feature-set',
         type=str,
         default='core_proposal',
-        choices=['core_proposal', 'core_plus_credit', 'macro_heavy', 'market_only', 'kitchen_sink'],
+        choices=['core_proposal', 'core_plus_credit', 'macro_heavy', 'market_only', 'kitchen_sink', 'core_dynamics'],
         help='Feature set configuration from feature_configs.py'
     )
     parser.add_argument(
         '--frequency',
         type=str,
         default='daily',
-        choices=['daily', 'monthly'],
+        choices=['daily', 'weekly', 'monthly'],
         help='Data frequency'
+    )
+    parser.add_argument(
+        '--enhanced',
+        action='store_true',
+        help='Use enhanced dataset with technical features'
     )
     parser.add_argument(
         '--train-pct',
         type=float,
         default=0.7,
-        help='Training set proportion (default: 0.7)'
+        help='Training set proportion (default: 0.7). Ignored if date boundaries are specified.'
     )
     parser.add_argument(
         '--val-pct',
         type=float,
         default=0.15,
-        help='Validation set proportion (default: 0.15)'
+        help='Validation set proportion (default: 0.15). Ignored if date boundaries are specified.'
+    )
+    # Date boundary arguments for rolling/walk-forward evaluation
+    parser.add_argument(
+        '--train-start',
+        type=str,
+        default=None,
+        help='Training start date (YYYY-MM-DD). If not specified, uses start of data.'
+    )
+    parser.add_argument(
+        '--train-end',
+        type=str,
+        default=None,
+        help='Training end date (YYYY-MM-DD). Enables date-based splitting.'
+    )
+    parser.add_argument(
+        '--val-end',
+        type=str,
+        default=None,
+        help='Validation end date (YYYY-MM-DD). If not specified, no validation split.'
+    )
+    parser.add_argument(
+        '--test-start',
+        type=str,
+        default=None,
+        help='Test start date (YYYY-MM-DD). If not specified, starts after val-end or train-end.'
+    )
+    parser.add_argument(
+        '--test-end',
+        type=str,
+        default=None,
+        help='Test end date (YYYY-MM-DD). If not specified, uses end of data.'
     )
     parser.add_argument(
         '--data-path',
@@ -94,22 +135,42 @@ def main():
     print(f"\nLoading feature set: {args.feature_set}")
     print(f"Frequency: {args.frequency}")
     print(f"Data version: {args.data_version}")
+    print(f"Enhanced: {args.enhanced}")
     df = load_feature_set(
         config_name=args.feature_set,
         frequency=args.frequency,
         version=args.data_version,
+        enhanced=args.enhanced,
         #data_path=args.data_path,
         verbose=True
     )
     
-    # Create temporal splits
-    print(f"\nCreating temporal splits (train={args.train_pct}, val={args.val_pct})...")
-    train, val, test = create_train_val_test_split(
-        df, 
-        train_pct=args.train_pct, 
-        val_pct=args.val_pct,
-        verbose=True
-    )
+    # Create temporal splits - use date-based if dates provided, else percentage-based
+    use_date_split = args.train_end is not None
+    
+    if use_date_split:
+        print(f"\nCreating date-based splits...")
+        print(f"  Train: {args.train_start or 'start'} to {args.train_end}")
+        print(f"  Val:   {args.train_end} to {args.val_end or 'none'}")
+        print(f"  Test:  {args.test_start or 'auto'} to {args.test_end or 'end'}")
+        
+        train, val, test = create_split_by_dates(
+            df,
+            train_start=args.train_start,
+            train_end=args.train_end,
+            val_end=args.val_end,
+            test_start=args.test_start,
+            test_end=args.test_end,
+            verbose=True
+        )
+    else:
+        print(f"\nCreating percentage-based splits (train={args.train_pct}, val={args.val_pct})...")
+        train, val, test = create_train_val_test_split(
+            df, 
+            train_pct=args.train_pct, 
+            val_pct=args.val_pct,
+            verbose=True
+        )
     
     # Save splits with data version in filename and subdirectory
     # Create subdirectory for data version (unless already specified in output-dir)
@@ -123,6 +184,8 @@ def main():
     os.makedirs(version_output_dir, exist_ok=True)
     
     split_prefix = f"{args.feature_set}_{args.frequency}_{args.data_version}"
+    if args.enhanced:
+        split_prefix = f"{split_prefix}_enhanced"
     if args.version:
         # Optional additional version suffix (e.g., "v2" for experiments)
         split_prefix = f"{split_prefix}_{args.version}"
@@ -149,26 +212,46 @@ def main():
         'feature_set': args.feature_set,
         'frequency': args.frequency,
         'data_version': args.data_version,
-        'train_pct': args.train_pct,
-        'val_pct': args.val_pct,
-        'test_pct': 1 - args.train_pct - args.val_pct,
+        'enhanced': args.enhanced,
+        'split_method': 'date' if use_date_split else 'percentage',
         'train_size': len(train),
         'val_size': len(val),
         'test_size': len(test),
-        'train_dates': {
-            'start': str(train.index[0]),
-            'end': str(train.index[-1])
-        },
-        'val_dates': {
-            'start': str(val.index[0]),
-            'end': str(val.index[-1])
-        },
-        'test_dates': {
-            'start': str(test.index[0]),
-            'end': str(test.index[-1])
-        },
         'features': list(df.columns),
     }
+    
+    # Add split parameters based on method
+    if use_date_split:
+        metadata['date_boundaries'] = {
+            'train_start': args.train_start,
+            'train_end': args.train_end,
+            'val_end': args.val_end,
+            'test_start': args.test_start,
+            'test_end': args.test_end,
+        }
+    else:
+        metadata['percentages'] = {
+            'train_pct': args.train_pct,
+            'val_pct': args.val_pct,
+            'test_pct': 1 - args.train_pct - args.val_pct,
+        }
+    
+    # Add actual date ranges
+    if len(train) > 0:
+        metadata['train_dates'] = {
+            'start': str(train.index[0]),
+            'end': str(train.index[-1])
+        }
+    if len(val) > 0:
+        metadata['val_dates'] = {
+            'start': str(val.index[0]),
+            'end': str(val.index[-1])
+        }
+    if len(test) > 0:
+        metadata['test_dates'] = {
+            'start': str(test.index[0]),
+            'end': str(test.index[-1])
+        }
     
     metadata_path = os.path.join(version_output_dir, f"{split_prefix}_metadata.json")
     with open(metadata_path, 'w') as f:

@@ -8,6 +8,7 @@ from src.feature_configs import FEATURE_SETS, FEATURE_METADATA, TARGET
 def load_feature_set(config_name='core_proposal', 
                      frequency='daily',
                      version='fixed',
+                     enhanced=False,
                      data_path='data',
                      verbose=True):
     """
@@ -18,7 +19,11 @@ def load_feature_set(config_name='core_proposal',
     config_name : str
         Name of feature set from FEATURE_SETS
     frequency : str
-        'daily' or 'monthly'
+        'daily', 'weekly', or 'monthly'
+    version : str
+        'fixed' or 'vintage'
+    enhanced : bool
+        If True, load enhanced dataset with technical features
     data_path : str
         Path to data directory
     verbose : bool
@@ -34,10 +39,19 @@ def load_feature_set(config_name='core_proposal',
         raise ValueError(f"Unknown config: {config_name}. "
                         f"Available: {list(FEATURE_SETS.keys())}")
     
+    # Validate frequency
+    valid_frequencies = ['daily', 'weekly', 'monthly']
+    if frequency not in valid_frequencies:
+        raise ValueError(f"Unknown frequency: {frequency}. "
+                        f"Available: {valid_frequencies}")
+    
     config = FEATURE_SETS[config_name]
     
     # Load full dataset
-    filename = f"{data_path}/financial_dataset_{frequency}_{version}.csv"
+    if enhanced:
+        filename = f"{data_path}/financial_dataset_{frequency}_{version}_enhanced.csv"
+    else:
+        filename = f"{data_path}/financial_dataset_{frequency}_{version}.csv"
     df = pd.read_csv(filename, index_col='Date', parse_dates=True)
     
     if verbose:
@@ -95,7 +109,7 @@ def load_feature_set(config_name='core_proposal',
 
 def create_train_val_test_split(df, train_pct=0.7, val_pct=0.15, verbose=True):
     """
-    Create temporal train/validation/test splits.
+    Create temporal train/validation/test splits by percentage.
     
     Parameters:
     -----------
@@ -130,6 +144,83 @@ def create_train_val_test_split(df, train_pct=0.7, val_pct=0.15, verbose=True):
               f"({len(val):,} obs, {val_pct*100:.0f}%)")
         print(f"Test:  {test.index[0].date()} to {test.index[-1].date()} "
               f"({len(test):,} obs, {(1-train_pct-val_pct)*100:.0f}%)")
+    
+    return train, val, test
+
+
+def create_split_by_dates(df, train_start=None, train_end=None, val_end=None, 
+                          test_start=None, test_end=None, verbose=True):
+    """
+    Create temporal train/validation/test splits by date boundaries.
+    
+    For rolling/walk-forward evaluation. Dates are inclusive.
+    
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        Dataset with DatetimeIndex
+    train_start : str or None
+        Training start date (YYYY-MM-DD). None = start of data.
+    train_end : str
+        Training end date (YYYY-MM-DD). Required.
+    val_end : str or None
+        Validation end date. None = no validation split (val will be empty).
+    test_start : str or None
+        Test start date. None = day after val_end (or train_end if no val).
+    test_end : str or None
+        Test end date. None = end of data.
+    verbose : bool
+        Print split information
+        
+    Returns:
+    --------
+    train, val, test : tuple of pd.DataFrame
+        Note: val may be empty DataFrame if val_end not specified
+    """
+    if train_end is None:
+        raise ValueError("train_end is required for date-based splitting")
+    
+    # Convert to timestamps
+    train_start = pd.Timestamp(train_start) if train_start else df.index[0]
+    train_end = pd.Timestamp(train_end)
+    val_end = pd.Timestamp(val_end) if val_end else None
+    test_start = pd.Timestamp(test_start) if test_start else None
+    test_end = pd.Timestamp(test_end) if test_end else df.index[-1]
+    
+    # Create splits
+    train = df[(df.index >= train_start) & (df.index <= train_end)].copy()
+    
+    if val_end:
+        # Validation: from day after train_end to val_end
+        val = df[(df.index > train_end) & (df.index <= val_end)].copy()
+        # Test: from test_start (or day after val_end) to test_end
+        if test_start is None:
+            test_start = val_end + pd.Timedelta(days=1)
+        test = df[(df.index >= test_start) & (df.index <= test_end)].copy()
+    else:
+        # No validation split
+        val = df.iloc[0:0].copy()  # Empty DataFrame with same columns
+        # Test: from day after train_end to test_end
+        if test_start is None:
+            test_start = train_end + pd.Timedelta(days=1)
+        test = df[(df.index >= test_start) & (df.index <= test_end)].copy()
+    
+    if verbose:
+        print(f"\n{'='*70}")
+        print("Train/Validation/Test Split (Date-Based)")
+        print(f"{'='*70}")
+        if len(train) > 0:
+            print(f"Train: {train.index[0].date()} to {train.index[-1].date()} ({len(train):,} obs)")
+        else:
+            print(f"Train: EMPTY")
+        if len(val) > 0:
+            print(f"Val:   {val.index[0].date()} to {val.index[-1].date()} ({len(val):,} obs)")
+        else:
+            print(f"Val:   EMPTY (no validation split)")
+        if len(test) > 0:
+            print(f"Test:  {test.index[0].date()} to {test.index[-1].date()} ({len(test):,} obs)")
+        else:
+            print(f"Test:  EMPTY")
     
     return train, val, test
 

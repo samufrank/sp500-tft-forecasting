@@ -364,7 +364,7 @@ def main():
                 continue
             
             results.append(data)
-            status = "âœ“ evaluated" if data.get('evaluated') else "  not evaluated"
+            status = " evaluated" if data.get('evaluated') else "  not evaluated"
             collapsed = " (COLLAPSED)" if data.get('collapsed') else ""
             print(f"  {exp_path.name}: {status}{collapsed}")
         except Exception as e:
@@ -409,7 +409,7 @@ def main():
     df_key_metrics = df[key_metrics_cols]
     
     df_key_metrics.to_csv(key_metrics_path, index=False)
-    print(f"âœ“ Saved key metrics summary to {key_metrics_path}")
+    print(f" Saved key metrics summary to {key_metrics_path}")
     
     # Split working vs collapsed if requested
     if args.split_working and 'collapsed' in df.columns:
@@ -420,12 +420,12 @@ def main():
         if len(working) > 0:
             working_path = output_dir / 'working_models.csv'
             working.to_csv(working_path, index=False)
-            print(f"âœ“ Saved working_models.csv ({len(working)} models) to {working_path}")
+            print(f" Saved working_models.csv ({len(working)} models) to {working_path}")
         
         if len(collapsed) > 0:
             collapsed_path = output_dir / 'collapsed_models.csv'
             collapsed.to_csv(collapsed_path, index=False)
-            print(f"âœ“ Saved collapsed_models.csv ({len(collapsed)} models) to {collapsed_path}")
+            print(f" Saved collapsed_models.csv ({len(collapsed)} models) to {collapsed_path}")
     
     # Print quick stats
     print(f"\n{'='*80}")
