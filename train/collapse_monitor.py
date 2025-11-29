@@ -96,6 +96,12 @@ class CollapseMonitor(Callback):
         # 5. Attention patterns
         self._log_attention_patterns(trainer, pl_module)
         
+        # 6. Regime diagnostics (if regime output enabled)
+        self._log_regime_diagnostics(trainer, pl_module)
+        
+        # 7. Expert weight divergence (if regime output enabled)
+        self._log_expert_weight_divergence(pl_module)
+        
         # Save to disk
         self._save_history(trainer.current_epoch)
         
@@ -103,6 +109,13 @@ class CollapseMonitor(Callback):
         pl_module.train()
         if hasattr(pl_module, '_current_fx_name'):
             pl_module._current_fx_name = None
+
+        # Reset debug flags for next epoch
+        if hasattr(pl_module, 'output_layer'):
+            if hasattr(pl_module.output_layer, '_vix_logged_this_epoch'):
+                pl_module.output_layer._vix_logged_this_epoch = False
+            if hasattr(pl_module.output_layer, '_hard_routing_logged_this_epoch'):
+                pl_module.output_layer._hard_routing_logged_this_epoch = False
         
     def _log_prediction_diversity(self, trainer, pl_module):
         """
@@ -181,12 +194,12 @@ class CollapseMonitor(Callback):
               f"mean: {pred_mean:.6f}")
         print(f"  Pos: {pct_pos:.1f}%, Neg: {pct_neg:.1f}%, "
               f"Unique: {n_unique}")
-        
+       
         # Log to pl_module so ModelCheckpoint can monitor these metrics
         pl_module.log('val_pred_std', float(pred_std), on_step=False, on_epoch=True, prog_bar=False)
         pl_module.log('val_pct_positive', float(pct_pos), on_step=False, on_epoch=True, prog_bar=False)
         pl_module.log('val_num_unique', int(n_unique), on_step=False, on_epoch=True, prog_bar=False)
-        
+
         # Print collapse penalty if computed
         if collapse_penalty is not None:
             print(f"  Collapse penalty: {collapse_penalty:.6f} "
@@ -417,6 +430,338 @@ class CollapseMonitor(Callback):
         else:
             self.history['attention_entropy'].append(None)
             print(f"  Attention entropy: (no data captured)")
+            
+    def _log_regime_diagnostics(self, trainer, pl_module):
+        """
+        Log regime-conditional output statistics if enabled.
+        
+        Tracks routing behavior and per-expert predictions by reading cached
+        diagnostics from RegimeConditionalOutput layer (no recomputation needed).
+        
+        Metrics:
+        - Routing entropy: H=0 (single expert dominates) to H=log(K) (uniform)
+        - Dominant regime %: Percentage assigned to most common regime
+        - Per-expert prediction diversity: Std/mean for each expert
+        - VIX correlation: Correlation between routing weights and VIX (if available)
+        """
+        # check if regime output is enabled
+        if not hasattr(pl_module, 'output_layer'):
+            return
+        
+        # importing RegimeConditionalOutput
+        try:
+            import sys
+            src_path = Path(__file__).parent / 'src'
+            if src_path.exists() and str(src_path) not in sys.path:
+                sys.path.insert(0, str(src_path))
+            from src.regime_output import RegimeConditionalOutput
+        except ImportError:
+            return  # regime_output module not available
+        
+        if not isinstance(pl_module.output_layer, RegimeConditionalOutput):
+            return  # Baseline output layer
+        
+        if pl_module.output_layer.routing_mode == 'disabled':
+            return  # Single expert mode, nothing to diagnose
+        
+        pl_module.eval()
+        
+        routing_weights_list = []
+        expert_preds_lists = [[] for _ in range(pl_module.output_layer.num_regimes)]
+        vix_values = []
+        
+        with torch.no_grad():
+            for i, batch in enumerate(self.val_dataloader):
+                if i >= 10:
+                    break
+            
+                x, y = batch
+                x = {k: v.to(pl_module.device) if torch.is_tensor(v) else v 
+                     for k, v in x.items()}
+                
+                # Forward pass - regime output caches diagnostics internally
+                output = pl_module(x)
+                
+                # Read from cache (already detached and on CPU)
+                if pl_module.output_layer._cached_routing_weights is None:
+                    continue
+                
+                routing_weights = pl_module.output_layer._cached_routing_weights
+                
+                """
+                if i == 0:
+                    print(f"[DEBUG Monitor] Cached routing shape: {routing_weights.shape}")
+                    print(f"[DEBUG Monitor] First 5 samples: {routing_weights[:5].numpy()}")
+                """
+
+                # Routing weights shape: [batch, seq_len, num_regimes]
+                # Extract first timestep for single-step prediction
+                if routing_weights.ndim == 3:
+                    routing_weights = routing_weights[:, 0, :]  # [batch, num_regimes]
+                elif routing_weights.ndim == 2:
+                    pass  # Already [batch, num_regimes]
+                
+                routing_weights_list.append(routing_weights.numpy())
+                
+                # Extract per-expert predictions from cache
+                for regime_idx in range(pl_module.output_layer.num_regimes):
+                    cached_pred = getattr(
+                        pl_module.output_layer, 
+                        f'_cached_expert_preds_{regime_idx}',
+                        None
+                    )
+                    if cached_pred is None:
+                        continue
+                    
+                    # Extract median quantile (index 3) at first timestep
+                    # Shape: [batch, seq_len, output_size] -> [batch]
+                    if cached_pred.ndim == 3:
+                        preds = cached_pred[:, 0, 3].numpy()
+                    elif cached_pred.ndim == 2:
+                        preds = cached_pred[:, 3].numpy()
+                    else:
+                        continue
+                    
+                    expert_preds_lists[regime_idx].append(preds)
+               
+                # Extract raw VIX (same method as training)
+                if 'decoder_time_idx' in x:
+                    time_idx = x['decoder_time_idx'][:, 0]
+                    offset_idx = time_idx.cpu() - len(pl_module._raw_vix_train)
+                    vix_val = pl_module._raw_vix_val[offset_idx].numpy()
+                    vix_values.append(vix_val)
+                    
+                """
+                # Extract VIX if available
+                # VIX could be in encoder_cont or decoder_cont depending on feature config
+                # Try multiple possible locations
+                vix_extracted = False
+                
+                # Check encoder continuous features (most likely location)
+                if 'encoder_cont' in x and x['encoder_cont'].numel() > 0:
+                    # Try to find VIX in feature names if available
+                    # Otherwise assume it's first feature (configurable)
+                    # Extract from last encoder timestep: [batch, time, features]
+                    encoder_cont = x['encoder_cont']
+                    if encoder_cont.ndim == 3 and encoder_cont.size(-1) > 0:
+                        # Use first continuous feature as VIX (customize this index as needed)
+                        vix_val = encoder_cont[:, -1, 0].cpu().numpy()
+                        vix_values.append(vix_val)
+                        vix_extracted = True
+                
+                # Fallback: try decoder_cont
+                if not vix_extracted and 'decoder_cont' in x and x['decoder_cont'].numel() > 0:
+                    decoder_cont = x['decoder_cont']
+                    if decoder_cont.ndim == 3 and decoder_cont.size(-1) > 0:
+                        vix_val = decoder_cont[:, 0, 0].cpu().numpy()  # First decoder timestep
+                        vix_values.append(vix_val)
+                """
+        if not routing_weights_list:
+            print("  Regime diagnostics: (no data captured)")
+            return
+        
+        # Concatenate across batches
+        routing_weights = np.concatenate(routing_weights_list, axis=0)  # [N, num_regimes]
+        expert_preds = [
+            np.concatenate(preds, axis=0) if preds else np.array([])
+            for preds in expert_preds_lists
+        ]
+        
+        # 1. Routing entropy (H=0 if one regime dominates, H=log(K) if uniform)
+        eps = 1e-10
+        per_sample_entropy = -np.sum(
+            routing_weights * np.log(routing_weights + eps), 
+            axis=1
+        )
+        routing_entropy = per_sample_entropy.mean()
+        max_entropy = np.log(pl_module.output_layer.num_regimes)
+        normalized_entropy = routing_entropy / max_entropy  # [0, 1]
+        
+        # 2. Dominant regime percentage
+        assigned_regimes = np.argmax(routing_weights, axis=1)  # [N]
+        regime_counts = np.bincount(
+            assigned_regimes, 
+            minlength=pl_module.output_layer.num_regimes
+        )
+        dominant_regime_pct = regime_counts.max() / len(assigned_regimes) * 100
+        
+        # 3. Per-expert prediction diversity
+        expert_stds = [np.std(preds) if len(preds) > 0 else 0.0 for preds in expert_preds]
+        expert_means = [np.mean(preds) if len(preds) > 0 else 0.0 for preds in expert_preds]
+        
+        # 4. VIX correlation (if available)
+        vix_corr = None
+        if vix_values and len(vix_values) == len(routing_weights_list):
+            vix = np.concatenate(vix_values, axis=0)  # [N]
+            # Correlate routing weight for regime 1 (assumed high-volatility) with VIX
+            if routing_weights.shape[1] > 1:
+                # Check for valid variance before computing correlation
+                vix_std = np.std(vix)
+                regime1_std = np.std(routing_weights[:, 1])
+                
+                if vix_std > 1e-6 and regime1_std > 1e-6:
+                    vix_corr = np.corrcoef(routing_weights[:, 1], vix)[0, 1]
+                    # Check for NaN (can happen with constant series)
+                    if np.isnan(vix_corr):
+                        vix_corr = None
+        
+        # Initialize history keys if needed
+        if 'regime_entropy' not in self.history:
+            self.history['regime_entropy'] = []
+        if 'regime_entropy_normalized' not in self.history:
+            self.history['regime_entropy_normalized'] = []
+        if 'dominant_regime_pct' not in self.history:
+            self.history['dominant_regime_pct'] = []
+        if 'expert_stds' not in self.history:
+            self.history['expert_stds'] = {}
+            for i in range(pl_module.output_layer.num_regimes):
+                self.history['expert_stds'][f'expert_{i}'] = []
+        if 'expert_means' not in self.history:
+            self.history['expert_means'] = {}
+            for i in range(pl_module.output_layer.num_regimes):
+                self.history['expert_means'][f'expert_{i}'] = []
+        if 'vix_correlation' not in self.history:
+            self.history['vix_correlation'] = []
+        if 'regime_assignments' not in self.history:
+            self.history['regime_assignments'] = {}
+            for i in range(pl_module.output_layer.num_regimes):
+                self.history['regime_assignments'][f'regime_{i}_pct'] = []
+        
+        # Store metrics
+        self.history['regime_entropy'].append(float(routing_entropy))
+        self.history['regime_entropy_normalized'].append(float(normalized_entropy))
+        self.history['dominant_regime_pct'].append(float(dominant_regime_pct))
+        
+        for i, (std, mean) in enumerate(zip(expert_stds, expert_means)):
+            self.history['expert_stds'][f'expert_{i}'].append(float(std))
+            self.history['expert_means'][f'expert_{i}'].append(float(mean))
+        
+        # Store regime assignment percentages
+        for i, count in enumerate(regime_counts):
+            pct = (count / len(assigned_regimes) * 100) if len(assigned_regimes) > 0 else 0.0
+            self.history['regime_assignments'][f'regime_{i}_pct'].append(float(pct))
+        
+        if vix_corr is not None:
+            self.history['vix_correlation'].append(float(vix_corr))
+        else:
+            self.history['vix_correlation'].append(None)
+        
+        # Print summary
+        print("  Regime diagnostics:")
+        print(f"    Routing entropy: {routing_entropy:.4f} (normalized: {normalized_entropy:.4f})")
+        print(f"    Dominant regime: {dominant_regime_pct:.1f}%")
+        print(f"    Regime assignments: " + ", ".join(
+            f"{i}={regime_counts[i]/len(assigned_regimes)*100:.1f}%" 
+            for i in range(len(regime_counts))
+        ))
+        
+        # Routing weight statistics (soft probabilities)
+        avg_routing_weights = routing_weights.mean(axis=0)
+        print(f"    Avg routing weights: " + ", ".join(
+            f"R{i}={avg_routing_weights[i]:.4f}"
+            for i in range(len(avg_routing_weights))
+        ))
+        
+        for i, (std, mean) in enumerate(zip(expert_stds, expert_means)):
+            print(f"    Expert {i}: std={std:.6f}, mean={mean:.6f}")
+            if std < 0.05:
+                print(f"      WARNING: Expert {i} collapsed (std < 0.05)")
+        if vix_corr is not None:
+            print(f"    VIX correlation (regime_1): {vix_corr:.3f}")
+        else:
+            print(f"    VIX correlation: (VIX not found in batch)")
+    
+    def _log_expert_weight_divergence(self, pl_module):
+        """
+        Track if expert weights are diverging (learning different functions).
+        
+        Monitors weight differences between experts to detect:
+        - Experts learning identical functions (no divergence = routing doesn't matter)
+        - Healthy specialization (moderate divergence)
+        - Extreme divergence (potential training instability)
+        
+        Metrics logged:
+        - weight_diff: L2 norm of weight difference between expert pairs
+        - weight_cosine: Cosine similarity (1.0 = identical, 0.0 = orthogonal)
+        """
+        import torch.nn.functional as F
+        
+        if not hasattr(pl_module, 'output_layer'):
+            return
+        if not hasattr(pl_module.output_layer, 'experts'):
+            return
+        
+        experts = pl_module.output_layer.experts
+        num_experts = len(experts)
+        
+        if num_experts < 2:
+            return
+        
+        # Helper to extract first layer weights from Linear or Sequential experts
+        def get_first_layer_weight(expert):
+            if isinstance(expert, torch.nn.Sequential):
+                return expert[0].weight
+            return expert.weight
+        
+        # Initialize history keys if needed
+        if 'expert_weight_diff' not in self.history:
+            self.history['expert_weight_diff'] = []
+        if 'expert_weight_cosine' not in self.history:
+            self.history['expert_weight_cosine'] = []
+        
+        # For >2 experts, track pairwise metrics as dict
+        if num_experts > 2:
+            if 'expert_weight_diff_pairs' not in self.history:
+                self.history['expert_weight_diff_pairs'] = {}
+            if 'expert_weight_cosine_pairs' not in self.history:
+                self.history['expert_weight_cosine_pairs'] = {}
+        
+        # Compute metrics for first two experts (backward compatible)
+        w0 = get_first_layer_weight(experts[0])
+        w1 = get_first_layer_weight(experts[1])
+        
+        weight_diff = (w0 - w1).norm().item()
+        weight_cosine = F.cosine_similarity(
+            w0.flatten().unsqueeze(0), 
+            w1.flatten().unsqueeze(0)
+        ).item()
+        
+        self.history['expert_weight_diff'].append(weight_diff)
+        self.history['expert_weight_cosine'].append(weight_cosine)
+        
+        print(f"  Expert weight divergence (0 vs 1): diff={weight_diff:.4f}, cosine={weight_cosine:.4f}")
+        
+        # For 3+ experts, also track all pairwise comparisons
+        if num_experts > 2:
+            for i in range(num_experts):
+                for j in range(i + 1, num_experts):
+                    if i == 0 and j == 1:
+                        continue  # Already computed above
+                    
+                    pair_key = f"{i}_vs_{j}"
+                    wi = get_first_layer_weight(experts[i])
+                    wj = get_first_layer_weight(experts[j])
+                    
+                    diff = (wi - wj).norm().item()
+                    cos = F.cosine_similarity(
+                        wi.flatten().unsqueeze(0),
+                        wj.flatten().unsqueeze(0)
+                    ).item()
+                    
+                    if pair_key not in self.history['expert_weight_diff_pairs']:
+                        self.history['expert_weight_diff_pairs'][pair_key] = []
+                        self.history['expert_weight_cosine_pairs'][pair_key] = []
+                    
+                    self.history['expert_weight_diff_pairs'][pair_key].append(diff)
+                    self.history['expert_weight_cosine_pairs'][pair_key].append(cos)
+                    
+                    print(f"  Expert weight divergence ({i} vs {j}): diff={diff:.4f}, cosine={cos:.4f}")
+        
+        # Interpretation guidance
+        if weight_cosine > 0.99:
+            print(f"    WARNING: Experts nearly identical (cosine > 0.99) - routing may be ineffective")
+        elif weight_cosine < 0.5:
+            print(f"    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions")
             
     def _save_history(self, epoch):
         """Save monitoring history to disk."""

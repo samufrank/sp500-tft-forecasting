@@ -119,6 +119,9 @@ def parse_args():
     # Optional arguments
     parser.add_argument('--checkpoint', type=str, default=None,
                         help='Path to checkpoint (if None, uses best from training)')
+    parser.add_argument('--checkpoint-type', type=str, default='best_val_loss_path',
+                        choices=['best_val_loss_path', 'best_pred_std_path', 'best_unique_path'],
+                        help='Checkpoint selection metric (ignored if --checkpoint is provided)')
     parser.add_argument('--test-split', type=str, default=None,
                         help='Path to test CSV (if None, infers from config)')
     parser.add_argument('--output-dir', type=str, default=None,
@@ -244,10 +247,7 @@ def load_test_data(config, test_split_path=None):
     has_staleness = any('days_since' in f or 'is_fresh' in f for f in features_list)
     
     if has_staleness:
-        try:
-            from data_utils import add_staleness_features
-        except ImportError:
-            from src.data_utils import add_staleness_features
+        from src.data_utils import add_staleness_features
         
         print("Detected staleness features in config, adding to data...")
         train_df = add_staleness_features(train_df, verbose=False)
@@ -335,7 +335,7 @@ def prepare_test_dataset(train_df, test_df, config):
 # MODEL LOADING
 # ============================================================================
 
-def load_model(checkpoint_path):
+def load_model(checkpoint_path, config):
     """
     Load trained TFT model from checkpoint.
     
@@ -351,67 +351,176 @@ def load_model(checkpoint_path):
     """
     if not os.path.exists(checkpoint_path):
         raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
+
+    # Check if this model used regime output
+    regime_config = config.get('regime_output', {})
+    use_regime_output = regime_config.get('enabled', False)
     
-    # Inspect checkpoint to determine model type
-    print(f"  Inspecting checkpoint: {os.path.basename(checkpoint_path)}")
-    try:
-        checkpoint = torch.load(checkpoint_path, map_location='cpu')
-        hparams = checkpoint.get('hyper_parameters', {})
-        
-        if not hparams:
-            raise ValueError("Checkpoint missing 'hyper_parameters' - cannot determine model type")
-        
-        # Detect model type by hyperparameter signature
-        is_custom_model = 'num_encoder_features' in hparams
-        
-        if is_custom_model:
-            print(f"  Detected: CUSTOM TFT model (has 'num_encoder_features')")
-            print(f"    - num_encoder_features: {hparams['num_encoder_features']}")
-            print(f"    - hidden_size: {hparams.get('hidden_size', 'N/A')}")
-            print(f"    - max_encoder_length: {hparams.get('max_encoder_length', 'N/A')}")
-            
-            # Check if checkpoint has post-FF gate
-            state_dict = checkpoint.get('state_dict', {})
-            has_post_ff_gate = any('post_ff_gate_norm' in key for key in state_dict.keys())
-            
-            if has_post_ff_gate:
-                print(f"    - Architecture: Full custom TFT (with post-FF gate)")
-                from models.tft_model import TemporalFusionTransformer as CustomTFT
-            else:
-                print(f"    - Architecture: Custom TFT without post-FF gate")
-                from models.tft_model_no_post_ff import TemporalFusionTransformer as CustomTFT
-            
-            model = CustomTFT.load_from_checkpoint(checkpoint_path)
-            
-        else:
-            print(f"  Detected: BASELINE TFT model (pytorch-forecasting)")
-            print(f"    - hidden_size: {hparams.get('hidden_size', 'N/A')}")
-            print(f"    - max_encoder_length: {hparams.get('max_encoder_length', 'N/A')}")
-            print(f"    - output_size: {hparams.get('output_size', 'N/A')}")
-            
-            # Use baseline TFT (already imported at top)
-            # Note: TemporalFusionTransformer imported from pytorch_forecasting at line 35
-            model = TemporalFusionTransformer.load_from_checkpoint(checkpoint_path)
-        
+    # Check if this model used distribution loss
+    training_config = config.get('training', {})
+    mean_weight = training_config.get('dist_loss_mean_weight', 0.0)
+    std_weight = training_config.get('dist_loss_std_weight', 0.0)
+    uses_dist_loss = mean_weight > 0 or std_weight > 0
+    
+    # Case 1: Baseline model (no regime output, no dist loss)
+    if not uses_dist_loss and not use_regime_output:
+        model = TemporalFusionTransformer.load_from_checkpoint(checkpoint_path)
         model.eval()
         print(f"  Model loaded successfully and set to eval mode")
         return model
+    
+    # Case 2: Regime output without dist loss (clean loading path)
+    if use_regime_output and not uses_dist_loss:
+        import torch
         
-    except Exception as e:
-        print(f"\nERROR loading checkpoint: {checkpoint_path}")
-        print(f"  Error type: {type(e).__name__}")
-        print(f"  Error message: {str(e)}")
-        print(f"\nCheckpoint structure:")
-        try:
-            checkpoint = torch.load(checkpoint_path, map_location='cpu')
-            print(f"  Available keys: {list(checkpoint.keys())}")
-            if 'hyper_parameters' in checkpoint:
-                print(f"  Hyperparameter keys: {list(checkpoint['hyper_parameters'].keys())[:10]}...")
-        except:
-            print("  Could not inspect checkpoint")
-        raise
-
-
+        print(f"  Detected regime output checkpoint, applying architecture modification...")
+        
+        # Load checkpoint dict first (don't instantiate model yet)
+        checkpoint = torch.load(checkpoint_path, map_location='cpu')
+        
+        # Extract hparams from checkpoint
+        hparams = checkpoint['hyper_parameters']
+        
+        # Create model with baseline architecture
+        model = TemporalFusionTransformer(**hparams)
+        
+        # Apply regime output architecture before loading weights
+        from src.regime_output import replace_output_layer
+        
+        num_regimes = regime_config.get('num_regimes', 2)
+        routing_mode = regime_config.get('routing_mode', 'learned')
+        routing_strategy = regime_config.get('routing_strategy', 'learned')
+        vix_threshold = regime_config.get('vix_threshold', 25.0)
+        vix_threshold_low = regime_config.get('vix_threshold_low', None)
+        vix_threshold_high = regime_config.get('vix_threshold_high', None)
+        load_balance_weight = regime_config.get('load_balance_weight', 0.5)
+        expert_hidden_size = regime_config.get('expert_hidden_size', 0)
+        # Note: hard_routing_train only affects training, but we pass False for eval
+        # to ensure soft routing is used during evaluation
+        hard_routing_train = False  # Always soft routing during evaluation
+        
+        model = replace_output_layer(
+            model,
+            num_regimes=num_regimes,
+            routing_mode=routing_mode,
+            routing_strategy=routing_strategy,
+            vix_threshold=vix_threshold,
+            vix_threshold_low=vix_threshold_low,
+            vix_threshold_high=vix_threshold_high,
+            load_balance_weight=load_balance_weight,
+            expert_hidden_size=expert_hidden_size,
+            hard_routing_train=hard_routing_train
+        )
+        
+        # NOW load the MoE weights
+        model.load_state_dict(checkpoint['state_dict'])
+        print(f"  Successfully loaded regime output state_dict")
+        
+        model.eval()
+        return model
+    
+    # Case 3: Distribution loss (with or without regime output)
+    # Need custom unpickling to bypass corrupted loss functions
+    print(f"  Loading distribution loss checkpoint (bypassing corrupted loss)...")
+    
+    import torch
+    import pickle
+    import io
+    import zipfile
+    import tempfile
+    
+    # Custom unpickler that creates fresh QuantileLoss instances
+    class FixedUnpickler(pickle.Unpickler):
+        def find_class(self, module, name):
+            if name == 'QuantileLoss' and 'pytorch_forecasting' in module:
+                from pytorch_forecasting.metrics import QuantileLoss
+                return QuantileLoss
+            return super().find_class(module, name)
+    
+    try:
+        # Try loading as direct pickle (PyTorch 1.x format)
+        with open(checkpoint_path, 'rb') as f:
+            checkpoint = FixedUnpickler(f).load()
+    except (pickle.UnpicklingError, zipfile.BadZipFile, Exception) as e:
+        print(f"  Direct unpickling failed, checkpoint may be unfixable: {e}")
+        raise RuntimeError(
+            f"Cannot load checkpoint with monkey-patched loss. "
+            f"The checkpoint is corrupted beyond repair. "
+            f"Recommendation: Retrain this experiment without distribution loss, "
+            f"or skip distribution loss analysis for Phase 3."
+        )
+    
+    # Fix hyperparameters if loss object exists
+    if 'hyper_parameters' in checkpoint and 'loss' in checkpoint['hyper_parameters']:
+        from pytorch_forecasting.metrics import QuantileLoss
+        checkpoint['hyper_parameters']['loss'] = QuantileLoss()
+    
+    # Save fixed checkpoint temporarily
+    with tempfile.NamedTemporaryFile(suffix='.ckpt', delete=False) as tmp:
+        tmp_path = tmp.name
+    
+    try:
+        # If regime output was used, we need to create model with hparams, apply MoE, then load
+        if use_regime_output:
+            print(f"  Detected regime output checkpoint, applying architecture modification...")
+            
+            # Create model from hyperparameters (no weights loaded)
+            hparams = checkpoint['hyper_parameters']
+            model = TemporalFusionTransformer(**hparams)
+            
+            # Apply regime output architecture before loading weights
+            from src.regime_output import replace_output_layer
+            
+            num_regimes = regime_config.get('num_regimes', 2)
+            routing_mode = regime_config.get('routing_mode', 'learned')
+            routing_strategy = regime_config.get('routing_strategy', 'learned')
+            vix_threshold = regime_config.get('vix_threshold', 25.0)
+            vix_threshold_low = regime_config.get('vix_threshold_low', None)
+            vix_threshold_high = regime_config.get('vix_threshold_high', None)
+            load_balance_weight = regime_config.get('load_balance_weight', 0.5)
+            expert_hidden_size = regime_config.get('expert_hidden_size', 0)
+            # Note: hard_routing_train only affects training, use False for eval
+            hard_routing_train = False  # Always soft routing during evaluation
+            
+            model = replace_output_layer(
+                model,
+                num_regimes=num_regimes,
+                routing_mode=routing_mode,
+                routing_strategy=routing_strategy,
+                vix_threshold=vix_threshold,
+                vix_threshold_low=vix_threshold_low,
+                vix_threshold_high=vix_threshold_high,
+                load_balance_weight=load_balance_weight,
+                expert_hidden_size=expert_hidden_size,
+                hard_routing_train=hard_routing_train
+            )
+            
+            # Now load the state dict with MoE architecture
+            model.load_state_dict(checkpoint['state_dict'])
+            print(f"  Successfully loaded regime output state_dict")
+        else:
+            # No regime output - use standard checkpoint loading
+            torch.save(checkpoint, tmp_path)
+            model = TemporalFusionTransformer.load_from_checkpoint(tmp_path)
+        
+    finally:
+        os.unlink(tmp_path)
+    
+    model.eval()
+    
+    # Re-apply distribution penalties
+    from loss_wrapper import add_distribution_penalties
+    model = add_distribution_penalties(
+        model,
+        mean_weight=mean_weight,
+        std_weight=std_weight,
+        target_mean=training_config.get('dist_loss_target_mean', 0.0003),
+        target_std=training_config.get('dist_loss_target_std', 0.01)
+    )
+    print(f"  Re-applied distribution penalties: mean_weight={mean_weight}, std_weight={std_weight}")
+    
+    return model
+    
 # ============================================================================
 # PREDICTION
 # ============================================================================
@@ -1026,7 +1135,7 @@ def create_diagnostic_plots(predictions, actuals, dates, output_dir):
     axes[2].fill_between(dates_dt, 
                          rolling_mean_mag - rolling_std_mag, 
                          rolling_mean_mag + rolling_std_mag,
-                         alpha=0.2, color='blue', label='±1 std')
+                         alpha=0.2, color='blue', label='Ã‚Â±1 std')
     axes[2].axhline(y=0.01, color='orange', linestyle='--', alpha=0.5, label='1% threshold')
     axes[2].set_xlabel('Date')
     axes[2].set_ylabel('|Prediction| (%)')
@@ -1099,7 +1208,7 @@ def create_regression_diagnostic_plots(predictions, actuals, dates, output_dir):
     # Overlay normal distribution
     mu, sigma = errors.mean(), errors.std()
     x = np.linspace(errors.min(), errors.max(), 100)
-    axes[1, 0].plot(x, stats.norm.pdf(x, mu, sigma), 'r-', linewidth=2, label=f'Normal(Î¼={mu:.3f}, Ïƒ={sigma:.3f})')
+    axes[1, 0].plot(x, stats.norm.pdf(x, mu, sigma), 'r-', linewidth=2, label=f'Normal(mu={mu:.3f}, sigma={sigma:.3f})')
     axes[1, 0].set_xlabel('Prediction Error (%)')
     axes[1, 0].set_ylabel('Density')
     axes[1, 0].set_title('Residual Distribution')
@@ -1375,9 +1484,23 @@ def save_results(predictions, actuals, dates, metrics_stat, metrics_fin,
     
     results_df.to_csv(os.path.join(output_dir, 'predictions.csv'), index=False)
     
+    # Compute prediction statistics
+    prediction_stats = {
+        'min': float(np.min(predictions)),
+        'max': float(np.max(predictions)),
+        'mean': float(np.mean(predictions)),
+        'std': float(np.std(predictions)),
+        'range': float(np.ptp(predictions)),
+        'num_unique': int(len(np.unique(np.round(predictions, 6)))),
+        'pct_positive': float((predictions > 0).mean() * 100),
+        'pct_negative': float((predictions < 0).mean() * 100),
+        'num_predictions': int(len(predictions)),
+    }
+    
     # Combine all metrics
     all_metrics = {
         'evaluation_timestamp': datetime.now().isoformat(),
+        'prediction_stats': prediction_stats,
         'statistical_metrics': metrics_stat,
         'financial_metrics': metrics_fin,
         'residual_diagnostics': diagnostics,
@@ -1403,7 +1526,7 @@ def print_summary(metrics_stat, metrics_fin):
     print(f"  MSE:              {metrics_stat['mse']:.6f}")
     print(f"  RMSE:             {metrics_stat['rmse']:.6f}")
     print(f"  MAE:              {metrics_stat['mae']:.6f}")
-    print(f"  Out-of-sample R²: {metrics_stat['r2']:.4f}")
+    print(f"  Out-of-sample RÂ²: {metrics_stat['r2']:.4f}")
     
     print("\nFINANCIAL METRICS:")
     print(f"  Directional Acc:  {metrics_fin['directional_accuracy']:.2%}")
@@ -1443,12 +1566,9 @@ def evaluate():
     
     # Determine checkpoint path
     if args.checkpoint is None:
-        # Auto-load best checkpoint from training
-        # Try multiple paths for phase subdirectories
         possible_metrics_paths = [
             f'experiments/{args.experiment_name}/final_metrics.json',
             f'experiments/00_baseline_exploration/{args.experiment_name}/final_metrics.json',
-            f'experiments/01_staleness_features/{args.experiment_name}/final_metrics.json',
             f'experiments/01_staleness_features_fixed/{args.experiment_name}/final_metrics.json',
         ]
         
@@ -1472,9 +1592,19 @@ def evaluate():
                 f"Either specify --checkpoint manually or ensure training completed successfully."
             )
         
+        ckpt_type = args.checkpoint_type
+        
         with open(metrics_path, 'r') as f:
             metrics = json.load(f)
-        checkpoint_path = metrics['best_model_path']
+        
+        if ckpt_type not in metrics:
+            raise KeyError(
+                f"Checkpoint type '{ckpt_type}' not found in final_metrics.json.\n"
+                f"Available: {list(metrics.keys())}\n"
+                f"This might be an old experiment without multi-metric checkpointing."
+            )
+        
+        checkpoint_path = metrics[ckpt_type]
         
         # Checkpoint path in final_metrics.json might not include phase directory
         # If it doesn't exist, prepend the phase directory from metrics_path
@@ -1495,7 +1625,7 @@ def evaluate():
                     checkpoint_path = corrected_checkpoint_path
                 else:
                     print(f"WARNING: Could not find checkpoint at:")
-                    print(f"  Original: {metrics['best_model_path']}")
+                    print(f"  Original: {metrics[ckpt_type]}")
                     print(f"  Corrected: {corrected_checkpoint_path}")
             else:
                 print(f"WARNING: Checkpoint path doesn't start with 'experiments/': {checkpoint_path}")
@@ -1575,7 +1705,7 @@ def evaluate():
     
     # Load model
     print(f"Loading model from checkpoint...")
-    model = load_model(checkpoint_path)
+    model = load_model(checkpoint_path, config)
     
     # Generate predictions
     print("Generating predictions...")

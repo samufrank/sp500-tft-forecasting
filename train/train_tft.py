@@ -37,12 +37,11 @@ warnings.filterwarnings('ignore', category=FutureWarning)
 
 # Custom components
 from src.custom_losses import create_loss_from_args
+from src.regime_output import replace_output_layer
 
 # in same /train dir
 from collapse_monitor import CollapseMonitor
 from callbacks import EpochSummaryCallback
-    
-
 
 # ============================================================================
 # CLI ARGUMENT PARSING
@@ -80,17 +79,17 @@ def parse_args():
                         help='Hidden layer size')
     parser.add_argument('--attention-heads', type=int, default=2,
                         help='Number of attention heads')
-    parser.add_argument('--dropout', type=float, default=0.15,
+    parser.add_argument('--dropout', type=float, default=0.10,
                         help='Dropout rate')
     parser.add_argument('--hidden-continuous-size', type=int, default=16,
                         help='Hidden size for continuous features')
     
     # Training
-    parser.add_argument('--learning-rate', type=float, default=0.001,
+    parser.add_argument('--learning-rate', type=float, default=0.0005,
                         help='Learning rate')
     parser.add_argument('--batch-size', type=int, default=64,
                         help='Batch size')
-    parser.add_argument('--max-epochs', type=int, default=50,
+    parser.add_argument('--max-epochs', type=int, default=100,
                         help='Maximum training epochs')
     parser.add_argument('--gradient-clip', type=float, default=0.1,
                         help='Gradient clipping value')
@@ -142,7 +141,38 @@ def parse_args():
                          'Mutually exclusive with magnitude-weight-alpha.')
     parser.add_argument('--extreme-move-percentile', type=int, default=95,
                     help='Percentile threshold for extreme moves (default: 95 = top 5%%)')
-    
+
+    # Regime-conditional output (Phase 5 modifications)
+    parser.add_argument('--regime-output', action='store_true',
+                        help='Enable regime-conditional output layer (MoE architecture)')
+    parser.add_argument('--num-regimes', type=int, default=2,
+                        help='Number of expert heads for regime-conditional output (default: 2)')
+    parser.add_argument('--routing-mode', type=str, default='learned',
+                        choices=['learned', 'disabled'],
+                        help='Routing strategy: learned=MoE with learned router, disabled=single expert baseline')
+    parser.add_argument('--routing-strategy', type=str, default='learned',
+                    choices=['learned', 'vix_threshold'],
+                    help='Routing strategy: learned (linear router) or vix_threshold (deterministic VIX)')
+    parser.add_argument('--load-balance-weight', type=float, default=0.5,
+                    help='Weight for load balancing auxiliary loss (prevents winner-takes-all routing)')
+    parser.add_argument('--vix-threshold', type=float, default=25.0,
+                    help='VIX threshold for 2-regime deterministic routing (only used with --routing-strategy vix_threshold)')
+    parser.add_argument('--vix-threshold-low', type=float, default=None,
+                    help='Lower VIX threshold for 3-regime routing (required when --num-regimes 3 with vix_threshold strategy)')
+    parser.add_argument('--vix-threshold-high', type=float, default=None,
+                    help='Upper VIX threshold for 3-regime routing (required when --num-regimes 3 with vix_threshold strategy)')
+    parser.add_argument('--expert-hidden-size', type=int, default=0,
+                    help='Expert hidden layer size. 0=linear experts (default), >0=MLP with that hidden size')
+    parser.add_argument('--hard-routing-train', action='store_true',
+                    help='Use hard routing during training (each sample only trains its assigned expert). '
+                         'Requires --routing-strategy vix_threshold. Validation/test uses soft routing.')
+
+    # Frozen backbone / transfer learning
+    parser.add_argument('--freeze-backbone', action='store_true',
+                        help='Freeze all TFT parameters except output layer (for diagnostic/transfer learning)')
+    parser.add_argument('--load-checkpoint', type=str, default=None,
+                        help='Path to checkpoint to load before training (for transfer learning)')
+
     return parser.parse_args()
 
 
@@ -214,7 +244,7 @@ def set_all_seeds(seed):
     torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
     pl.seed_everything(seed, workers=True)
-    # Make CUDA operations deterministic (may impact performance)
+    # Make CUDA operations deterministic
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
@@ -374,8 +404,12 @@ def prepare_tft_data(train_df, val_df, args, features, add_staleness=True):
         predict=False,
         stop_randomization=True
     )
+
+    # save VIX for regime o/p
+    raw_vix_train = train_df['VIX'].values
+    raw_vix_val = val_df['VIX'].values
     
-    return training, validation
+    return training, validation, raw_vix_train, raw_vix_val
 
 # ============================================================================
 # MODEL SETUP
@@ -407,20 +441,6 @@ def create_model(training_dataset, args):
     else:
         print("\nUsing standard QuantileLoss (no penalties)")
     
-    # DEBUG: Show what features the dataset has BEFORE model creation
-    #print("\n" + "="*80)
-    #print("BASELINE FEATURE INSPECTION (before model creation)")
-    #print("="*80)
-    #print(f"training_dataset.reals: {training_dataset.reals}")
-    #print(f"  Count: {len(training_dataset.reals)}")
-    #print(f"\ntraining_dataset.time_varying_reals_encoder: {training_dataset.time_varying_reals_encoder}")
-    #print(f"  Count: {len(training_dataset.time_varying_reals_encoder)}")
-    #print(f"\ntraining_dataset.time_varying_known_reals: {training_dataset.time_varying_known_reals}")
-    #print(f"  Count: {len(training_dataset.time_varying_known_reals)}")
-    #print(f"\ntraining_dataset.static_reals: {training_dataset.static_reals}")
-    #print(f"  Count: {len(training_dataset.static_reals)}")
-    #print("="*80 + "\n")
-    
     tft = TemporalFusionTransformer.from_dataset(
         training_dataset,
         learning_rate=args.learning_rate,
@@ -433,6 +453,93 @@ def create_model(training_dataset, args):
         log_interval=10,
         reduce_on_plateau_patience=4,
     )
+
+    # REGIME CONDITIONED O/P
+    if args.regime_output:
+        # Validate 3-regime configuration
+        if args.num_regimes == 3 and args.routing_strategy == 'vix_threshold':
+            if args.vix_threshold_low is None or args.vix_threshold_high is None:
+                raise ValueError(
+                    "3-regime VIX routing requires both --vix-threshold-low and "
+                    "--vix-threshold-high to be specified"
+                )
+        
+        # Validate hard routing configuration
+        if args.hard_routing_train and args.routing_strategy != 'vix_threshold':
+            raise ValueError(
+                "--hard-routing-train requires --routing-strategy vix_threshold"
+            )
+        
+        from src.regime_output import replace_output_layer
+        tft = replace_output_layer(
+            model=tft,
+            num_regimes=args.num_regimes,
+            routing_mode=args.routing_mode,
+            routing_strategy=args.routing_strategy,  
+            vix_threshold=args.vix_threshold,
+            vix_threshold_low=args.vix_threshold_low,
+            vix_threshold_high=args.vix_threshold_high,
+            load_balance_weight=args.load_balance_weight,
+            expert_hidden_size=args.expert_hidden_size,
+            hard_routing_train=args.hard_routing_train
+        )
+        routing_type = "HARD" if args.hard_routing_train else "soft"
+        print(f"\n[REGIME OUTPUT] Enabled with {args.num_regimes} regimes, mode={args.routing_mode}, strategy={args.routing_strategy}, training={routing_type}")
+        
+        # Modify monkey-patch to extract and pass VIX
+        original_training_step = tft.training_step
+        
+        def training_step_with_lb_and_vix(self, batch, batch_idx):
+            # VIX extraction is handled by forward_with_vix wrapper
+            # This wrapper just adds load balancing loss
+            
+            # Call original training_step
+            loss_dict = original_training_step(batch, batch_idx)
+            
+            # Add load balancing loss
+            if hasattr(self.output_layer, '_cached_lb_loss'):
+                lb = self.output_layer._cached_lb_loss
+                if lb is not None:
+                    loss_dict['loss'] = loss_dict['loss'] + lb
+            
+            return loss_dict
+        
+        import types
+        tft.training_step = types.MethodType(training_step_with_lb_and_vix, tft)
+        
+        # a lso need to patch TFT's forward to pass VIX to output layer
+        original_forward = tft.forward
+        
+        def forward_with_vix(self, x):
+            # Extract VIX if using VIX routing
+            vix_values = None
+            if hasattr(self.output_layer, 'routing_strategy'):
+                if self.output_layer.routing_strategy == 'vix_threshold':
+                    if 'decoder_time_idx' in x:
+                        time_idx = x['decoder_time_idx'][:, 0]
+                        if self.training:
+                            vix_values = self._raw_vix_train[time_idx.cpu()].to(x['encoder_cont'].device)
+                        else:
+                            # Validation uses offset indices - subtract train length
+                            offset_idx = time_idx.cpu() - len(self._raw_vix_train)
+                            vix_values = self._raw_vix_val[offset_idx].to(x['encoder_cont'].device)  
+            
+            # store VIX on output_layer before forward
+            if vix_values is not None:
+                self.output_layer._vix_for_forward = vix_values
+            
+            result = original_forward(x)
+            
+            # Clear cache
+            if hasattr(self.output_layer, '_vix_for_forward'):
+                self.output_layer._vix_for_forward = None
+            
+            return result
+        
+        tft.forward = types.MethodType(forward_with_vix, tft)
+
+    else:
+        print(f"\n[REGIME OUTPUT] Disabled (using baseline output layer)")
     
     # DEBUG: Show what the model actually received
     print("\n" + "="*80)
@@ -459,6 +566,46 @@ def create_model(training_dataset, args):
     print("="*80 + "\n")
     
     return tft
+
+def freeze_backbone(model, verbose=True):
+    """
+    Freeze all TFT parameters except the output layer.
+    
+    Used for:
+    1. Diagnostic: Test if hidden state contains usable regime signal
+    2. Transfer learning: Train new output head on pretrained backbone
+    
+    Parameters
+    ----------
+    model : TemporalFusionTransformer
+        Model to freeze
+    verbose : bool
+        Print parameter counts
+    
+    Returns
+    -------
+    model : TemporalFusionTransformer
+        Model with frozen backbone (modified in-place)
+    """
+    frozen_count = 0
+    trainable_count = 0
+    
+    for name, param in model.named_parameters():
+        if 'output_layer' in name:
+            param.requires_grad = True
+            trainable_count += param.numel()
+        else:
+            param.requires_grad = False
+            frozen_count += param.numel()
+    
+    if verbose:
+        total = frozen_count + trainable_count
+        print(f"\n[FREEZE BACKBONE] Parameter status:")
+        print(f"  Frozen: {frozen_count:,} ({100*frozen_count/total:.1f}%)")
+        print(f"  Trainable: {trainable_count:,} ({100*trainable_count/total:.1f}%)")
+        print(f"  Total: {total:,}")
+    
+    return model
 
 # ============================================================================
 # EXPERIMENT TRACKING SETUP
@@ -519,6 +666,22 @@ def save_config(args, features, output_dir):
             'magnitude_weight_alpha': getattr(args, 'magnitude_weight_alpha', 0.0),
             'extreme_move_weight': getattr(args, 'extreme_move_weight', 1.0),
             'extreme_move_percentile': getattr(args, 'extreme_move_percentile', 95),
+        },
+        'regime_output': {
+            'enabled': args.regime_output,
+            'num_regimes': args.num_regimes if args.regime_output else None,
+            'routing_mode': args.routing_mode if args.regime_output else None,
+            'routing_strategy': getattr(args, 'routing_strategy', 'learned') if args.regime_output else None,
+            'vix_threshold': args.vix_threshold if args.regime_output else None,
+            'vix_threshold_low': getattr(args, 'vix_threshold_low', None) if args.regime_output else None,
+            'vix_threshold_high': getattr(args, 'vix_threshold_high', None) if args.regime_output else None,
+            'load_balance_weight': args.load_balance_weight if args.regime_output else None,
+            'expert_hidden_size': getattr(args, 'expert_hidden_size', 0) if args.regime_output else None,
+            'hard_routing_train': getattr(args, 'hard_routing_train', False) if args.regime_output else None,
+        },
+        'transfer_learning': {
+            'freeze_backbone': getattr(args, 'freeze_backbone', False),
+            'load_checkpoint': getattr(args, 'load_checkpoint', None),
         },
         'features': features,
         'pytorch_version': torch.__version__,
@@ -637,7 +800,10 @@ def train():
     
     # Prepare TFT datasets
     print("\nPreparing TimeSeriesDataSet...")
-    training, validation = prepare_tft_data(train_df, val_df, args, features)
+    training, validation, raw_vix_train, raw_vix_val = prepare_tft_data(train_df, val_df, args, features)
+
+    print(f"[DEBUG] VIX train values: {raw_vix_train[0:5]}")
+    print(f"[DEBUG] VIX val values: {raw_vix_val[0:5]}")
     
     # Create dataloaders
     train_dataloader = training.to_dataloader(
@@ -665,6 +831,47 @@ def train():
     print("\nInitializing model...")
     tft = create_model(training, args)
     
+    # Load checkpoint if specified (transfer learning)
+    if args.load_checkpoint:
+        if not os.path.exists(args.load_checkpoint):
+            print(f"\nERROR: Checkpoint not found: {args.load_checkpoint}")
+            return None, None
+        
+        print(f"\n[TRANSFER LEARNING] Loading checkpoint: {args.load_checkpoint}")
+        
+        # Load state dict from checkpoint
+        checkpoint = torch.load(args.load_checkpoint, map_location='cpu')
+        
+        # Handle different checkpoint formats
+        if 'state_dict' in checkpoint:
+            state_dict = checkpoint['state_dict']
+        else:
+            state_dict = checkpoint
+        
+        # Filter out output_layer weights if we're using regime output
+        # (we want fresh regime experts, not the old single output layer)
+        if args.regime_output:
+            state_dict = {k: v for k, v in state_dict.items() 
+                         if 'output_layer' not in k}
+            print(f"  Filtered out output_layer weights (using fresh regime experts)")
+        
+        # Load the state dict
+        missing, unexpected = tft.load_state_dict(state_dict, strict=False)
+        if missing:
+            print(f"  Missing keys: {len(missing)} (expected if output_layer filtered)")
+        if unexpected:
+            print(f"  Unexpected keys: {unexpected}")
+        
+        print(f"  Backbone loaded successfully")
+    
+    # Freeze backbone if requested
+    if args.freeze_backbone:
+        tft = freeze_backbone(tft, verbose=True)
+    
+    # store VIX on the model so training loop can access
+    tft._raw_vix_train = torch.tensor(raw_vix_train, dtype=torch.float32)
+    tft._raw_vix_val = torch.tensor(raw_vix_val, dtype=torch.float32)
+    
     # Distribution penalties are now handled in create_model() via EnhancedQuantileLoss
     # Old monkey-patching code (Phase 3) removed - see loss_wrapper.py for reference
     
@@ -690,7 +897,7 @@ def train():
         filename='tft-epoch={epoch:02d}-valloss={val_loss:.4f}',
         monitor='val_loss',
         mode='min',
-        save_top_k=1,
+        save_top_k=3,
         every_n_epochs=args.checkpoint_every_n_epochs,
     )
     
@@ -699,7 +906,7 @@ def train():
         filename='tft-epoch={epoch:02d}-predstd={val_pred_std:.4f}',
         monitor='val_pred_std',
         mode='max',  # Higher std = better diversity
-        save_top_k=1,
+        save_top_k=3,
         every_n_epochs=args.checkpoint_every_n_epochs,
     )
     
@@ -708,7 +915,7 @@ def train():
         filename='tft-epoch={epoch:02d}-unique={val_num_unique:.0f}',
         monitor='val_num_unique',
         mode='max',  # More unique predictions = better
-        save_top_k=1,
+        save_top_k=3,
         every_n_epochs=args.checkpoint_every_n_epochs,
     )
     
@@ -746,7 +953,7 @@ def train():
         devices=1,
         gradient_clip_val=args.gradient_clip,
         callbacks=callbacks,
-        deterministic=True,
+        deterministic="warn",
         strategy="auto",
         enable_progress_bar=False,
         enable_model_summary=True,
