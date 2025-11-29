@@ -200,7 +200,8 @@ def correlation_matrix(
     if config_cols is None:
         config_cols = [
             'num_regimes', 'dropout', 'load_balance_weight', 
-            'expert_hidden_size', 'hard_routing_train', 'vix_threshold'
+            'expert_hidden_size', 'hard_routing_train', 'vix_threshold',
+            'directional_weight', 'dist_loss_std_weight'
         ]
     
     if metric_cols is None:

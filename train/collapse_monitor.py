@@ -129,6 +129,7 @@ class CollapseMonitor(Callback):
         """
         pl_module.eval()
         all_predictions = []
+        all_actuals = []
         
         with torch.no_grad():
             batch_count = 0
@@ -155,10 +156,16 @@ class CollapseMonitor(Callback):
                     preds = output[:, 0, 3]
                     
                 all_predictions.append(preds.cpu().numpy())
+                
+                # Collect actuals - handle different shapes
+                y_np = y[0].cpu().numpy() if isinstance(y, (list, tuple)) else y.cpu().numpy()
+                y_np = y_np.flatten()
+                all_actuals.append(y_np)
 
         print(f"  [DEBUG] Processed {batch_count} batches from val_dataloader")
            
         predictions = np.concatenate(all_predictions)
+        actuals = np.concatenate(all_actuals)
         print(f"  [DEBUG] Predictions shape after concat: {predictions.shape}")
         print(f"  [DEBUG] All predictions list length: {len(all_predictions)}")
         print(f"  [DEBUG] First batch shape: {all_predictions[0].shape if all_predictions else 'empty'}")
@@ -199,6 +206,33 @@ class CollapseMonitor(Callback):
         pl_module.log('val_pred_std', float(pred_std), on_step=False, on_epoch=True, prog_bar=False)
         pl_module.log('val_pct_positive', float(pct_pos), on_step=False, on_epoch=True, prog_bar=False)
         pl_module.log('val_num_unique', int(n_unique), on_step=False, on_epoch=True, prog_bar=False)
+
+        # Compute and log directional accuracy and prediction Sharpe
+        # Directional accuracy: % of times sign(pred) == sign(actual)
+        pred_signs = np.sign(predictions)
+        actual_signs = np.sign(actuals)
+        dir_acc = np.mean(pred_signs == actual_signs)
+        
+        # Prediction Sharpe: mean(pred) / std(pred) * sqrt(252) for daily
+        # This measures how "confident" the predictions are, adjusted for variance
+        if pred_std > 1e-10:
+            pred_sharpe = (pred_mean / pred_std) * np.sqrt(252)
+        else:
+            pred_sharpe = 0.0
+        
+        # Log for ModelCheckpoint
+        pl_module.log('val_dir_acc', float(dir_acc), on_step=False, on_epoch=True, prog_bar=False)
+        pl_module.log('val_sharpe', float(pred_sharpe), on_step=False, on_epoch=True, prog_bar=False)
+        
+        # Store in history
+        if 'directional_accuracy' not in self.history:
+            self.history['directional_accuracy'] = []
+        if 'prediction_sharpe' not in self.history:
+            self.history['prediction_sharpe'] = []
+        self.history['directional_accuracy'].append(float(dir_acc))
+        self.history['prediction_sharpe'].append(float(pred_sharpe))
+        
+        print(f"  Dir Acc: {dir_acc*100:.2f}%, Pred Sharpe: {pred_sharpe:.4f}")
 
         # Print collapse penalty if computed
         if collapse_penalty is not None:

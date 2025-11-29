@@ -897,7 +897,7 @@ def train():
         filename='tft-epoch={epoch:02d}-valloss={val_loss:.4f}',
         monitor='val_loss',
         mode='min',
-        save_top_k=3,
+        save_top_k=5,
         every_n_epochs=args.checkpoint_every_n_epochs,
     )
     
@@ -906,7 +906,7 @@ def train():
         filename='tft-epoch={epoch:02d}-predstd={val_pred_std:.4f}',
         monitor='val_pred_std',
         mode='max',  # Higher std = better diversity
-        save_top_k=3,
+        save_top_k=5,
         every_n_epochs=args.checkpoint_every_n_epochs,
     )
     
@@ -915,7 +915,7 @@ def train():
         filename='tft-epoch={epoch:02d}-unique={val_num_unique:.0f}',
         monitor='val_num_unique',
         mode='max',  # More unique predictions = better
-        save_top_k=3,
+        save_top_k=5,
         every_n_epochs=args.checkpoint_every_n_epochs,
     )
     
@@ -925,7 +925,7 @@ def train():
         filename='tft-epoch={epoch:02d}-diracc={val_dir_acc:.4f}',
         monitor='val_dir_acc',
         mode='max',  # Higher directional accuracy = better
-        save_top_k=3,
+        save_top_k=5,
         every_n_epochs=args.checkpoint_every_n_epochs,
     )
     
@@ -934,7 +934,7 @@ def train():
         filename='tft-epoch={epoch:02d}-sharpe={val_sharpe:.4f}',
         monitor='val_sharpe',
         mode='max',  # Higher Sharpe = better (more confident predictions)
-        save_top_k=3,
+        save_top_k=5,
         every_n_epochs=args.checkpoint_every_n_epochs,
     )
     
@@ -954,7 +954,6 @@ def train():
         checkpoint_unique,
         checkpoint_dir_acc,
         checkpoint_sharpe,
-        checkpoint_last,
         EpochSummaryCallback(),
         collapse_monitor
     ]
