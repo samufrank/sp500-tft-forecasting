@@ -919,12 +919,25 @@ def train():
         every_n_epochs=args.checkpoint_every_n_epochs,
     )
     
-    checkpoint_last = ModelCheckpoint(
+    # Financial performance checkpoints
+    checkpoint_dir_acc = ModelCheckpoint(
         dirpath=os.path.join(output_dir, 'checkpoints'),
-        filename='tft-last',
-        save_last=True,
+        filename='tft-epoch={epoch:02d}-diracc={val_dir_acc:.4f}',
+        monitor='val_dir_acc',
+        mode='max',  # Higher directional accuracy = better
+        save_top_k=3,
         every_n_epochs=args.checkpoint_every_n_epochs,
     )
+    
+    checkpoint_sharpe = ModelCheckpoint(
+        dirpath=os.path.join(output_dir, 'checkpoints'),
+        filename='tft-epoch={epoch:02d}-sharpe={val_sharpe:.4f}',
+        monitor='val_sharpe',
+        mode='max',  # Higher Sharpe = better (more confident predictions)
+        save_top_k=3,
+        every_n_epochs=args.checkpoint_every_n_epochs,
+    )
+    
     
     from pytorch_lightning.loggers import CSVLogger, TensorBoardLogger
     # Setup both loggers to get numeric metrics + figures
@@ -939,6 +952,8 @@ def train():
         checkpoint_val_loss,
         checkpoint_pred_std,
         checkpoint_unique,
+        checkpoint_dir_acc,
+        checkpoint_sharpe,
         checkpoint_last,
         EpochSummaryCallback(),
         collapse_monitor
@@ -1016,6 +1031,8 @@ def train():
     print(f"  - Best val_loss: {checkpoint_val_loss.best_model_path}")
     print(f"  - Best pred_std: {checkpoint_pred_std.best_model_path}")
     print(f"  - Best unique: {checkpoint_unique.best_model_path}")
+    print(f"  - Best dir_acc: {checkpoint_dir_acc.best_model_path}")
+    print(f"  - Best sharpe: {checkpoint_sharpe.best_model_path}")
     print(f"  - Last epoch: {checkpoint_last.best_model_path}")
     print(f"Completed at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"Log saved to: {log_file}")
@@ -1034,9 +1051,15 @@ def train():
     # Save final metrics
     metrics = {
         'best_val_loss_path': checkpoint_val_loss.best_model_path,
-        'best_val_loss': float(checkpoint_val_loss.best_model_score),
+        'best_val_loss': float(checkpoint_val_loss.best_model_score) if checkpoint_val_loss.best_model_score is not None else None,
         'best_pred_std_path': checkpoint_pred_std.best_model_path,
+        'best_pred_std': float(checkpoint_pred_std.best_model_score) if checkpoint_pred_std.best_model_score is not None else None,
         'best_unique_path': checkpoint_unique.best_model_path,
+        'best_unique': float(checkpoint_unique.best_model_score) if checkpoint_unique.best_model_score is not None else None,
+        'best_dir_acc_path': checkpoint_dir_acc.best_model_path,
+        'best_dir_acc': float(checkpoint_dir_acc.best_model_score) if checkpoint_dir_acc.best_model_score is not None else None,
+        'best_sharpe_path': checkpoint_sharpe.best_model_path,
+        'best_sharpe': float(checkpoint_sharpe.best_model_score) if checkpoint_sharpe.best_model_score is not None else None,
         'last_path': checkpoint_last.best_model_path,
         'total_epochs': trainer.current_epoch,
         'early_stopped': stopped_early,

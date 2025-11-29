@@ -764,15 +764,10 @@ class CollapseMonitor(Callback):
             print(f"    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions")
             
     def _save_history(self, epoch):
-        """Save monitoring history to disk."""
-        save_path = self.log_dir / f'collapse_monitor_epoch{epoch}.json'
+        """Save monitoring history to disk (overwrites each epoch)."""
+        save_path = self.log_dir / 'collapse_monitor_latest.json'
         
         with open(save_path, 'w') as f:
-            json.dump(self.history, f, indent=2)
-            
-        # Also save latest as separate file for easy access
-        latest_path = self.log_dir / 'collapse_monitor_latest.json'
-        with open(latest_path, 'w') as f:
             json.dump(self.history, f, indent=2)
             
         print(f"  Saved to: {save_path}")

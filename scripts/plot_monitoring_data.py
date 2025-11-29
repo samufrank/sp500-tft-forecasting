@@ -243,9 +243,8 @@ def plot_gradient_flow(experiments, output_path='gradient_flow.png'):
             ax.grid(True, alpha=0.3)
             ax.set_yscale('log')
             
-            # Force integer epoch labels
-            if len(epochs) > 0:
-                ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
+            # Force integer epoch labels (epochs defined in loop, may not exist)
+            ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
     
     # Hide unused subplot if 2x3 layout
     if len(axes) > len(layer_groups):
