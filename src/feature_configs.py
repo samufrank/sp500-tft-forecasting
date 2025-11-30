@@ -5,6 +5,8 @@ Each config specifies:
 - features: list of column names to use
 - description: what this feature set represents
 - min_date: earliest date with all features available (None = use all)
+- include_constituents: (optional) whether to join constituent returns for multi-task
+- constituent_count: (optional) how many constituents to include (25, 50, 75, 100)
 """
 
 FEATURE_SETS = {
@@ -66,29 +68,140 @@ FEATURE_SETS = {
         'min_date': '1997-01-01',  # Most restrictive constraint
     },
     
-    'core_dynamics': {
+    # =========================================================================
+    # Multi-task feature sets (include constituent returns as auxiliary targets)
+    # =========================================================================
+    
+    'multitask_core': {
         'features': [
-            # Levels (original core)
-            'SP500_Returns',      # Target
-            'VIX',                # Market volatility level
-            'Treasury_10Y',       # Long-term rate level
-            'Yield_Spread',       # Yield curve slope
-            'Inflation_YoY',      # CPI year-over-year
-            # Dynamics (regime indicators)
-            'VIX_relative',       # Fear relative to recent norm
-            'VIX_spike',          # Acute fear event (binary)
-            'Treasury_10Y_change',  # Rate momentum
+            'SP500_Returns',
+            'VIX',
+            'Treasury_10Y',
+            'Yield_Spread',
+            'Inflation_YoY',
         ],
-        'description': 'Core levels + regime dynamics indicators (requires enhanced dataset)',
+        'include_constituents': True,
+        'constituent_count': 50,  # Top 50 by market cap
+        'constituent_version': 'vintage_2005',  # Which constituent file to use
+        'description': 'Core features + top 50 constituent returns for multi-task learning',
         'min_date': None,
+    },
+    
+    # =========================================================================
+    # Single-stock prediction (transfer learning targets)
+    # =========================================================================
+    
+    # as an example
+    'predict_AAPL': {
+        'features': [
+            'AAPL_Returns',  # Target
+            'SP500_Returns', # Index as feature
+            'VIX',
+            'Treasury_10Y',
+            'Yield_Spread',
+            'Inflation_YoY',
+        ],
+        'target': 'AAPL_Returns',  # Override default SP500_Returns
+        'include_constituents': False,
+        'description': 'Predict AAPL using macro features + index',
+        'min_date': '2005-01-01',  # AAPL data reliable from here
     },
 }
 
-# Define target variable
+# Define default target variable (can be overridden per feature set)
 TARGET = 'SP500_Returns'
 
 # Define which features are lagged returns (for proper temporal splits)
 AUTOREGRESSIVE_FEATURES = ['SP500_Returns']
+
+
+def get_target(config_name: str) -> str:
+    """
+    Get target variable for a feature set.
+    
+    Parameters:
+    -----------
+    config_name : str
+        Name of feature set from FEATURE_SETS
+        
+    Returns:
+    --------
+    str
+        Target column name (default: SP500_Returns, or override if specified)
+    """
+    config = FEATURE_SETS.get(config_name, {})
+    return config.get('target', TARGET)
+
+# Constituent configuration
+CONSTITUENT_CONFIG = {
+    # Ordered by market cap (highest first)
+    # Used to select top-N for multi-task learning
+    'tickers': [
+        'AAPL', 'MSFT', 'AMZN', 'NVDA', 'GOOGL', 'META', 'GOOG', 'BRK-B', 'TSLA', 'UNH',
+        'XOM', 'LLY', 'JPM', 'JNJ', 'V', 'AVGO', 'PG', 'MA', 'HD', 'CVX',
+        'MRK', 'ABBV', 'COST', 'PEP', 'KO', 'ADBE', 'WMT', 'MCD', 'CRM', 'TMO',
+        'CSCO', 'BAC', 'ACN', 'LIN', 'NFLX', 'AMD', 'ABT', 'NKE', 'DIS', 'TXN',
+        'PM', 'WFC', 'ORCL', 'DHR', 'CMCSA', 'INTU', 'VZ', 'COP', 'NEE', 'QCOM',
+        'UNP', 'IBM', 'AMGN', 'RTX', 'PFE', 'LOW', 'SPGI', 'HON', 'CAT', 'ELV',
+        'UPS', 'MS', 'BA', 'AMAT', 'GE', 'BLK', 'PLD', 'DE', 'SYK', 'LMT',
+        'BKNG', 'MDT', 'ADP', 'ADI', 'TJX', 'GILD', 'MDLZ', 'C', 'VRTX', 'MMC',
+        'SBUX', 'AMT', 'AXP', 'ISRG', 'REGN', 'CI', 'PGR', 'MO', 'ZTS', 'BDX',
+        'SCHW', 'CB', 'ETN', 'BMY', 'SO', 'DUK', 'CVS', 'LRCX', 'NOC', 'BSX'
+    ],
+    'column_suffix': '_Returns',  # e.g., AAPL_Returns
+}
+
+
+def get_constituent_columns(count: int = 50) -> list:
+    """
+    Get column names for top-N constituents.
+    
+    Parameters:
+    -----------
+    count : int
+        Number of top constituents (by market cap) to include.
+        
+    Returns:
+    --------
+    list
+        Column names like ['AAPL_Returns', 'MSFT_Returns', ...]
+    """
+    tickers = CONSTITUENT_CONFIG['tickers'][:count]
+    suffix = CONSTITUENT_CONFIG['column_suffix']
+    return [f"{ticker}{suffix}" for ticker in tickers]
+
+
+def get_all_targets(config_name: str) -> dict:
+    """
+    Get all target columns for a feature set (primary + auxiliary).
+    
+    Parameters:
+    -----------
+    config_name : str
+        Name of feature set from FEATURE_SETS
+        
+    Returns:
+    --------
+    dict with keys:
+        'primary': str - main target (SP500_Returns)
+        'auxiliary': list - constituent return columns (if multi-task)
+        'all': list - all targets combined
+    """
+    config = FEATURE_SETS.get(config_name, {})
+    
+    primary = TARGET
+    auxiliary = []
+    
+    if config.get('include_constituents', False):
+        count = config.get('constituent_count', 50)
+        auxiliary = get_constituent_columns(count)
+    
+    return {
+        'primary': primary,
+        'auxiliary': auxiliary,
+        'all': [primary] + auxiliary,
+    }
+
 
 # To create staleness features
 FEATURE_METADATA = {
