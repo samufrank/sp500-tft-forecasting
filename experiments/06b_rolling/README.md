@@ -1,4 +1,4 @@
-se 06b: Rolling Window Evaluation (Nov 29, 2024)
+# Phase 06b: Rolling Window Evaluation (Nov 29, 2024)
 
 Rolling window evaluation across 9 years (2016-2024) to test model robustness across different market regimes. Unlike fixed train/val/test splits that only evaluate on recent data, rolling evaluation reveals how models perform during volatility spikes, crashes, bear markets, and recoveries.
 
