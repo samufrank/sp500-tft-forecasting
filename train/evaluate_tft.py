@@ -416,6 +416,17 @@ def load_model(checkpoint_path, config):
     mean_weight = training_config.get('dist_loss_mean_weight', 0.0)
     std_weight = training_config.get('dist_loss_std_weight', 0.0)
     uses_dist_loss = mean_weight > 0 or std_weight > 0
+
+    # Check if this model used classification head
+    classification_config = config.get('classification', {})
+    use_classification = classification_config.get('enabled', False)
+
+    # Case 0: Classification model
+    if use_classification:
+        from src.classification_tft import ClassificationTFT
+        model = ClassificationTFT.load_from_checkpoint(checkpoint_path)
+        model.eval()
+        return model
     
     # Case 1: Baseline model (no regime output, no dist loss)
     if not uses_dist_loss and not use_regime_output:

@@ -234,6 +234,30 @@ class CollapseMonitor(Callback):
         
         print(f"  Dir Acc: {dir_acc*100:.2f}%, Pred Sharpe: {pred_sharpe:.4f}")
 
+        # Composite metric: directional accuracy penalized by distribution mismatch
+        # Penalizes deviation from actual target distribution, not arbitrary 50/50
+        actual_pct_positive = np.mean(actuals > 0)
+        pred_pct_positive = np.mean(predictions > 0)
+        distribution_match = 1.0 - abs(pred_pct_positive - actual_pct_positive)
+        composite = dir_acc * (0.5 + 0.5 * distribution_match)
+        
+        # Log for ModelCheckpoint
+        pl_module.log('val_composite', float(composite), on_step=False, on_epoch=True, prog_bar=False)
+        
+        # Store in history
+        if 'composite' not in self.history:
+            self.history['composite'] = []
+        if 'distribution_match' not in self.history:
+            self.history['distribution_match'] = []
+        if 'actual_pct_positive' not in self.history:
+            self.history['actual_pct_positive'] = []
+        self.history['composite'].append(float(composite))
+        self.history['distribution_match'].append(float(distribution_match))
+        self.history['actual_pct_positive'].append(float(actual_pct_positive * 100))
+        
+        print(f"  Composite: {composite:.4f} (dist_match: {distribution_match:.4f}, "
+              f"actual_pos: {actual_pct_positive*100:.1f}%, pred_pos: {pred_pct_positive*100:.1f}%)")
+
         # Print collapse penalty if computed
         if collapse_penalty is not None:
             print(f"  Collapse penalty: {collapse_penalty:.6f} "
@@ -278,7 +302,7 @@ class CollapseMonitor(Callback):
         
         # Print summary of key layers
         key_layers = ['lstm_encoder', 'lstm_decoder', 'multihead_attention', 
-                      'output_layer']
+                      'output_layer', 'classification_head']
         print("  Gradient norms:")
         for layer_name in key_layers:
             matching = [k for k in self.history['gradient_norms'].keys() 
