@@ -938,6 +938,15 @@ def train():
         every_n_epochs=args.checkpoint_every_n_epochs,
     )
     
+    checkpoint_composite = ModelCheckpoint(
+        dirpath=os.path.join(output_dir, 'checkpoints'),
+        filename='tft-epoch={epoch:02d}-composite={val_composite:.4f}',
+        monitor='val_composite',
+        mode='max',  # Higher = better directional accuracy with balanced predictions
+        save_top_k=5,
+        every_n_epochs=args.checkpoint_every_n_epochs,
+    )
+    
     
     from pytorch_lightning.loggers import CSVLogger, TensorBoardLogger
     # Setup both loggers to get numeric metrics + figures
@@ -954,6 +963,7 @@ def train():
         checkpoint_unique,
         checkpoint_dir_acc,
         checkpoint_sharpe,
+        checkpoint_composite,
         EpochSummaryCallback(),
         collapse_monitor
     ]
@@ -1032,6 +1042,7 @@ def train():
     print(f"  - Best unique: {checkpoint_unique.best_model_path}")
     print(f"  - Best dir_acc: {checkpoint_dir_acc.best_model_path}")
     print(f"  - Best sharpe: {checkpoint_sharpe.best_model_path}")
+    print(f"  - Best composite: {checkpoint_composite.best_model_path}")
     print(f"Completed at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"Log saved to: {log_file}")
     print("="*70)
@@ -1058,7 +1069,8 @@ def train():
         'best_dir_acc': float(checkpoint_dir_acc.best_model_score) if checkpoint_dir_acc.best_model_score is not None else None,
         'best_sharpe_path': checkpoint_sharpe.best_model_path,
         'best_sharpe': float(checkpoint_sharpe.best_model_score) if checkpoint_sharpe.best_model_score is not None else None,
-        'last_path': checkpoint_last.best_model_path,
+        'best_composite_path': checkpoint_composite.best_model_path,
+        'best_composite': float(checkpoint_composite.best_model_score) if checkpoint_composite.best_model_score is not None else None,
         'total_epochs': trainer.current_epoch,
         'early_stopped': stopped_early,
     }

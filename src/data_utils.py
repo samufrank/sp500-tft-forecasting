@@ -2,51 +2,13 @@
 Utilities for loading and preparing datasets for modeling.
 """
 
-import os
 import pandas as pd
-from src.feature_configs import FEATURE_SETS, FEATURE_METADATA, TARGET, get_constituent_columns
-
-
-def load_constituents(frequency='daily', version='vintage_2005', data_path='data', verbose=True):
-    """
-    Load constituent returns from separate CSV file.
-    
-    Parameters:
-    -----------
-    frequency : str
-        'daily' (weekly/monthly not typically used for constituents)
-    version : str
-        Version suffix, e.g., 'vintage_2005' -> constituents_daily_vintage_2005.csv
-    data_path : str
-        Path to data directory
-    verbose : bool
-        Print loading information
-        
-    Returns:
-    --------
-    pd.DataFrame or None
-        Constituent returns indexed by date, or None if file doesn't exist
-    """
-    filename = f"{data_path}/constituents_{frequency}_{version}.csv"
-    
-    if not os.path.exists(filename):
-        if verbose:
-            print(f"Constituent file not found: {filename}")
-            print("Run collect_constituents.py to generate this file.")
-        return None
-    
-    df = pd.read_csv(filename, index_col='Date', parse_dates=True)
-    
-    if verbose:
-        print(f"Loaded constituents: {df.shape[1]} tickers, {len(df)} observations")
-        print(f"Date range: {df.index[0].date()} to {df.index[-1].date()}")
-    
-    return df
-
+from src.feature_configs import FEATURE_SETS, FEATURE_METADATA, TARGET
 
 def load_feature_set(config_name='core_proposal', 
                      frequency='daily',
                      version='fixed',
+                     enhanced=False,
                      data_path='data',
                      verbose=True):
     """
@@ -60,6 +22,8 @@ def load_feature_set(config_name='core_proposal',
         'daily', 'weekly', or 'monthly'
     version : str
         'fixed' or 'vintage'
+    enhanced : bool
+        If True, load enhanced dataset with technical features
     data_path : str
         Path to data directory
     verbose : bool
@@ -68,18 +32,26 @@ def load_feature_set(config_name='core_proposal',
     Returns:
     --------
     pd.DataFrame
-        Dataset with selected features and date filtering applied.
-        If config has include_constituents=True, constituent columns are joined.
+        Dataset with selected features and date filtering applied
     """
     # Validate config
     if config_name not in FEATURE_SETS:
         raise ValueError(f"Unknown config: {config_name}. "
                         f"Available: {list(FEATURE_SETS.keys())}")
     
+    # Validate frequency
+    valid_frequencies = ['daily', 'weekly', 'monthly']
+    if frequency not in valid_frequencies:
+        raise ValueError(f"Unknown frequency: {frequency}. "
+                        f"Available: {valid_frequencies}")
+    
     config = FEATURE_SETS[config_name]
     
     # Load full dataset
-    filename = f"{data_path}/financial_dataset_{frequency}_{version}.csv"
+    if enhanced:
+        filename = f"{data_path}/financial_dataset_{frequency}_{version}_enhanced.csv"
+    else:
+        filename = f"{data_path}/financial_dataset_{frequency}_{version}.csv"
     df = pd.read_csv(filename, index_col='Date', parse_dates=True)
     
     if verbose:
@@ -97,6 +69,7 @@ def load_feature_set(config_name='core_proposal',
         features_to_load = config['features'].copy()
         
         # Add source columns needed for staleness computation
+        from src.feature_configs import FEATURE_METADATA
         for feature in config['features']:
             if feature in FEATURE_METADATA:
                 metadata = FEATURE_METADATA[feature]
@@ -110,49 +83,13 @@ def load_feature_set(config_name='core_proposal',
         selected = df[features_to_load].copy()
     
     # Apply date filtering if specified
-    if config.get('min_date') is not None:
+    if config['min_date'] is not None:
         original_len = len(selected)
         selected = selected[selected.index >= config['min_date']]
         if verbose:
             print(f"Date filter: >={config['min_date']}")
             print(f"  Samples before: {original_len}")
             print(f"  Samples after: {len(selected)}")
-    
-    # Join constituent returns if requested
-    if config.get('include_constituents', False):
-        constituent_count = config.get('constituent_count', 50)
-        constituent_version = config.get('constituent_version', 'vintage_2005')
-        
-        if verbose:
-            print(f"\nLoading constituent returns (top {constituent_count}, version: {constituent_version})...")
-        
-        constituents_df = load_constituents(
-            frequency=frequency,
-            version=constituent_version,
-            data_path=data_path,
-            verbose=verbose
-        )
-        
-        if constituents_df is not None:
-            # Get column names for requested count
-            requested_cols = get_constituent_columns(constituent_count)
-            
-            # Filter to available columns (some may have failed coverage screening)
-            available_cols = [col for col in requested_cols if col in constituents_df.columns]
-            
-            if verbose:
-                print(f"Requested: {len(requested_cols)} constituents")
-                print(f"Available: {len(available_cols)} constituents")
-            
-            # Join on date index
-            constituents_subset = constituents_df[available_cols]
-            selected = selected.join(constituents_subset, how='left')
-            
-            if verbose:
-                print(f"Joined constituent columns: {len(available_cols)}")
-        else:
-            if verbose:
-                print("WARNING: Constituent data not available. Proceeding without.")
     
     # Remove any remaining NaNs
     original_len = len(selected)
@@ -172,7 +109,7 @@ def load_feature_set(config_name='core_proposal',
 
 def create_train_val_test_split(df, train_pct=0.7, val_pct=0.15, verbose=True):
     """
-    Create temporal train/validation/test splits.
+    Create temporal train/validation/test splits by percentage.
     
     Parameters:
     -----------
@@ -207,6 +144,83 @@ def create_train_val_test_split(df, train_pct=0.7, val_pct=0.15, verbose=True):
               f"({len(val):,} obs, {val_pct*100:.0f}%)")
         print(f"Test:  {test.index[0].date()} to {test.index[-1].date()} "
               f"({len(test):,} obs, {(1-train_pct-val_pct)*100:.0f}%)")
+    
+    return train, val, test
+
+
+def create_split_by_dates(df, train_start=None, train_end=None, val_end=None, 
+                          test_start=None, test_end=None, verbose=True):
+    """
+    Create temporal train/validation/test splits by date boundaries.
+    
+    For rolling/walk-forward evaluation. Dates are inclusive.
+    
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        Dataset with DatetimeIndex
+    train_start : str or None
+        Training start date (YYYY-MM-DD). None = start of data.
+    train_end : str
+        Training end date (YYYY-MM-DD). Required.
+    val_end : str or None
+        Validation end date. None = no validation split (val will be empty).
+    test_start : str or None
+        Test start date. None = day after val_end (or train_end if no val).
+    test_end : str or None
+        Test end date. None = end of data.
+    verbose : bool
+        Print split information
+        
+    Returns:
+    --------
+    train, val, test : tuple of pd.DataFrame
+        Note: val may be empty DataFrame if val_end not specified
+    """
+    if train_end is None:
+        raise ValueError("train_end is required for date-based splitting")
+    
+    # Convert to timestamps
+    train_start = pd.Timestamp(train_start) if train_start else df.index[0]
+    train_end = pd.Timestamp(train_end)
+    val_end = pd.Timestamp(val_end) if val_end else None
+    test_start = pd.Timestamp(test_start) if test_start else None
+    test_end = pd.Timestamp(test_end) if test_end else df.index[-1]
+    
+    # Create splits
+    train = df[(df.index >= train_start) & (df.index <= train_end)].copy()
+    
+    if val_end:
+        # Validation: from day after train_end to val_end
+        val = df[(df.index > train_end) & (df.index <= val_end)].copy()
+        # Test: from test_start (or day after val_end) to test_end
+        if test_start is None:
+            test_start = val_end + pd.Timedelta(days=1)
+        test = df[(df.index >= test_start) & (df.index <= test_end)].copy()
+    else:
+        # No validation split
+        val = df.iloc[0:0].copy()  # Empty DataFrame with same columns
+        # Test: from day after train_end to test_end
+        if test_start is None:
+            test_start = train_end + pd.Timedelta(days=1)
+        test = df[(df.index >= test_start) & (df.index <= test_end)].copy()
+    
+    if verbose:
+        print(f"\n{'='*70}")
+        print("Train/Validation/Test Split (Date-Based)")
+        print(f"{'='*70}")
+        if len(train) > 0:
+            print(f"Train: {train.index[0].date()} to {train.index[-1].date()} ({len(train):,} obs)")
+        else:
+            print(f"Train: EMPTY")
+        if len(val) > 0:
+            print(f"Val:   {val.index[0].date()} to {val.index[-1].date()} ({len(val):,} obs)")
+        else:
+            print(f"Val:   EMPTY (no validation split)")
+        if len(test) > 0:
+            print(f"Test:  {test.index[0].date()} to {test.index[-1].date()} ({len(test):,} obs)")
+        else:
+            print(f"Test:  EMPTY")
     
     return train, val, test
 
@@ -261,6 +275,9 @@ def add_staleness_features(df, use_vintage=False, verbose=True):
         feature_values = df[source_col]
         
         # Detect updates: value changed from previous day
+        # updates = (feature_values != feature_values.shift(1))
+        # updates = (feature_values.diff().abs() > 1e-6)  # Only count changes > threshold
+
         # For CPI/inflation, changes should be substantial (at least 0.01%)
         updates = (feature_values.diff().abs() > 0.01)
 
@@ -304,38 +321,13 @@ def add_staleness_features(df, use_vintage=False, verbose=True):
     return df
 
 
-def get_constituent_target_columns(df):
-    """
-    Extract constituent return columns from a DataFrame.
-    
-    Parameters:
-    -----------
-    df : pd.DataFrame
-        Dataset that may contain constituent return columns
-        
-    Returns:
-    --------
-    list
-        Column names ending with '_Returns' (excluding SP500_Returns)
-    """
-    return [col for col in df.columns 
-            if col.endswith('_Returns') and col != 'SP500_Returns']
-
 
 if __name__ == "__main__":
     print("Testing feature set loading...\n")
     
     # Test each config
     for config_name in FEATURE_SETS.keys():
-        try:
-            # Skip multitask if constituents not available
-            if 'multitask' in config_name:
-                print(f"\n{config_name}: Skipping (requires constituent data)")
-                continue
-                
-            data = load_feature_set(config_name, frequency='daily', version='vintage', verbose=False)
-            train, val, test = create_train_val_test_split(data, verbose=False)
-            print(f"\n{config_name}: {len(data)} total samples "
-                  f"(train={len(train)}, val={len(val)}, test={len(test)})")
-        except Exception as e:
-            print(f"\n{config_name}: Error - {e}")
+        data = load_feature_set(config_name, frequency='monthly')
+        train, val, test = create_train_val_test_split(data, verbose=False)
+        print(f"\n{config_name}: {len(data)} total samples "
+              f"(train={len(train)}, val={len(val)}, test={len(test)})")

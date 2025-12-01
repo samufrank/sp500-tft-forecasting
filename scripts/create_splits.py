@@ -5,9 +5,13 @@ This script ensures all experiments use identical data splits.
 Run once after data preprocessing is complete.
 
 Usage:
+    # Percentage-based split (default)
     python create_splits.py --feature-set core_proposal --frequency daily
     python create_splits.py --feature-set macro_heavy --frequency monthly
-    python create_splits.py --feature-set multitask_core --frequency daily --data-version vintage
+    
+    # Date-based split (for rolling/walk-forward evaluation)
+    python create_splits.py --feature-set core_proposal --frequency daily \\
+        --train-end 2015-12-31 --val-end 2017-12-31 --test-end 2019-12-31
 """
 
 import os
@@ -15,24 +19,19 @@ import json
 import argparse
 import pandas as pd
 from datetime import datetime
-from src.data_utils import load_feature_set, create_train_val_test_split, get_constituent_target_columns
-from src.feature_configs import FEATURE_SETS, get_all_targets
+from src.data_utils import load_feature_set, create_train_val_test_split, create_split_by_dates
 
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         description='Create train/val/test splits for financial forecasting experiments'
     )
-    
-    # Dynamically get available feature sets
-    available_sets = list(FEATURE_SETS.keys())
-    
     parser.add_argument(
         '--feature-set',
         type=str,
         default='core_proposal',
-        choices=available_sets,
-        help=f'Feature set configuration from feature_configs.py. Available: {available_sets}'
+        choices=['core_proposal', 'core_plus_credit', 'macro_heavy', 'market_only', 'kitchen_sink', 'core_dynamics'],
+        help='Feature set configuration from feature_configs.py'
     )
     parser.add_argument(
         '--frequency',
@@ -42,21 +41,57 @@ def parse_args():
         help='Data frequency'
     )
     parser.add_argument(
+        '--enhanced',
+        action='store_true',
+        help='Use enhanced dataset with technical features'
+    )
+    parser.add_argument(
         '--train-pct',
         type=float,
         default=0.7,
-        help='Training set proportion (default: 0.7)'
+        help='Training set proportion (default: 0.7). Ignored if date boundaries are specified.'
     )
     parser.add_argument(
         '--val-pct',
         type=float,
         default=0.15,
-        help='Validation set proportion (default: 0.15)'
+        help='Validation set proportion (default: 0.15). Ignored if date boundaries are specified.'
+    )
+    # Date boundary arguments for rolling/walk-forward evaluation
+    parser.add_argument(
+        '--train-start',
+        type=str,
+        default=None,
+        help='Training start date (YYYY-MM-DD). If not specified, uses start of data.'
+    )
+    parser.add_argument(
+        '--train-end',
+        type=str,
+        default=None,
+        help='Training end date (YYYY-MM-DD). Enables date-based splitting.'
+    )
+    parser.add_argument(
+        '--val-end',
+        type=str,
+        default=None,
+        help='Validation end date (YYYY-MM-DD). If not specified, no validation split.'
+    )
+    parser.add_argument(
+        '--test-start',
+        type=str,
+        default=None,
+        help='Test start date (YYYY-MM-DD). If not specified, starts after val-end or train-end.'
+    )
+    parser.add_argument(
+        '--test-end',
+        type=str,
+        default=None,
+        help='Test end date (YYYY-MM-DD). If not specified, uses end of data.'
     )
     parser.add_argument(
         '--data-path',
         type=str,
-        default='data',
+        default='.',
         help='Path to data directory'
     )
     parser.add_argument(
@@ -79,12 +114,11 @@ def parse_args():
     parser.add_argument(
         '--data-version',
         type=str,
-        default='vintage',
+        default='fixed',
         choices=['fixed', 'vintage'],
         help='Data version to use: fixed (fixed-shift alignment) or vintage (ALFRED alignment)'
     )
     return parser.parse_args()
-
 
 def main():
     args = parse_args()
@@ -92,52 +126,68 @@ def main():
     print("="*70)
     print("Creating Data Splits")
     print("="*70)
-    
-    # Check if this is a multitask feature set
-    config = FEATURE_SETS[args.feature_set]
-    is_multitask = config.get('include_constituents', False)
-    
-    if is_multitask:
-        print(f"\n*** MULTI-TASK MODE ***")
-        print(f"Feature set '{args.feature_set}' includes constituent returns")
-        constituent_count = config.get('constituent_count', 50)
-        print(f"Constituent count: {constituent_count}")
+    args = parse_args()
     
     # Create output directory
     os.makedirs(args.output_dir, exist_ok=True)
     
-    # Load feature set (handles constituent joining internally)
+    # Load feature set
     print(f"\nLoading feature set: {args.feature_set}")
     print(f"Frequency: {args.frequency}")
     print(f"Data version: {args.data_version}")
-    
+    print(f"Enhanced: {args.enhanced}")
     df = load_feature_set(
         config_name=args.feature_set,
         frequency=args.frequency,
         version=args.data_version,
-        data_path=args.data_path,
+        enhanced=args.enhanced,
+        #data_path=args.data_path,
         verbose=True
     )
     
-    # Create temporal splits
-    print(f"\nCreating temporal splits (train={args.train_pct}, val={args.val_pct})...")
-    train, val, test = create_train_val_test_split(
-        df, 
-        train_pct=args.train_pct, 
-        val_pct=args.val_pct,
-        verbose=True
-    )
+    # Create temporal splits - use date-based if dates provided, else percentage-based
+    use_date_split = args.train_end is not None
+    
+    if use_date_split:
+        print(f"\nCreating date-based splits...")
+        print(f"  Train: {args.train_start or 'start'} to {args.train_end}")
+        print(f"  Val:   {args.train_end} to {args.val_end or 'none'}")
+        print(f"  Test:  {args.test_start or 'auto'} to {args.test_end or 'end'}")
+        
+        train, val, test = create_split_by_dates(
+            df,
+            train_start=args.train_start,
+            train_end=args.train_end,
+            val_end=args.val_end,
+            test_start=args.test_start,
+            test_end=args.test_end,
+            verbose=True
+        )
+    else:
+        print(f"\nCreating percentage-based splits (train={args.train_pct}, val={args.val_pct})...")
+        train, val, test = create_train_val_test_split(
+            df, 
+            train_pct=args.train_pct, 
+            val_pct=args.val_pct,
+            verbose=True
+        )
     
     # Save splits with data version in filename and subdirectory
+    # Create subdirectory for data version (unless already specified in output-dir)
     if args.output_dir.endswith(args.data_version):
+        # User already specified version in path (e.g., data/splits/vintage)
         version_output_dir = args.output_dir
     else:
+        # Add version subdirectory (e.g., data/splits -> data/splits/vintage)
         version_output_dir = os.path.join(args.output_dir, args.data_version)
     
     os.makedirs(version_output_dir, exist_ok=True)
     
     split_prefix = f"{args.feature_set}_{args.frequency}_{args.data_version}"
+    if args.enhanced:
+        split_prefix = f"{split_prefix}_enhanced"
     if args.version:
+        # Optional additional version suffix (e.g., "v2" for experiments)
         split_prefix = f"{split_prefix}_{args.version}"
     if args.timestamp:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -156,69 +206,61 @@ def main():
     print(f"  Val: {val_path}")
     print(f"  Test: {test_path}")
     
-    # Identify target columns
-    targets = get_all_targets(args.feature_set)
-    constituent_targets = get_constituent_target_columns(df)
-    input_features = [col for col in df.columns if col not in targets['all']]
-    
     # Create metadata
     metadata = {
         'created_at': datetime.now().isoformat(),
         'feature_set': args.feature_set,
         'frequency': args.frequency,
         'data_version': args.data_version,
-        'train_pct': args.train_pct,
-        'val_pct': args.val_pct,
-        'test_pct': 1 - args.train_pct - args.val_pct,
+        'enhanced': args.enhanced,
+        'split_method': 'date' if use_date_split else 'percentage',
         'train_size': len(train),
         'val_size': len(val),
         'test_size': len(test),
-        'train_dates': {
+        'features': list(df.columns),
+    }
+    
+    # Add split parameters based on method
+    if use_date_split:
+        metadata['date_boundaries'] = {
+            'train_start': args.train_start,
+            'train_end': args.train_end,
+            'val_end': args.val_end,
+            'test_start': args.test_start,
+            'test_end': args.test_end,
+        }
+    else:
+        metadata['percentages'] = {
+            'train_pct': args.train_pct,
+            'val_pct': args.val_pct,
+            'test_pct': 1 - args.train_pct - args.val_pct,
+        }
+    
+    # Add actual date ranges
+    if len(train) > 0:
+        metadata['train_dates'] = {
             'start': str(train.index[0]),
             'end': str(train.index[-1])
-        },
-        'val_dates': {
+        }
+    if len(val) > 0:
+        metadata['val_dates'] = {
             'start': str(val.index[0]),
             'end': str(val.index[-1])
-        },
-        'test_dates': {
+        }
+    if len(test) > 0:
+        metadata['test_dates'] = {
             'start': str(test.index[0]),
             'end': str(test.index[-1])
-        },
-        'columns': {
-            'all': list(df.columns),
-            'input_features': input_features,
-            'primary_target': targets['primary'],
-            'auxiliary_targets': constituent_targets,
-        },
-        'multitask': {
-            'enabled': is_multitask,
-            'constituent_count': config.get('constituent_count', 0) if is_multitask else 0,
-            'actual_constituents': len(constituent_targets),
-        },
-    }
+        }
     
     metadata_path = os.path.join(version_output_dir, f"{split_prefix}_metadata.json")
     with open(metadata_path, 'w') as f:
         json.dump(metadata, f, indent=2)
     
     print(f"\nMetadata saved to: {metadata_path}")
-    
-    # Summary
     print("\n" + "="*70)
-    print("Split Creation Summary")
+    print("Split creation complete!")
     print("="*70)
-    print(f"Total columns: {len(df.columns)}")
-    print(f"Input features: {len(input_features)}")
-    print(f"Primary target: {targets['primary']}")
-    if is_multitask:
-        print(f"Auxiliary targets: {len(constituent_targets)} constituent returns")
-    print(f"\nSplit sizes:")
-    print(f"  Train: {len(train):,} observations")
-    print(f"  Val:   {len(val):,} observations")
-    print(f"  Test:  {len(test):,} observations")
-    print("="*70)
-
 
 if __name__ == "__main__":
     main()
