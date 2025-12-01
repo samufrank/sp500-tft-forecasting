@@ -302,7 +302,7 @@ class CollapseMonitor(Callback):
         
         # Print summary of key layers
         key_layers = ['lstm_encoder', 'lstm_decoder', 'multihead_attention', 
-                      'output_layer']
+                      'output_layer', 'classification_head']
         print("  Gradient norms:")
         for layer_name in key_layers:
             matching = [k for k in self.history['gradient_norms'].keys() 

@@ -173,6 +173,22 @@ def parse_args():
     parser.add_argument('--load-checkpoint', type=str, default=None,
                         help='Path to checkpoint to load before training (for transfer learning)')
 
+    # Classification head (diagnostic auxiliary task)
+    parser.add_argument('--classification', action='store_true',
+                        help='Enable classification head alongside regression')
+    parser.add_argument('--classification-mode', type=str, default='direction',
+                        choices=['direction', 'direction_3class', 'regime_volatility', 'regime_volatility_3class'],
+                        help='Classification target: direction=up/down, direction_3class=down/neutral/up, '
+                             'regime_volatility=low/high VIX, regime_volatility_3class=low/med/high VIX')
+    parser.add_argument('--classification-weight', type=float, default=1.0,
+                        help='Weight for classification loss (beta)')
+    parser.add_argument('--regression-weight', type=float, default=1.0,
+                        help='Weight for regression loss (alpha). Set to 0 for pure classification.')
+    parser.add_argument('--num-classes', type=int, default=2,
+                        help='Number of classification classes (2 for binary, 3 for 3-class modes)')
+    parser.add_argument('--classification-thresholds', type=float, nargs='+', default=None,
+                        help='Thresholds for multi-class classification (e.g., -0.01 0.01 for direction_3class)')
+
     return parser.parse_args()
 
 
@@ -440,7 +456,7 @@ def create_model(training_dataset, args):
         print(f"\nActive loss penalties: {', '.join(active_penalties)}")
     else:
         print("\nUsing standard QuantileLoss (no penalties)")
-    
+    """
     tft = TemporalFusionTransformer.from_dataset(
         training_dataset,
         learning_rate=args.learning_rate,
@@ -453,7 +469,41 @@ def create_model(training_dataset, args):
         log_interval=10,
         reduce_on_plateau_patience=4,
     )
-
+    """
+    # Common TFT kwargs
+    tft_kwargs = dict(
+        learning_rate=args.learning_rate,
+        hidden_size=args.hidden_size,
+        attention_head_size=args.attention_heads,
+        dropout=args.dropout,
+        hidden_continuous_size=args.hidden_continuous_size,
+        output_size=7,
+        loss=loss_fn,
+        log_interval=-1 if args.classification else 10, # disable interpretation logging for classification
+        reduce_on_plateau_patience=4,
+    )
+    
+    # Create model - use ClassificationTFT if classification enabled
+    if args.classification:
+        from src.classification_tft import ClassificationTFT
+        tft = ClassificationTFT.from_dataset(
+            training_dataset,
+            classification=True,
+            classification_mode=args.classification_mode,
+            classification_weight=args.classification_weight,
+            regression_weight=args.regression_weight,
+            num_classes=args.num_classes,
+            classification_thresholds=args.classification_thresholds,
+            **tft_kwargs
+        )
+        print(f"\n[CLASSIFICATION] Enabled: mode={args.classification_mode}, "
+              f"classes={args.num_classes}, weights=(reg={args.regression_weight}, clf={args.classification_weight})")
+    else:
+        tft = TemporalFusionTransformer.from_dataset(
+            training_dataset,
+            **tft_kwargs
+        )
+    
     # REGIME CONDITIONED O/P
     if args.regime_output:
         # Validate 3-regime configuration
@@ -682,6 +732,14 @@ def save_config(args, features, output_dir):
         'transfer_learning': {
             'freeze_backbone': getattr(args, 'freeze_backbone', False),
             'load_checkpoint': getattr(args, 'load_checkpoint', None),
+        },
+        'classification': {
+            'enabled': getattr(args, 'classification', False),
+            'mode': getattr(args, 'classification_mode', 'direction'),
+            'weight': getattr(args, 'classification_weight', 1.0),
+            'regression_weight': getattr(args, 'regression_weight', 1.0),
+            'num_classes': getattr(args, 'num_classes', 2),
+            'thresholds': getattr(args, 'classification_thresholds', None),
         },
         'features': features,
         'pytorch_version': torch.__version__,

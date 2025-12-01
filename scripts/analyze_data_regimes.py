@@ -13,6 +13,8 @@ Usage:
     python analyze_data_regimes.py --splits test --no-figures  # Quick stats only
     python analyze_data_regimes.py --mark-events fed  # Mark Fed policy changes
     python analyze_data_regimes.py --mark-events all  # Mark all significant events
+    python analyze_data_regimes.py --combined-plot   # Generate single combined timeline
+    python analyze_data_regimes.py --paper-format    # IEEE paper optimized output
 """
 
 import argparse
@@ -67,6 +69,13 @@ MARKET_EVENTS = {
         ('2020-11-09', 'Vaccine announcement', 'green'),
         ('2022-01-01', 'Fed pivot expectations', 'purple'),
         ('2024-11-05', 'Trump election', 'purple'),
+    ],
+    # Curated subset for IEEE paper - major events only, well-spaced
+    'paper': [
+        ('2000-03-10', 'Dot-com Peak', 'red'),
+        ('2008-09-15', 'Lehman', 'red'),
+        ('2020-03-23', 'COVID', 'red'),
+        ('2022-03-16', 'Fed Hikes', 'blue'),
     ]
 }
 
@@ -75,8 +84,9 @@ def get_events_for_marking(event_type: str) -> List[Tuple[str, str, str]]:
     """Get list of events to mark based on user selection."""
     if event_type == 'all':
         events = []
-        for event_list in MARKET_EVENTS.values():
-            events.extend(event_list)
+        for key, event_list in MARKET_EVENTS.items():
+            if key != 'paper':  # Don't include paper subset in 'all'
+                events.extend(event_list)
         return events
     elif event_type in MARKET_EVENTS:
         return MARKET_EVENTS[event_type]
@@ -160,11 +170,9 @@ def analyze_rolling_windows(returns: np.ndarray, window: int = 30) -> Dict[str, 
 
 def analyze_directional_streaks(returns: np.ndarray) -> Dict[str, float]:
     """Analyze streaks of consecutive positive or negative returns."""
-    # Find streaks of same sign
     signs = np.sign(returns)
-    signs[signs == 0] = 1  # Treat zero as positive
+    signs[signs == 0] = 1
     
-    # Find streak lengths
     streak_lengths = []
     current_streak = 1
     
@@ -174,11 +182,10 @@ def analyze_directional_streaks(returns: np.ndarray) -> Dict[str, float]:
         else:
             streak_lengths.append(current_streak)
             current_streak = 1
-    streak_lengths.append(current_streak)  # Add final streak
+    streak_lengths.append(current_streak)
     
     streak_lengths = np.array(streak_lengths)
     
-    # Analyze rolling window directional behavior (like collapse detection)
     window = 30
     rolling_pct_positive = []
     
@@ -194,7 +201,6 @@ def analyze_directional_streaks(returns: np.ndarray) -> Dict[str, float]:
     rolling_pct_positive = np.array(rolling_pct_positive)
     valid_pct = rolling_pct_positive[~np.isnan(rolling_pct_positive)]
     
-    # Count extreme windows (>90% or <10% one direction)
     highly_positive_windows = np.sum(valid_pct > 0.9)
     highly_negative_windows = np.sum(valid_pct < 0.1)
     
@@ -212,33 +218,23 @@ def analyze_directional_streaks(returns: np.ndarray) -> Dict[str, float]:
 
 
 def analyze_naive_baselines(returns: np.ndarray) -> Dict[str, float]:
-    """
-    Analyze naive baseline prediction strategies to provide performance context.
-    These represent the minimum performance a model should exceed.
-    """
-    # Strategy 1: Always predict positive (equity premium)
+    """Analyze naive baseline prediction strategies."""
     always_positive = np.ones_like(returns)
     dir_acc_positive = np.mean((returns > 0) == (always_positive > 0))
     
-    # Strategy 2: Always predict zero (no change)
     always_zero = np.zeros_like(returns)
     dir_acc_zero = np.mean((returns > 0) == (always_zero > 0))
     
-    # Strategy 3: Predict historical mean
     mean_pred = np.full_like(returns, np.mean(returns))
     dir_acc_mean = np.mean((returns > 0) == (mean_pred > 0))
     
-    # Strategy 4: Momentum (yesterday's return)
     momentum_pred = np.concatenate([[0], returns[:-1]])
     dir_acc_momentum = np.mean((returns[1:] > 0) == (momentum_pred[1:] > 0))
     
-    # Strategy 5: Mean reversion (negative of yesterday)
     reversion_pred = -momentum_pred
     dir_acc_reversion = np.mean((returns[1:] > 0) == (reversion_pred[1:] > 0))
     
-    # Compute rolling correlations for structural collapse detection context
     window = 30
-    # Random walk has ~0 correlation
     random_pred = np.random.randn(len(returns)) * np.std(returns)
     
     rolling_corr_random = []
@@ -269,9 +265,8 @@ def analyze_naive_baselines(returns: np.ndarray) -> Dict[str, float]:
     }
 
 
-
 def detect_regimes_vix(df: pd.DataFrame, low_thresh: float = 15, high_thresh: float = 25) -> np.ndarray:
-    """Classify regimes based on VIX levels: low/medium/high volatility."""
+    """Classify regimes based on VIX levels."""
     if 'VIX' not in df.columns:
         return np.array(['unknown'] * len(df))
     
@@ -285,12 +280,11 @@ def detect_regimes_vix(df: pd.DataFrame, low_thresh: float = 15, high_thresh: fl
 
 
 def print_statistics_table(stats_dict: Dict[str, Dict[str, float]]) -> None:
-    """Print formatted statistics table to console."""
+    """Print formatted statistics table."""
     print("\n" + "="*80)
     print("SPLIT STATISTICS SUMMARY")
     print("="*80)
     
-    # Header
     splits = list(stats_dict.keys())
     print(f"{'Metric':<20}", end='')
     for split in splits:
@@ -298,7 +292,6 @@ def print_statistics_table(stats_dict: Dict[str, Dict[str, float]]) -> None:
     print()
     print("-"*80)
     
-    # Metrics
     metrics = [
         ('count', 'Count', '14.0f'),
         ('mean', 'Mean', '14.6f'),
@@ -315,38 +308,10 @@ def print_statistics_table(stats_dict: Dict[str, Dict[str, float]]) -> None:
     for key, label, fmt in metrics:
         print(f"{label:<20}", end='')
         for split in splits:
-            print(f"{stats_dict[split][key]:>{fmt}}  ", end='')  # Added 2 spaces between columns
+            print(f"{stats_dict[split][key]:>{fmt}}  ", end='')
         print()
     
     print("="*80 + "\n")
-
-
-def print_markdown_table(stats_dict: Dict[str, Dict[str, float]]) -> str:
-    """Generate markdown-formatted table for reports."""
-    splits = list(stats_dict.keys())
-    
-    lines = []
-    lines.append("| Metric | " + " | ".join(s.capitalize() for s in splits) + " |")
-    lines.append("|--------|" + "|".join(["--------:"] * len(splits)) + "|")
-    
-    metrics = [
-        ('count', 'Count', '.0f'),
-        ('mean', 'Mean', '.6f'),
-        ('std', 'Std Dev', '.6f'),
-        ('min', 'Min', '.6f'),
-        ('max', 'Max', '.6f'),
-        ('p05', '5th percentile', '.6f'),
-        ('p50', 'Median', '.6f'),
-        ('p95', '95th percentile', '.6f'),
-        ('skewness', 'Skewness', '.4f'),
-        ('kurtosis', 'Kurtosis', '.4f'),
-    ]
-    
-    for key, label, fmt in metrics:
-        values = [f"{stats_dict[split][key]:{fmt}}" for split in splits]
-        lines.append(f"| {label} | " + " | ".join(values) + " |")
-    
-    return "\n".join(lines)
 
 
 def print_rolling_window_table(window_stats_dict: Dict[str, Dict[str, float]]) -> None:
@@ -452,18 +417,41 @@ def print_baseline_performance_table(baseline_stats_dict: Dict[str, Dict[str, fl
     print("="*80 + "\n")
     print("Note: Directional accuracy (%) shows sign prediction accuracy.")
     print("      Models should exceed these baselines to be useful.")
-    print("      Random walk correlation provides context for collapse detection.")
     print()
 
 
+def print_markdown_table(stats_dict: Dict[str, Dict[str, float]]) -> str:
+    """Generate markdown-formatted table."""
+    splits = list(stats_dict.keys())
+    
+    lines = []
+    lines.append("| Metric | " + " | ".join(s.capitalize() for s in splits) + " |")
+    lines.append("|--------|" + "|".join(["--------:"] * len(splits)) + "|")
+    
+    metrics = [
+        ('count', 'Count', '.0f'),
+        ('mean', 'Mean', '.6f'),
+        ('std', 'Std Dev', '.6f'),
+        ('min', 'Min', '.6f'),
+        ('max', 'Max', '.6f'),
+        ('p05', '5th percentile', '.6f'),
+        ('p50', 'Median', '.6f'),
+        ('p95', '95th percentile', '.6f'),
+        ('skewness', 'Skewness', '.4f'),
+        ('kurtosis', 'Kurtosis', '.4f'),
+    ]
+    
+    for key, label, fmt in metrics:
+        values = [f"{stats_dict[split][key]:{fmt}}" for split in splits]
+        lines.append(f"| {label} | " + " | ".join(values) + " |")
+    
+    return "\n".join(lines)
 
-def plot_distribution_comparison(
-    data_dict: Dict[str, np.ndarray], output_path: Path
-) -> None:
-    """Create overlaid histogram and Q-Q plots for split comparison."""
+
+def plot_distribution_comparison(data_dict: Dict[str, np.ndarray], output_path: Path) -> None:
+    """Create overlaid histogram and Q-Q plots."""
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     
-    # Overlaid histograms
     ax = axes[0, 0]
     colors = {'train': 'blue', 'val': 'green', 'test': 'red'}
     for split, returns in data_dict.items():
@@ -475,9 +463,8 @@ def plot_distribution_comparison(
     ax.legend()
     ax.grid(True, alpha=0.3)
     
-    # Q-Q plots
     for idx, (split, returns) in enumerate(data_dict.items()):
-        if idx >= 3:  # Only plot first 3 splits
+        if idx >= 3:
             break
         row = (idx + 1) // 2
         col = (idx + 1) % 2
@@ -497,17 +484,15 @@ def plot_rolling_volatility(
     df: pd.DataFrame, split_name: str, window: int, output_path: Path,
     mark_events: List[Tuple[str, str, str]] = None
 ) -> None:
-    """Plot rolling volatility with regime coloring and optional event markers."""
+    """Plot rolling volatility with regime coloring."""
     returns = df['SP500_Returns'].values
     dates = df['Date'].values
     _, rolling_std = compute_rolling_statistics(returns, window)
     
-    # Detect regimes
     regimes = detect_regimes_vix(df)
     
     fig, axes = plt.subplots(2, 1, figsize=(14, 8), sharex=True)
     
-    # Returns plot
     ax = axes[0]
     regime_colors = {'low_vol': 'green', 'medium_vol': 'yellow', 'high_vol': 'red'}
     
@@ -516,7 +501,6 @@ def plot_rolling_volatility(
         ax.scatter(dates[mask], returns[mask], c=regime_colors[regime], 
                   alpha=0.6, s=10, label=regime.replace('_', ' ').title())
     
-    # Mark events if requested
     if mark_events:
         date_range = (pd.Timestamp(dates[0]), pd.Timestamp(dates[-1]))
         for event_date_str, event_label, event_color in mark_events:
@@ -524,7 +508,6 @@ def plot_rolling_volatility(
             if date_range[0] <= event_date <= date_range[1]:
                 ax.axvline(x=event_date, color=event_color, linestyle='--', 
                           linewidth=1.5, alpha=0.8)
-                # Add text label at top with better formatting
                 y_pos = ax.get_ylim()[1] * 0.85
                 ax.text(event_date, y_pos, event_label, 
                        rotation=90, verticalalignment='top', horizontalalignment='right',
@@ -532,15 +515,13 @@ def plot_rolling_volatility(
     
     ax.set_ylabel('Daily Returns')
     ax.set_title(f'{split_name.capitalize()} Split: Returns Colored by VIX Regime')
-    ax.legend(loc='upper left', framealpha=0.9)  # Changed from upper right to avoid overlap
+    ax.legend(loc='upper left', framealpha=0.9)
     ax.grid(True, alpha=0.3)
     ax.axhline(y=0, color='black', linestyle='--', linewidth=0.5)
     
-    # Rolling volatility plot
     ax = axes[1]
     ax.plot(dates, rolling_std, color='darkblue', linewidth=1.5)
     
-    # Mark events on volatility plot too
     if mark_events:
         for event_date_str, event_label, event_color in mark_events:
             event_date = pd.Timestamp(event_date_str)
@@ -556,6 +537,118 @@ def plot_rolling_volatility(
     plt.tight_layout()
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     print(f"Saved rolling volatility plot: {output_path}")
+    plt.close()
+
+
+def plot_combined_timeline(
+    df_dict: Dict[str, pd.DataFrame], 
+    window: int, 
+    output_path: Path,
+    mark_events: List[Tuple[str, str, str]] = None,
+    figsize: Tuple[float, float] = (10, 5)
+) -> None:
+    """
+    Plot all splits concatenated in a single timeline.
+    Optimized for IEEE double-column paper format.
+    """
+    # Concatenate all splits in order
+    all_dfs = []
+    split_boundaries = []
+    
+    for split in ['train', 'val', 'test']:
+        if split in df_dict:
+            df = df_dict[split].copy()
+            all_dfs.append(df)
+            split_boundaries.append({
+                'name': split,
+                'start_date': df['Date'].iloc[0],
+                'end_date': df['Date'].iloc[-1]
+            })
+    
+    combined_df = pd.concat(all_dfs, ignore_index=True)
+    
+    returns = combined_df['SP500_Returns'].values
+    dates = combined_df['Date'].values
+    _, rolling_std = compute_rolling_statistics(returns, window)
+    
+    regimes = detect_regimes_vix(combined_df)
+    
+    fig, axes = plt.subplots(2, 1, figsize=figsize, sharex=True)
+    
+    # Returns plot
+    ax = axes[0]
+    regime_colors = {'low_vol': '#2ecc71', 'medium_vol': '#f1c40f', 'high_vol': '#e74c3c'}
+    
+    for regime in ['low_vol', 'medium_vol', 'high_vol']:
+        mask = regimes == regime
+        ax.scatter(dates[mask], returns[mask], c=regime_colors[regime], 
+                  alpha=0.5, s=5, label=regime.replace('_', ' ').title(), rasterized=True)
+    
+    # Mark split boundaries
+    split_colors = {'train': 'blue', 'val': 'orange', 'test': 'green'}
+    for i, boundary in enumerate(split_boundaries):
+        if i < len(split_boundaries) - 1:
+            next_start = split_boundaries[i + 1]['start_date']
+        else:
+            next_start = pd.Timestamp(dates[-1])
+        
+        ax.axvspan(boundary['start_date'], next_start, 
+                   alpha=0.08, color=split_colors[boundary['name']])
+        
+        # Add split label at bottom of upper plot
+        mid_date = boundary['start_date'] + (pd.Timestamp(next_start) - pd.Timestamp(boundary['start_date'])) / 2
+        ax.text(mid_date, -11, boundary['name'].upper(), 
+                ha='center', va='top', fontsize=14, fontweight='bold',
+                color=split_colors[boundary['name']], alpha=0.9)
+    
+    # Mark events
+    if mark_events:
+        date_range = (pd.Timestamp(dates[0]), pd.Timestamp(dates[-1]))
+        for event_date_str, event_label, event_color in mark_events:
+            event_date = pd.Timestamp(event_date_str)
+            if date_range[0] <= event_date <= date_range[1]:
+                ax.axvline(x=event_date, color=event_color, linestyle='--', 
+                          linewidth=1.2, alpha=0.8)
+                ax.text(event_date, 10, event_label, 
+                       rotation=90, verticalalignment='top', horizontalalignment='right',
+                       fontsize=14, alpha=0.9, color=event_color, fontweight='bold')
+    
+    ax.set_ylabel('Daily Returns (%)', fontsize=14)
+    ax.set_title('S&P 500 Returns by VIX Regime (1991-2025)', fontsize=14, fontweight='bold')
+    ax.legend(loc='upper left', framealpha=0.9, fontsize=14, markerscale=2)
+    ax.grid(True, alpha=0.3, linewidth=0.5)
+    ax.axhline(y=0, color='black', linestyle='-', linewidth=0.3)
+    ax.set_ylim(-13, 13)
+    ax.tick_params(axis='both', labelsize=16)
+    
+    # Rolling volatility plot
+    ax = axes[1]
+    ax.plot(dates, rolling_std, color='darkblue', linewidth=1.0)
+    ax.fill_between(dates, 0, rolling_std, alpha=0.3, color='darkblue')
+    
+    if mark_events:
+        for event_date_str, event_label, event_color in mark_events:
+            event_date = pd.Timestamp(event_date_str)
+            if date_range[0] <= event_date <= date_range[1]:
+                ax.axvline(x=event_date, color=event_color, linestyle='--', 
+                          linewidth=1.2, alpha=0.8)
+    
+    for i, boundary in enumerate(split_boundaries):
+        if i < len(split_boundaries) - 1:
+            next_start = split_boundaries[i + 1]['start_date']
+        else:
+            next_start = pd.Timestamp(dates[-1])
+        ax.axvspan(boundary['start_date'], next_start, 
+                   alpha=0.08, color=split_colors[boundary['name']])
+    
+    ax.set_xlabel('Date', fontsize=16)
+    ax.set_ylabel(f'{window}-Day Rolling Std', fontsize=16)
+    ax.grid(True, alpha=0.3, linewidth=0.5)
+    ax.tick_params(axis='both', labelsize=16)
+    
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    print(f"Saved combined timeline plot: {output_path}")
     plt.close()
 
 
@@ -582,7 +675,6 @@ def plot_regime_statistics(data_dict: Dict[str, pd.DataFrame], output_path: Path
     
     regime_df = pd.DataFrame(regime_stats)
     
-    # Mean by regime
     ax = axes[0]
     for split in regime_df['split'].unique():
         split_data = regime_df[regime_df['split'] == split]
@@ -593,7 +685,6 @@ def plot_regime_statistics(data_dict: Dict[str, pd.DataFrame], output_path: Path
     ax.legend()
     ax.grid(True, alpha=0.3)
     
-    # Std by regime
     ax = axes[1]
     for split in regime_df['split'].unique():
         split_data = regime_df[regime_df['split'] == split]
@@ -614,42 +705,18 @@ def main():
     parser = argparse.ArgumentParser(
         description='Analyze regime characteristics in financial returns data'
     )
-    parser.add_argument(
-        '--data_dir',
-        type=str,
-        default='data/splits/vintage',
-        help='Directory containing split CSV files'
-    )
-    parser.add_argument(
-        '--output_dir',
-        type=str,
-        default='results/regime_analysis',
-        help='Directory for output figures and tables'
-    )
-    parser.add_argument(
-        '--splits',
-        nargs='+',
-        default=['train', 'val', 'test'],
-        help='Splits to analyze (default: train val test)'
-    )
-    parser.add_argument(
-        '--window',
-        type=int,
-        default=30,
-        help='Window size for rolling statistics (default: 30)'
-    )
-    parser.add_argument(
-        '--no-figures',
-        action='store_true',
-        help='Skip figure generation, only print statistics'
-    )
-    parser.add_argument(
-        '--mark-events',
-        type=str,
-        choices=['fed', 'crises', 'regime_shifts', 'all'],
-        default=None,
-        help='Mark significant market events on plots (fed=monetary policy, crises=market shocks, regime_shifts=structural changes, all=everything)'
-    )
+    parser.add_argument('--data_dir', type=str, default='data/splits/vintage')
+    parser.add_argument('--output_dir', type=str, default='results/regime_analysis')
+    parser.add_argument('--splits', nargs='+', default=['train', 'val', 'test'])
+    parser.add_argument('--window', type=int, default=30)
+    parser.add_argument('--no-figures', action='store_true')
+    parser.add_argument('--mark-events', type=str, 
+                        choices=['fed', 'crises', 'regime_shifts', 'all', 'paper'],
+                        default=None)
+    parser.add_argument('--combined-plot', action='store_true',
+                        help='Generate single combined timeline of all splits')
+    parser.add_argument('--paper-format', action='store_true',
+                        help='Use IEEE paper formatting (smaller, curated events)')
     
     args = parser.parse_args()
     
@@ -659,13 +726,15 @@ def main():
     if not args.no_figures:
         output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Get events to mark if requested
     events_to_mark = None
     if args.mark_events:
         events_to_mark = get_events_for_marking(args.mark_events)
         print(f"\nMarking {len(events_to_mark)} events of type: {args.mark_events}")
     
-    # Load data
+    if args.paper_format and not args.mark_events:
+        events_to_mark = get_events_for_marking('paper')
+        print(f"\nUsing paper-optimized events ({len(events_to_mark)} events)")
+    
     print(f"\nLoading data from {data_dir}...")
     data_dict = {}
     df_dict = {}
@@ -684,7 +753,6 @@ def main():
         print("Error: No valid splits found.")
         sys.exit(1)
     
-    # Compute statistics
     print("\nComputing statistics...")
     stats_dict = {}
     window_stats_dict = {}
@@ -697,13 +765,11 @@ def main():
         streak_stats_dict[split] = analyze_directional_streaks(returns)
         baseline_stats_dict[split] = analyze_naive_baselines(returns)
     
-    # Print results
     print_rolling_window_table(window_stats_dict)
     print_directional_streak_table(streak_stats_dict)
     print_baseline_performance_table(baseline_stats_dict)
     print_statistics_table(stats_dict)
     
-    # Save markdown table
     if not args.no_figures:
         md_table = print_markdown_table(stats_dict)
         md_path = output_dir / 'statistics_table.md'
@@ -713,35 +779,33 @@ def main():
             f.write("\n")
         print(f"Saved markdown table: {md_path}")
         
-        # Save JSON
         json_path = output_dir / 'statistics.json'
         with open(json_path, 'w') as f:
             json.dump(stats_dict, f, indent=2)
         print(f"Saved statistics JSON: {json_path}")
     
-    # Generate figures
     if not args.no_figures:
         print("\nGenerating figures...")
         
-        # Distribution comparison
-        plot_distribution_comparison(
-            data_dict,
-            output_dir / 'distribution_comparison.png'
-        )
+        plot_distribution_comparison(data_dict, output_dir / 'distribution_comparison.png')
         
-        # Rolling volatility for each split
-        for split, df in df_dict.items():
-            plot_rolling_volatility(
-                df, split, args.window,
-                output_dir / f'rolling_volatility_{split}.png',
-                mark_events=events_to_mark
+        if args.combined_plot or args.paper_format:
+            figsize = (7, 3.5) if args.paper_format else (14, 6)
+            plot_combined_timeline(
+                df_dict, args.window,
+                output_dir / 'combined_timeline.png',
+                mark_events=events_to_mark,
+                figsize=figsize
             )
+        else:
+            for split, df in df_dict.items():
+                plot_rolling_volatility(
+                    df, split, args.window,
+                    output_dir / f'rolling_volatility_{split}.png',
+                    mark_events=events_to_mark
+                )
         
-        # Regime statistics
-        plot_regime_statistics(
-            df_dict,
-            output_dir / 'regime_statistics.png'
-        )
+        plot_regime_statistics(df_dict, output_dir / 'regime_statistics.png')
     
     print("\nAnalysis complete!")
 

@@ -18,6 +18,10 @@ Usage:
     
     # Comprehensive summary
     python scripts/plot_monitoring_data.py --phase 02b_vintage_sweep --comprehensive
+    
+    # Paper-quality gradient overlay plot
+    python scripts/plot_monitoring_data.py experiment_name --gradient-overlay
+    python scripts/plot_monitoring_data.py experiment_name --gradient-overlay --paper-format
 """
 
 import json
@@ -34,13 +38,12 @@ plt.rcParams['font.size'] = 10
 
 def load_monitoring_log(experiment_name):
     """Load collapse monitoring data."""
-    # Try direct path first
     log_path = Path(f'experiments/{experiment_name}/collapse_monitoring/collapse_monitor_latest.json')
     
     if not log_path.exists():
-        # Try searching in phase directories (00_, 01_, etc.)
         phase_dirs = ['00_baseline_exploration', '01_staleness_features', 
-                      '01_staleness_features_fixed', '02_custom_tft']
+                      '01_staleness_features_fixed', '02_custom_tft',
+                      '02_vintage_baseline', '02b_vintage_sweep']
         for phase in phase_dirs:
             alt_path = Path(f'experiments/{phase}/{experiment_name}/collapse_monitoring/collapse_monitor_latest.json')
             if alt_path.exists():
@@ -70,22 +73,17 @@ def plot_prediction_diversity(experiments, output_path='prediction_diversity.png
         pred_std = data['prediction_std']
         pred_range = data['prediction_range']
         
-        # Determine if collapsed
         collapsed = pred_std[-1] < 0.05
         linestyle = '--' if collapsed else '-'
         marker = 'x' if collapsed else 'o'
         
         label = exp_name.replace('capacity_', '').replace('monitor_', '')
         
-        # Plot std
         ax1.plot(epochs, pred_std, linestyle=linestyle, marker=marker,
                 markersize=4, alpha=0.7, color=colors[idx], label=label)
-        
-        # Plot range
         ax2.plot(epochs, pred_range, linestyle=linestyle, marker=marker,
                 markersize=4, alpha=0.7, color=colors[idx], label=label)
     
-    # Formatting
     ax1.axhline(y=0.05, color='red', linestyle=':', linewidth=2, 
                label='Collapse threshold', alpha=0.7)
     ax1.set_xlabel('Epoch', fontsize=12)
@@ -111,8 +109,7 @@ def plot_prediction_diversity(experiments, output_path='prediction_diversity.png
 
 
 def plot_gradient_flow(experiments, output_path='gradient_flow.png'):
-    """Plot gradient norms over training."""
-    # Check if any experiment has attention gradients (custom models)
+    """Plot gradient norms over training (4-panel version)."""
     has_attention_gradients = False
     has_attention_entropy = False
     
@@ -125,7 +122,6 @@ def plot_gradient_flow(experiments, output_path='gradient_flow.png'):
         if 'attention_entropy' in data and any(e is not None for e in data['attention_entropy']):
             has_attention_entropy = True
     
-    # Decide layout: 2x2 (standard) or 2x3 (with both attention metrics)
     if has_attention_gradients and has_attention_entropy:
         fig, axes = plt.subplots(2, 3, figsize=(18, 10))
         layer_groups = {
@@ -157,7 +153,6 @@ def plot_gradient_flow(experiments, output_path='gradient_flow.png'):
     for idx, (group_name, layer_key) in enumerate(layer_groups.items()):
         ax = axes[idx]
         
-        # Special handling for attention entropy
         if group_name == 'Attention Entropy':
             ax.set_title('Attention Entropy', fontweight='bold')
             ax.set_xlabel('Epoch')
@@ -171,7 +166,6 @@ def plot_gradient_flow(experiments, output_path='gradient_flow.png'):
                 epochs = data['epoch']
                 entropy = data['attention_entropy']
                 
-                # Filter out None values
                 valid_data = [(e, ent) for e, ent in zip(epochs, entropy) if ent is not None]
                 if not valid_data:
                     continue
@@ -186,12 +180,8 @@ def plot_gradient_flow(experiments, output_path='gradient_flow.png'):
             
             ax.legend(fontsize=8)
             ax.grid(True, alpha=0.3)
+            ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
             
-            # Force integer epoch labels
-            if len(experiments) > 0:
-                ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
-            
-            # Add note about methodology
             if not has_attention_gradients:
                 ax.text(0.5, 0.95, '(Baseline: head-averaged)', 
                        transform=ax.transAxes, ha='center', va='top',
@@ -202,22 +192,18 @@ def plot_gradient_flow(experiments, output_path='gradient_flow.png'):
                        fontsize=8, style='italic', alpha=0.7)
         
         else:
-            # Standard gradient plotting
             for exp_name in experiments:
                 data = load_monitoring_log(exp_name)
                 if data is None:
                     continue
                 
                 epochs = data['epoch']
-                
-                # Find all gradient norms for this layer group
                 matching_layers = [k for k in data['gradient_norms'].keys() 
                                  if layer_key in k]
                 
                 if not matching_layers:
                     continue
                 
-                # Average across all params in this layer
                 avg_norms = []
                 for epoch_idx in range(len(epochs)):
                     norms = [data['gradient_norms'][layer][epoch_idx] 
@@ -228,7 +214,6 @@ def plot_gradient_flow(experiments, output_path='gradient_flow.png'):
                     else:
                         avg_norms.append(np.nan)
                 
-                # Determine if collapsed
                 collapsed = data['prediction_std'][-1] < 0.05
                 linestyle = '--' if collapsed else '-'
                 
@@ -242,17 +227,142 @@ def plot_gradient_flow(experiments, output_path='gradient_flow.png'):
             ax.legend(fontsize=8)
             ax.grid(True, alpha=0.3)
             ax.set_yscale('log')
-            
-            # Force integer epoch labels (epochs defined in loop, may not exist)
             ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
     
-    # Hide unused subplot if 2x3 layout
     if len(axes) > len(layer_groups):
         axes[-1].axis('off')
     
     plt.suptitle('Gradient Flow Analysis', fontsize=16, fontweight='bold', y=1.00)
     plt.tight_layout()
     plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    print(f"Saved: {output_path}")
+    plt.close()
+
+
+def extract_layer_gradients(data):
+    """Extract gradient norms for each layer group from monitoring data."""
+    gradient_norms = data.get('gradient_norms', {})
+    epochs = data['epoch']
+    
+    layers = {
+        'lstm_encoder': [],
+        'lstm_decoder': [],
+        'output_layer': [],
+        'attention': [],
+    }
+    
+    for epoch_idx in range(len(epochs)):
+        encoder_grads = []
+        decoder_grads = []
+        output_grads = []
+        attention_grads = []
+        
+        for key, values in gradient_norms.items():
+            if epoch_idx < len(values):
+                val = values[epoch_idx]
+                if val is not None:
+                    if 'lstm_encoder' in key:
+                        encoder_grads.append(val)
+                    elif 'lstm_decoder' in key:
+                        decoder_grads.append(val)
+                    elif 'output' in key or 'fc_out' in key:
+                        output_grads.append(val)
+                    elif 'attention' in key or 'multihead' in key:
+                        attention_grads.append(val)
+        
+        layers['lstm_encoder'].append(np.mean(encoder_grads) if encoder_grads else np.nan)
+        layers['lstm_decoder'].append(np.mean(decoder_grads) if decoder_grads else np.nan)
+        layers['output_layer'].append(np.mean(output_grads) if output_grads else np.nan)
+        layers['attention'].append(np.mean(attention_grads) if attention_grads else np.nan)
+    
+    return epochs, layers
+
+
+def plot_gradient_flow_overlay(
+    experiments, 
+    output_path='gradient_flow_overlay.png',
+    paper_format=False,
+    show_entropy=False  # Default off - cleaner
+):
+    """
+    Create overlaid gradient flow plot for publication.
+    
+    All layer gradient norms on single plot, with output layer highlighted
+    to show collapse phenomenon.
+    """
+    # Match combined timeline aesthetics
+    if paper_format:
+        figsize = (10, 4)
+    else:
+        figsize = (12, 5)
+    
+    fig, ax = plt.subplots(figsize=figsize)
+    
+    # Colors matching combined timeline style - output layer in warning red
+    colors = {
+        'lstm_encoder': '#2563eb',      # Blue
+        'lstm_decoder': '#16a34a',      # Green  
+        'output_layer': '#dc2626',      # Red (problem layer)
+        'attention': '#7c3aed',         # Purple
+    }
+    
+    labels = {
+        'lstm_encoder': 'LSTM Encoder',
+        'lstm_decoder': 'LSTM Decoder',
+        'output_layer': 'Output Layer',
+        'attention': 'Attention',
+    }
+    
+    for exp_idx, exp_name in enumerate(experiments):
+        data = load_monitoring_log(exp_name)
+        if data is None:
+            print(f"Warning: No data for {exp_name}")
+            continue
+        
+        epochs, layer_grads = extract_layer_gradients(data)
+        
+        # Plot non-output layers first (thinner, semi-transparent)
+        for layer_name in ['lstm_encoder', 'lstm_decoder', 'attention']:
+            grads = layer_grads[layer_name]
+            if all(np.isnan(grads)):
+                continue
+            
+            label = labels[layer_name] if exp_idx == 0 else None
+            ax.plot(epochs, grads, 
+                    color=colors[layer_name],
+                    linestyle='-',
+                    linewidth=2.0,
+                    alpha=0.7,
+                    zorder=5,
+                    label=label)
+        
+        # Plot output layer last (thicker, full opacity, on top)
+        output_grads = layer_grads['output_layer']
+        if not all(np.isnan(output_grads)):
+            label = labels['output_layer'] if exp_idx == 0 else None
+            ax.plot(epochs, output_grads, 
+                    color=colors['output_layer'],
+                    linestyle='-',
+                    linewidth=3.5,
+                    alpha=1.0,
+                    zorder=10,
+                    label=label)
+    
+    # Formatting to match combined timeline
+    ax.set_xlabel('Epoch', fontsize=10)
+    ax.set_ylabel('Gradient Norm', fontsize=14)
+    ax.set_yscale('log')
+    ax.tick_params(axis='both', labelsize=9)
+    ax.grid(True, alpha=0.3, linewidth=0.5)
+    ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
+    
+    ax.set_title('Gradient Flow During Training', fontsize=16, fontweight='bold')
+    
+    # Legend outside plot area on right
+    ax.legend(loc='upper right', fontsize=9, framealpha=0.95)
+    
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
     print(f"Saved: {output_path}")
     plt.close()
 
@@ -281,13 +391,10 @@ def plot_sign_distribution(experiments, output_path='sign_distribution.png'):
         ax2.plot(epochs, pct_neg, linestyle=linestyle, marker=marker,
                 markersize=4, alpha=0.7, label=label)
     
-    # Reference lines
     ax1.axhline(y=50, color='gray', linestyle=':', alpha=0.5)
-    ax1.axhline(y=95, color='red', linestyle=':', alpha=0.5, 
-               label='Collapse threshold')
+    ax1.axhline(y=95, color='red', linestyle=':', alpha=0.5, label='Collapse threshold')
     ax2.axhline(y=50, color='gray', linestyle=':', alpha=0.5)
-    ax2.axhline(y=95, color='red', linestyle=':', alpha=0.5,
-               label='Collapse threshold')
+    ax2.axhline(y=95, color='red', linestyle=':', alpha=0.5, label='Collapse threshold')
     
     ax1.set_xlabel('Epoch', fontsize=12)
     ax1.set_ylabel('% Positive Predictions', fontsize=12)
@@ -316,12 +423,12 @@ def plot_comprehensive_summary(experiments, output_path='comprehensive_summary.p
     fig = plt.figure(figsize=(18, 10))
     gs = fig.add_gridspec(2, 3, hspace=0.3, wspace=0.3)
     
-    ax1 = fig.add_subplot(gs[0, 0])  # Prediction std
-    ax2 = fig.add_subplot(gs[0, 1])  # Prediction range
-    ax3 = fig.add_subplot(gs[0, 2])  # Num unique
-    ax4 = fig.add_subplot(gs[1, 0])  # % Positive
-    ax5 = fig.add_subplot(gs[1, 1])  # % Negative  
-    ax6 = fig.add_subplot(gs[1, 2])  # Summary stats
+    ax1 = fig.add_subplot(gs[0, 0])
+    ax2 = fig.add_subplot(gs[0, 1])
+    ax3 = fig.add_subplot(gs[0, 2])
+    ax4 = fig.add_subplot(gs[1, 0])
+    ax5 = fig.add_subplot(gs[1, 1])
+    ax6 = fig.add_subplot(gs[1, 2])
     
     colors = plt.cm.viridis(np.linspace(0, 1, len(experiments)))
     
@@ -338,7 +445,6 @@ def plot_comprehensive_summary(experiments, output_path='comprehensive_summary.p
         marker = 'x' if collapsed else 'o'
         label = exp_name.replace('capacity_', '').replace('monitor_', '')[:20]
         
-        # Plot all metrics
         ax1.plot(epochs, data['prediction_std'], linestyle=linestyle, 
                 marker=marker, markersize=3, alpha=0.7, color=colors[idx], label=label)
         ax2.plot(epochs, data['prediction_range'], linestyle=linestyle,
@@ -350,7 +456,6 @@ def plot_comprehensive_summary(experiments, output_path='comprehensive_summary.p
         ax5.plot(epochs, data['pct_negative'], linestyle=linestyle,
                 marker=marker, markersize=3, alpha=0.7, color=colors[idx])
         
-        # Collect summary data
         summary_data.append({
             'experiment': label,
             'final_std': data['prediction_std'][-1],
@@ -359,7 +464,6 @@ def plot_comprehensive_summary(experiments, output_path='comprehensive_summary.p
                                   if s < 0.05), None) if collapsed else None
         })
     
-    # Format subplots
     ax1.axhline(y=0.05, color='red', linestyle=':', alpha=0.7)
     ax1.set_ylabel('Prediction Std', fontsize=10)
     ax1.set_title('Prediction Diversity', fontweight='bold')
@@ -389,7 +493,6 @@ def plot_comprehensive_summary(experiments, output_path='comprehensive_summary.p
     ax5.set_title('Negative Predictions', fontweight='bold')
     ax5.grid(True, alpha=0.3)
     
-    # Summary table
     ax6.axis('off')
     ax6.text(0.5, 0.95, 'Collapse Summary', ha='center', va='top',
             fontsize=12, fontweight='bold', transform=ax6.transAxes)
@@ -415,17 +518,21 @@ def main():
     parser = argparse.ArgumentParser(description='Plot collapse monitoring data')
     parser.add_argument('experiments', nargs='*', help='Experiment names (or use --phase)')
     parser.add_argument('--phase', type=str, default=None,
-                       help='Process all experiments in a phase directory (e.g., 02b_vintage_sweep)')
+                       help='Process all experiments in a phase directory')
     parser.add_argument('--output-dir', type=str, default=None,
-                       help='Directory for output plots (default: experiments/{experiment}/monitoring/)')
+                       help='Directory for output plots')
     parser.add_argument('--comprehensive', action='store_true',
                        help='Generate comprehensive summary figure')
+    parser.add_argument('--gradient-overlay', action='store_true',
+                       help='Generate single overlaid gradient flow plot (paper-ready)')
+    parser.add_argument('--paper-format', action='store_true',
+                       help='Use IEEE paper formatting (smaller figures)')
+    parser.add_argument('--no-entropy', action='store_true',
+                       help='Omit attention entropy from gradient overlay')
     
     args = parser.parse_args()
     
-    # Determine experiments to process
     if args.phase:
-        # Process all experiments in phase directory
         phase_path = Path('experiments') / args.phase
         if not phase_path.exists():
             print(f"Error: Phase directory not found: {phase_path}")
@@ -435,33 +542,35 @@ def main():
         for exp_dir in sorted(phase_path.iterdir()):
             if not exp_dir.is_dir():
                 continue
-            
-            # Check if it has monitoring data
             monitor_path = exp_dir / 'collapse_monitoring' / 'collapse_monitor_latest.json'
             if monitor_path.exists():
-                # Store as phase/experiment format
                 experiments.append(f"{args.phase}/{exp_dir.name}")
         
         if not experiments:
             print(f"No experiments with monitoring data found in {phase_path}")
             return
         
-        print(f"Found {len(experiments)} experiments with monitoring data in {args.phase}")
+        print(f"Found {len(experiments)} experiments in {args.phase}")
         
-        # Process each individually (save to their own monitoring/ subdirs)
         for exp_full_path in experiments:
-            exp_name = exp_full_path.split('/')[-1]  # Get just the experiment name
+            exp_name = exp_full_path.split('/')[-1]
             print(f"\nProcessing: {exp_name}")
             
-            # Auto-generate output directory
             exp_output_dir = Path('experiments') / exp_full_path / 'monitoring'
             exp_output_dir.mkdir(parents=True, exist_ok=True)
             
-            # Generate plots for this single experiment
             try:
                 if args.comprehensive:
                     plot_comprehensive_summary([exp_full_path], 
                                              exp_output_dir / 'collapse_comprehensive.png')
+                elif args.gradient_overlay:
+                    suffix = '_paper' if args.paper_format else ''
+                    plot_gradient_flow_overlay(
+                        [exp_full_path], 
+                        exp_output_dir / f'gradient_flow_overlay{suffix}.png',
+                        paper_format=args.paper_format,
+                        show_entropy=not args.no_entropy
+                    )
                 else:
                     plot_prediction_diversity([exp_full_path], 
                                             exp_output_dir / 'collapse_diversity.png')
@@ -477,13 +586,11 @@ def main():
         print(f"\nProcessed {len(experiments)} experiments")
         
     else:
-        # Original behavior: process specified experiments
         if not args.experiments:
             print("Error: Must specify experiments or use --phase")
             parser.print_help()
             return
         
-        # Expand wildcards
         experiments = []
         for pattern in args.experiments:
             if '*' in pattern:
@@ -499,19 +606,13 @@ def main():
         
         print(f"Plotting {len(experiments)} experiments...")
         
-        # Determine output directory
         if args.output_dir:
-            # User specified output directory
             output_dir = Path(args.output_dir)
         elif len(experiments) == 1:
-            # Single experiment: auto-save to its monitoring/ subdir
             exp_path = experiments[0]
-            
-            # Handle both "experiment_name" and "phase/experiment_name" formats
             if '/' in exp_path:
                 output_dir = Path('experiments') / exp_path / 'monitoring'
             else:
-                # Try to find it in phase directories
                 found = False
                 for phase_dir in ['00_baseline_exploration', '01_staleness_features',
                                  '01_staleness_features_fixed', '02_custom_tft',
@@ -521,27 +622,27 @@ def main():
                         output_dir = test_path / 'monitoring'
                         found = True
                         break
-                
                 if not found:
-                    # Assume it's directly under experiments/
                     output_dir = Path('experiments') / exp_path / 'monitoring'
         else:
-            # Multiple experiments: use experiments/ as default
             output_dir = Path('experiments')
         
         output_dir.mkdir(parents=True, exist_ok=True)
         
-        # Generate plots
         if args.comprehensive:
-            plot_comprehensive_summary(experiments, 
-                                       output_dir / 'collapse_comprehensive.png')
+            plot_comprehensive_summary(experiments, output_dir / 'collapse_comprehensive.png')
+        elif args.gradient_overlay:
+            suffix = '_paper' if args.paper_format else ''
+            plot_gradient_flow_overlay(
+                experiments,
+                output_dir / f'gradient_flow_overlay{suffix}.png',
+                paper_format=args.paper_format,
+                show_entropy=not args.no_entropy
+            )
         else:
-            plot_prediction_diversity(experiments, 
-                                     output_dir / 'collapse_diversity.png')
-            plot_sign_distribution(experiments, 
-                                 output_dir / 'collapse_signs.png')
-            plot_gradient_flow(experiments, 
-                             output_dir / 'collapse_gradients.png')
+            plot_prediction_diversity(experiments, output_dir / 'collapse_diversity.png')
+            plot_sign_distribution(experiments, output_dir / 'collapse_signs.png')
+            plot_gradient_flow(experiments, output_dir / 'collapse_gradients.png')
         
         print("\nDone! Check output in:", output_dir)
 
