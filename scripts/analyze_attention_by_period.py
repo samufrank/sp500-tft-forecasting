@@ -459,7 +459,6 @@ def load_model(checkpoint_path, config):
     )
     print(f"  Re-applied distribution penalties: mean_weight={mean_weight}, std_weight={std_weight}")
     
-=======
     # Check if this is a custom TFT model
     is_custom = False
     if 'state_dict' in checkpoint:
@@ -505,7 +504,6 @@ def load_model(checkpoint_path, config):
     model.eval()
 
     # Move model to appropriate device
->>>>>>> regime-output
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = model.to(device)
     print(f"  Model moved to device: {device}")
@@ -817,7 +815,7 @@ def plot_attention_heatmap(period_stats, feature_names, output_path):
     period_names = list(period_stats.keys())
     n_features = len(feature_names)
     
-    # Build matrix: periods Ãƒâ€” features
+    # Build matrix: periods” features
     attention_matrix = np.zeros((len(period_names), n_features))
     for i, period in enumerate(period_names):
         attention_matrix[i] = period_stats[period]['mean_attention']
@@ -969,7 +967,7 @@ def print_summary(period_stats, comparisons):
     for period, stats in period_stats.items():
         print(f"\n{period}:")
         print(f"  Samples: {stats['n_samples']}")
-        print(f"  Entropy: {stats['entropy_mean']:.4f} Ã‚Â± {stats['entropy_std']:.4f}")
+        print(f"  Entropy: {stats['entropy_mean']:.4f} +/- {stats['entropy_std']:.4f}")
         print(f"  Concentration: {stats['attention_concentration']:.4f}")
         print(f"  Top 5 features:")
         for feat, weight in stats['top_features']:

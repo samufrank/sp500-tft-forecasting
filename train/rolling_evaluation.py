@@ -236,6 +236,17 @@ def create_fold_splits(fold, args, splits_base_dir, logger, dry_run=False):
     fold_splits_dir = splits_base_dir / fold['fold_id'] / args.alignment
     fold_splits_dir.mkdir(parents=True, exist_ok=True)
     
+    # Check if splits already exist
+    expected_files = [
+        f"{args.feature_set}_{args.frequency}_{args.alignment}_{split}.csv"
+        for split in ['train', 'val', 'test']
+    ]
+    splits_exist = all((fold_splits_dir / f).exists() for f in expected_files)
+    
+    if splits_exist:
+        logger.info(f"  Splits already exist for {fold['fold_id']}, skipping creation")
+        return True
+    
     cmd = [
         'python', 'scripts/create_splits.py',
         '--feature-set', args.feature_set,
