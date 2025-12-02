@@ -62,7 +62,22 @@ class CollapseMonitor(Callback):
                     self._current_epoch_gradients[name] = []
                     
                 self._current_epoch_gradients[name].append(grad_norm)
+            
+            # Log regime gate gradients
+            if 'regime_gates' in name:
+                if not hasattr(self, '_regime_gate_grads_epoch'):
+                    self._regime_gate_grads_epoch = []
+                self._regime_gate_grads_epoch.append(param.grad.clone().cpu())
+            
+            """
+            if 'regime_gates' in name and param.grad is not None:
+                param.grad *= 100  # Amplify gradient
+                print(f"[DEBUG] regime_gates grad (amplified): {param.grad}")
     
+            if 'regime_gates' in name:
+                print(f"[DEBUG] regime_gates grad in optimizer step: {param.grad}")
+            """
+
     def on_validation_epoch_start(self, trainer, pl_module):
         """Reset temporal state in loss function before validation epoch."""
         # Reset directional penalty buffer and temporal consistency state
@@ -101,6 +116,9 @@ class CollapseMonitor(Callback):
         
         # 7. Expert weight divergence (if regime output enabled)
         self._log_expert_weight_divergence(pl_module)
+
+        # 8. Regime attention diagnostics (if regime attention enabled)
+        self._log_regime_attention_diagnostics(pl_module)
         
         # Save to disk
         self._save_history(trainer.current_epoch)
@@ -275,7 +293,16 @@ class CollapseMonitor(Callback):
                 else:
                     print(f"  Directional penalty: not computed yet "
                           f"(weight: {dir_weight:.2f}, threshold: {dir_threshold:.2f})")
-            
+        
+        # regime attn
+        if hasattr(pl_module, 'multihead_attn') and hasattr(pl_module.multihead_attn, 'get_regime_diagnostics'):
+            from train.regime_attention_training import get_regime_diagnostics
+            diag = get_regime_diagnostics(pl_module)
+            if diag.get('regime_distribution'):
+                print(f"  Regime distribution: {diag['regime_distribution']}")
+            if diag.get('gate_statistics'):
+                print(f"  Regime gates: {diag['gate_statistics']}")
+
         # Save actual predictions for debugging
         pred_save_path = self.log_dir / f'val_predictions_epoch{trainer.current_epoch}.npy'
         np.save(pred_save_path, predictions)
@@ -312,6 +339,18 @@ class CollapseMonitor(Callback):
                 avg_norm = np.mean(norms)
                 print(f"    {layer_name}: {avg_norm:.6f}")
         
+        # In _log_gradient_flow, replace the existing regime gate grad print:
+        if hasattr(self, '_regime_gate_grads_epoch') and self._regime_gate_grads_epoch:
+            avg_grad = torch.stack(self._regime_gate_grads_epoch).mean(dim=0)
+            print(f"  Regime gate grads (epoch avg): {avg_grad}")
+                    
+            # Save to history
+            if 'regime_gate_grads' not in self.history:
+                self.history['regime_gate_grads'] = []
+            self.history['regime_gate_grads'].append(avg_grad.tolist())
+    
+            self._regime_gate_grads_epoch = []  # Reset for next epoch
+
         # Clear buffer for next epoch
         self._current_epoch_gradients = {}
                 
@@ -488,7 +527,22 @@ class CollapseMonitor(Callback):
         else:
             self.history['attention_entropy'].append(None)
             print(f"  Attention entropy: (no data captured)")
-            
+    
+    def _log_regime_attention_diagnostics(self, pl_module):
+        """Log regime attention gate values if enabled."""
+        if not hasattr(pl_module, 'multihead_attn'):
+            return
+        if not hasattr(pl_module.multihead_attn, 'regime_gates'):
+            return
+        
+        gate_values = torch.sigmoid(pl_module.multihead_attn.regime_gates).detach().cpu()
+        
+        if 'regime_attention_gate_values' not in self.history:
+            self.history['regime_attention_gate_values'] = []
+        self.history['regime_attention_gate_values'].append(gate_values.tolist())
+        
+        print(f"  Regime attention gates: {gate_values.tolist()}")
+
     def _log_regime_diagnostics(self, trainer, pl_module):
         """
         Log regime-conditional output statistics if enabled.

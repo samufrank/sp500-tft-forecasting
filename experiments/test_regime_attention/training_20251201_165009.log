@@ -1,0 +1,2752 @@
+
+[INFO] MPS detected but upsample ops unsupported, using CPU for stability.
+
+[INFO] Patched matplotlib.Axes.errorbar to abs() negative yerr for robustness.
+======================================================================
+Training TFT: test_regime_attention
+======================================================================
+Logging to: experiments/test_regime_attention/training_20251201_165009.log
+Started at: 2025-12-01 16:50:09
+======================================================================
+Configuration saved to: experiments/test_regime_attention/config.json
+
+Loading data splits...
+Train: 6074 samples
+Val: 1302 samples
+Test: 1302 samples
+
+Preparing TimeSeriesDataSet...
+
+Dropping source columns (used for staleness only): ['CPI']
+
+Final features for TFT: ['SP500_Returns', 'VIX', 'Treasury_10Y', 'Yield_Spread', 'Inflation_YoY']
+
+======================================================================
+FEATURE STATISTICS - BEFORE NORMALIZATION
+======================================================================
+VIX                             mean= 19.7438  std=  8.0295  min=  9.3100  max= 80.8600
+Treasury_10Y                    mean=  4.7672  std=  1.6903  min=  1.4300  max=  8.3600
+Yield_Spread                    mean=  1.2778  std=  0.9179  min= -0.5200  max=  2.9100
+Inflation_YoY                   mean=  2.5322  std=  1.1865  min= -2.1498  max=  6.7300
+
+======================================================================
+FEATURES AFTER GROUPNORMALIZER (first batch, last timestep)
+======================================================================
+VIX                             normalized_value=  1.0000
+Treasury_10Y                    normalized_value= -0.0500
+Yield_Spread                    normalized_value=  0.0817
+Inflation_YoY                   normalized_value=  0.8774
+======================================================================
+
+[DEBUG] VIX train values: [28.95 30.38 33.3  31.33 32.63]
+[DEBUG] VIX val values: [14.31 15.15 15.13 12.86 13.85]
+Batches per epoch: 94
+[DEBUG] Validation batches: 21
+[DEBUG] Validation dataset size: 1282
+[DEBUG] Batch size: 64
+
+Initializing model...
+
+Using standard QuantileLoss (no penalties)
+
+[REGIME OUTPUT] Disabled (using baseline output layer)
+
+[REGIME ATTENTION] Replaced attention module:
+  Mode: vix_threshold
+  Regimes: 2
+  VIX threshold: 25.0
+  Heads: 2
+  New parameters: 4 (regime gates only)
+  Total attention parameters: 812
+[REGIME ATTENTION] Using raw VIX values (train: 6074, val: 1302)
+[REGIME ATTENTION] VIX range - train: 9.3-80.9, val: 9.1-82.7
+
+[REGIME ATTENTION] Enabled: vix_threshold=25.0
+
+================================================================================
+BASELINE MODEL FEATURE CONFIGURATION (after from_dataset)
+================================================================================
+tft.hparams.time_varying_reals_encoder: ['relative_time_idx', 'VIX', 'Treasury_10Y', 'Yield_Spread', 'Inflation_YoY']
+  Count: 5
+
+tft.hparams.time_varying_reals_decoder: ['relative_time_idx']
+  Count: 1
+
+tft.hparams.x_reals (all reals passed to model): ['encoder_length', 'relative_time_idx', 'VIX', 'Treasury_10Y', 'Yield_Spread', 'Inflation_YoY']
+  Count: 6
+
+Encoder VSN configuration:
+  num_inputs: 5
+  input_sizes: {'relative_time_idx': 16, 'VIX': 16, 'Treasury_10Y': 16, 'Yield_Spread': 16, 'Inflation_YoY': 16}
+  flattened_grn.fc1: in_features=80, out_features=5
+  -> Params in fc1: 400 (should be 5*16*5=400 if 5 features)
+================================================================================
+
+Model parameters: 22,619
+
+Starting training...
+Checkpoints will be saved to: experiments/test_regime_attention/checkpoints/
+Logs will be saved to: experiments/test_regime_attention/logs/
+
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 0
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 0: val_loss=N/A
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 0
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 0: val_loss=0.6006137728691101
+Epoch 0: train_loss=0.6956979632377625
+
+[CollapseMonitor] Epoch 0
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.018871, range: 0.083665, mean: 0.137138
+  Pos: 100.0%, Neg: 0.0%, Unique: 1259
+  Dir Acc: 54.76%, Pred Sharpe: 115.3635
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5032820105552673, 'std': 0.0016235250514000654, 'min': 0.5018759965896606, 'max': 0.504688024520874}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch0.npy
+  Gradient norms:
+    lstm_encoder: 0.008603
+    lstm_decoder: 0.013544
+    output_layer: 0.618361
+  Regime gate grads (epoch avg): tensor([[-0.0229, -0.0328],
+        [-0.0204, -0.0308]])
+  VSN output std:
+    encoder: 0.157940
+  Attention entropy: 2.990917
+  Regime attention gates: [[0.5027578473091125, 0.4964192807674408], [0.5018759965896606, 0.504688024520874]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 1
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 1: val_loss=0.5017869472503662
+Epoch 1: train_loss=0.5918311476707458
+
+[CollapseMonitor] Epoch 1
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.013015, range: 0.062719, mean: 0.039191
+  Pos: 100.0%, Neg: 0.0%, Unique: 1259
+  Dir Acc: 54.76%, Pred Sharpe: 47.8022
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5040063858032227, 'std': 0.0016646482981741428, 'min': 0.5025647878646851, 'max': 0.505448043346405}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch1.npy
+  Gradient norms:
+    lstm_encoder: 0.006859
+    lstm_decoder: 0.009561
+    output_layer: 0.461489
+  Regime gate grads (epoch avg): tensor([[-0.0170, -0.0269],
+        [-0.0181, -0.0204]])
+  VSN output std:
+    encoder: 0.165244
+  Attention entropy: 2.992092
+  Regime attention gates: [[0.5032161474227905, 0.497014582157135], [0.5025647878646851, 0.505448043346405]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 2
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 2: val_loss=0.46547839045524597
+Epoch 2: train_loss=0.5069224238395691
+
+[CollapseMonitor] Epoch 2
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.011300, range: 0.057288, mean: 0.031789
+  Pos: 99.6%, Neg: 0.4%, Unique: 1261
+  Dir Acc: 54.68%, Pred Sharpe: 44.6581
+  Composite: 0.4242 (dist_match: 0.5515, actual_pos: 54.8%, pred_pos: 99.6%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5049976706504822, 'std': 0.0017003343673422933, 'min': 0.5035251379013062, 'max': 0.5064702033996582}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch2.npy
+  Gradient norms:
+    lstm_encoder: 0.004257
+    lstm_decoder: 0.004651
+    output_layer: 0.245789
+  Regime gate grads (epoch avg): tensor([[ 0.0142,  0.0139],
+        [-0.0135, -0.0132]])
+  VSN output std:
+    encoder: 0.165101
+  Attention entropy: 2.993186
+  Regime attention gates: [[0.5027099251747131, 0.49648213386535645], [0.5035251379013062, 0.5064702033996582]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 3
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 3: val_loss=0.45557260513305664
+Epoch 3: train_loss=0.4763633906841278
+
+[CollapseMonitor] Epoch 3
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.010131, range: 0.052724, mean: 0.021856
+  Pos: 96.4%, Neg: 3.6%, Unique: 1261
+  Dir Acc: 54.45%, Pred Sharpe: 34.2482
+  Composite: 0.4311 (dist_match: 0.5835, actual_pos: 54.8%, pred_pos: 96.4%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.505932092666626, 'std': 0.00156244239769876, 'min': 0.5045790076255798, 'max': 0.5072852373123169}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch3.npy
+  Gradient norms:
+    lstm_encoder: 0.003409
+    lstm_decoder: 0.003312
+    output_layer: 0.141070
+  Regime gate grads (epoch avg): tensor([[ 0.0185,  0.0187],
+        [-0.0066, -0.0042]])
+  VSN output std:
+    encoder: 0.161722
+  Attention entropy: 2.993090
+  Regime attention gates: [[0.5011163949966431, 0.49487224221229553], [0.5045790076255798, 0.5072852373123169]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 4
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 4: val_loss=0.4520684480667114
+Epoch 4: train_loss=0.4644825756549835
+
+[CollapseMonitor] Epoch 4
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.010014, range: 0.048999, mean: 0.039121
+  Pos: 100.0%, Neg: 0.0%, Unique: 1238
+  Dir Acc: 54.76%, Pred Sharpe: 62.0168
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5072554349899292, 'std': 0.00153315719217062, 'min': 0.5059276819229126, 'max': 0.5085831880569458}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch4.npy
+  Gradient norms:
+    lstm_encoder: 0.002962
+    lstm_decoder: 0.002788
+    output_layer: 0.103373
+  Regime gate grads (epoch avg): tensor([[ 0.0162,  0.0172],
+        [-0.0092, -0.0078]])
+  VSN output std:
+    encoder: 0.167751
+  Attention entropy: 2.993192
+  Regime attention gates: [[0.499493807554245, 0.4932909607887268], [0.5059276819229126, 0.5085831880569458]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 5
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 5: val_loss=0.450057715177536
+Epoch 5: train_loss=0.4599446654319763
+
+[CollapseMonitor] Epoch 5
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.010727, range: 0.052749, mean: 0.015770
+  Pos: 99.8%, Neg: 0.2%, Unique: 1243
+  Dir Acc: 54.76%, Pred Sharpe: 23.3390
+  Composite: 0.4241 (dist_match: 0.5491, actual_pos: 54.8%, pred_pos: 99.8%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5091395974159241, 'std': 0.0014748619869351387, 'min': 0.5078623294830322, 'max': 0.5104168653488159}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch5.npy
+  Gradient norms:
+    lstm_encoder: 0.003142
+    lstm_decoder: 0.002890
+    output_layer: 0.098395
+  Regime gate grads (epoch avg): tensor([[ 0.0159,  0.0165],
+        [-0.0153, -0.0137]])
+  VSN output std:
+    encoder: 0.179751
+  Attention entropy: 2.993038
+  Regime attention gates: [[0.49758875370025635, 0.49151310324668884], [0.5078623294830322, 0.5104168653488159]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 6
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 6: val_loss=0.44760745763778687
+Epoch 6: train_loss=0.45728668570518494
+
+[CollapseMonitor] Epoch 6
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.011953, range: 0.058042, mean: 0.029937
+  Pos: 100.0%, Neg: 0.0%, Unique: 1250
+  Dir Acc: 54.76%, Pred Sharpe: 39.7588
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5116434097290039, 'std': 0.0014554187655448914, 'min': 0.5103830099105835, 'max': 0.5129038691520691}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch6.npy
+  Gradient norms:
+    lstm_encoder: 0.003306
+    lstm_decoder: 0.002828
+    output_layer: 0.092480
+  Regime gate grads (epoch avg): tensor([[ 0.0171,  0.0176],
+        [-0.0148, -0.0132]])
+  VSN output std:
+    encoder: 0.175668
+  Attention entropy: 2.990813
+  Regime attention gates: [[0.4953252077102661, 0.48954716324806213], [0.5103830099105835, 0.5129038691520691]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 7
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 7: val_loss=0.4451894760131836
+Epoch 7: train_loss=0.4536333680152893
+
+[CollapseMonitor] Epoch 7
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.012841, range: 0.071308, mean: 0.041412
+  Pos: 100.0%, Neg: 0.0%, Unique: 1251
+  Dir Acc: 54.76%, Pred Sharpe: 51.1961
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5134108066558838, 'std': 0.0015852580545470119, 'min': 0.5120379328727722, 'max': 0.5147836804389954}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch7.npy
+  Gradient norms:
+    lstm_encoder: 0.003683
+    lstm_decoder: 0.002945
+    output_layer: 0.094788
+  Regime gate grads (epoch avg): tensor([[ 0.0067,  0.0048],
+        [-0.0114, -0.0118]])
+  VSN output std:
+    encoder: 0.175846
+  Attention entropy: 2.987465
+  Regime attention gates: [[0.49420803785324097, 0.48865628242492676], [0.5120379328727722, 0.5147836804389954]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 8
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 8: val_loss=0.44171589612960815
+Epoch 8: train_loss=0.45073553919792175
+
+[CollapseMonitor] Epoch 8
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.015527, range: 0.084224, mean: 0.077203
+  Pos: 100.0%, Neg: 0.0%, Unique: 1241
+  Dir Acc: 54.76%, Pred Sharpe: 78.9293
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.515716552734375, 'std': 0.0015426207100972533, 'min': 0.5143806338310242, 'max': 0.5170525312423706}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch8.npy
+  Gradient norms:
+    lstm_encoder: 0.004237
+    lstm_decoder: 0.003076
+    output_layer: 0.093834
+  Regime gate grads (epoch avg): tensor([[ 0.0056,  0.0046],
+        [-0.0174, -0.0162]])
+  VSN output std:
+    encoder: 0.171147
+  Attention entropy: 2.978134
+  Regime attention gates: [[0.4936542212963104, 0.4882553517818451], [0.5143806338310242, 0.5170525312423706]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 9
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 9: val_loss=0.4343743622303009
+Epoch 9: train_loss=0.4477587640285492
+
+[CollapseMonitor] Epoch 9
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.011716, range: 0.087964, mean: 0.060436
+  Pos: 100.0%, Neg: 0.0%, Unique: 1244
+  Dir Acc: 54.76%, Pred Sharpe: 81.8858
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5185999870300293, 'std': 0.0016925226664170623, 'min': 0.5171341896057129, 'max': 0.5200657248497009}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch9.npy
+  Gradient norms:
+    lstm_encoder: 0.004446
+    lstm_decoder: 0.003279
+    output_layer: 0.090595
+  Regime gate grads (epoch avg): tensor([[-0.0021, -0.0017],
+        [-0.0200, -0.0202]])
+  VSN output std:
+    encoder: 0.165546
+  Attention entropy: 2.969282
+  Regime attention gates: [[0.49384015798568726, 0.4885830879211426], [0.5171341896057129, 0.5200657248497009]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 10
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 10: val_loss=0.4301729202270508
+Epoch 10: train_loss=0.4441836476325989
+
+[CollapseMonitor] Epoch 10
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.013116, range: 0.098429, mean: 0.051713
+  Pos: 100.0%, Neg: 0.0%, Unique: 1252
+  Dir Acc: 54.76%, Pred Sharpe: 62.5881
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5214288830757141, 'std': 0.0020638706628233194, 'min': 0.5196415185928345, 'max': 0.5232162475585938}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch10.npy
+  Gradient norms:
+    lstm_encoder: 0.005171
+    lstm_decoder: 0.003573
+    output_layer: 0.094748
+  Regime gate grads (epoch avg): tensor([[ 0.0120,  0.0095],
+        [-0.0224, -0.0253]])
+  VSN output std:
+    encoder: 0.166393
+  Attention entropy: 2.967206
+  Regime attention gates: [[0.49296534061431885, 0.4880375564098358], [0.5196415185928345, 0.5232162475585938]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 11
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 11: val_loss=0.4282255172729492
+Epoch 11: train_loss=0.4406653046607971
+
+[CollapseMonitor] Epoch 11
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.016161, range: 0.111455, mean: 0.069406
+  Pos: 100.0%, Neg: 0.0%, Unique: 1233
+  Dir Acc: 54.76%, Pred Sharpe: 68.1749
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5239772796630859, 'std': 0.001927733886986971, 'min': 0.522307813167572, 'max': 0.5256467461585999}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch11.npy
+  Gradient norms:
+    lstm_encoder: 0.005378
+    lstm_decoder: 0.003589
+    output_layer: 0.092503
+  Regime gate grads (epoch avg): tensor([[ 0.0154,  0.0160],
+        [-0.0218, -0.0194]])
+  VSN output std:
+    encoder: 0.165604
+  Attention entropy: 2.976484
+  Regime attention gates: [[0.4914364516735077, 0.4865022301673889], [0.522307813167572, 0.5256467461585999]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 12
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 12: val_loss=0.42697128653526306
+Epoch 12: train_loss=0.4399683475494385
+
+[CollapseMonitor] Epoch 12
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.019591, range: 0.114855, mean: 0.090026
+  Pos: 100.0%, Neg: 0.0%, Unique: 1244
+  Dir Acc: 54.76%, Pred Sharpe: 72.9475
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5263669490814209, 'std': 0.002058123704046011, 'min': 0.5245845317840576, 'max': 0.5281493067741394}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch12.npy
+  Gradient norms:
+    lstm_encoder: 0.005946
+    lstm_decoder: 0.003746
+    output_layer: 0.098345
+  Regime gate grads (epoch avg): tensor([[ 0.0105,  0.0144],
+        [-0.0216, -0.0216]])
+  VSN output std:
+    encoder: 0.164144
+  Attention entropy: 2.981244
+  Regime attention gates: [[0.49028170108795166, 0.48487672209739685], [0.5245845317840576, 0.5281493067741394]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 13
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 13: val_loss=0.42481735348701477
+Epoch 13: train_loss=0.43763265013694763
+
+[CollapseMonitor] Epoch 13
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.020942, range: 0.124018, mean: 0.095413
+  Pos: 100.0%, Neg: 0.0%, Unique: 1234
+  Dir Acc: 54.76%, Pred Sharpe: 72.3262
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5289360880851746, 'std': 0.00192057597450912, 'min': 0.5272728204727173, 'max': 0.5305993556976318}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch13.npy
+  Gradient norms:
+    lstm_encoder: 0.006355
+    lstm_decoder: 0.003789
+    output_layer: 0.091918
+  Regime gate grads (epoch avg): tensor([[ 0.0205,  0.0195],
+        [-0.0233, -0.0213]])
+  VSN output std:
+    encoder: 0.163084
+  Attention entropy: 2.978693
+  Regime attention gates: [[0.4885309636592865, 0.4832901358604431], [0.5272728204727173, 0.5305993556976318]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 14
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 14: val_loss=0.42523497343063354
+Epoch 14: train_loss=0.43591758608818054
+
+[CollapseMonitor] Epoch 14
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.016404, range: 0.138753, mean: 0.054505
+  Pos: 99.1%, Neg: 0.9%, Unique: 1238
+  Dir Acc: 54.68%, Pred Sharpe: 52.7447
+  Composite: 0.4255 (dist_match: 0.5562, actual_pos: 54.8%, pred_pos: 99.1%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5313893556594849, 'std': 0.002020338550209999, 'min': 0.529639720916748, 'max': 0.5331390500068665}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch14.npy
+  Gradient norms:
+    lstm_encoder: 0.006678
+    lstm_decoder: 0.004000
+    output_layer: 0.097615
+  Regime gate grads (epoch avg): tensor([[ 0.0145,  0.0165],
+        [-0.0200, -0.0210]])
+  VSN output std:
+    encoder: 0.162585
+  Attention entropy: 2.985695
+  Regime attention gates: [[0.4871038794517517, 0.48169973492622375], [0.529639720916748, 0.5331390500068665]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 15
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 15: val_loss=0.4232228696346283
+Epoch 15: train_loss=0.43544521927833557
+
+[CollapseMonitor] Epoch 15
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.015565, range: 0.147392, mean: 0.077689
+  Pos: 100.0%, Neg: 0.0%, Unique: 1238
+  Dir Acc: 54.76%, Pred Sharpe: 79.2335
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5334335565567017, 'std': 0.002109054708853364, 'min': 0.5316070318222046, 'max': 0.535260021686554}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch15.npy
+  Gradient norms:
+    lstm_encoder: 0.006813
+    lstm_decoder: 0.003906
+    output_layer: 0.094990
+  Regime gate grads (epoch avg): tensor([[ 0.0134,  0.0149],
+        [-0.0186, -0.0186]])
+  VSN output std:
+    encoder: 0.162954
+  Attention entropy: 2.985353
+  Regime attention gates: [[0.4861706495285034, 0.48042893409729004], [0.5316070318222046, 0.535260021686554]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 16
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 16: val_loss=0.42179039120674133
+Epoch 16: train_loss=0.43487367033958435
+
+[CollapseMonitor] Epoch 16
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.011382, range: 0.141149, mean: 0.074970
+  Pos: 100.0%, Neg: 0.0%, Unique: 1237
+  Dir Acc: 54.76%, Pred Sharpe: 104.5627
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5355703830718994, 'std': 0.0023478104267269373, 'min': 0.5335370898246765, 'max': 0.5376036167144775}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch16.npy
+  Gradient norms:
+    lstm_encoder: 0.007224
+    lstm_decoder: 0.004124
+    output_layer: 0.093147
+  Regime gate grads (epoch avg): tensor([[ 0.0162,  0.0229],
+        [-0.0200, -0.0219]])
+  VSN output std:
+    encoder: 0.160788
+  Attention entropy: 2.983097
+  Regime attention gates: [[0.4849313497543335, 0.47878384590148926], [0.5335370898246765, 0.5376036167144775]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 17
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 17: val_loss=0.4218514859676361
+Epoch 17: train_loss=0.4329175353050232
+
+[CollapseMonitor] Epoch 17
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.011343, range: 0.146807, mean: 0.080362
+  Pos: 100.0%, Neg: 0.0%, Unique: 1245
+  Dir Acc: 54.76%, Pred Sharpe: 112.4651
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5376723408699036, 'std': 0.0027093852404505014, 'min': 0.5353259444236755, 'max': 0.5400187373161316}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch17.npy
+  Gradient norms:
+    lstm_encoder: 0.007505
+    lstm_decoder: 0.004215
+    output_layer: 0.094828
+  Regime gate grads (epoch avg): tensor([[ 0.0216,  0.0182],
+        [-0.0172, -0.0211]])
+  VSN output std:
+    encoder: 0.162838
+  Attention entropy: 2.982582
+  Regime attention gates: [[0.4830476939678192, 0.4770912230014801], [0.5353259444236755, 0.5400187373161316]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 18
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 18: val_loss=0.42126360535621643
+Epoch 18: train_loss=0.4308513104915619
+
+[CollapseMonitor] Epoch 18
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.013460, range: 0.147167, mean: 0.067829
+  Pos: 100.0%, Neg: 0.0%, Unique: 1243
+  Dir Acc: 54.76%, Pred Sharpe: 79.9948
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5396760702133179, 'std': 0.002693864982575178, 'min': 0.5373430848121643, 'max': 0.5420089960098267}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch18.npy
+  Gradient norms:
+    lstm_encoder: 0.007578
+    lstm_decoder: 0.004344
+    output_layer: 0.096659
+  Regime gate grads (epoch avg): tensor([[ 0.0191,  0.0263],
+        [-0.0193, -0.0174]])
+  VSN output std:
+    encoder: 0.162096
+  Attention entropy: 2.986446
+  Regime attention gates: [[0.48141416907310486, 0.47493478655815125], [0.5373430848121643, 0.5420089960098267]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 19
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 19: val_loss=0.41750988364219666
+Epoch 19: train_loss=0.4292580485343933
+
+[CollapseMonitor] Epoch 19
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.013037, range: 0.149232, mean: 0.081763
+  Pos: 100.0%, Neg: 0.0%, Unique: 1237
+  Dir Acc: 54.76%, Pred Sharpe: 99.5578
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5417081117630005, 'std': 0.0029427381232380867, 'min': 0.5391595959663391, 'max': 0.5442565679550171}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch19.npy
+  Gradient norms:
+    lstm_encoder: 0.008389
+    lstm_decoder: 0.004674
+    output_layer: 0.099197
+  Regime gate grads (epoch avg): tensor([[ 0.0165,  0.0159],
+        [-0.0189, -0.0216]])
+  VSN output std:
+    encoder: 0.163772
+  Attention entropy: 2.979002
+  Regime attention gates: [[0.4793708324432373, 0.4729790687561035], [0.5391595959663391, 0.5442565679550171]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 20
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 20: val_loss=0.4168843924999237
+Epoch 20: train_loss=0.42881277203559875
+
+[CollapseMonitor] Epoch 20
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.012709, range: 0.150987, mean: 0.082708
+  Pos: 100.0%, Neg: 0.0%, Unique: 1254
+  Dir Acc: 54.76%, Pred Sharpe: 103.3125
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5437811017036438, 'std': 0.0029065704438835382, 'min': 0.5412639379501343, 'max': 0.5462982654571533}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch20.npy
+  Gradient norms:
+    lstm_encoder: 0.008100
+    lstm_decoder: 0.004433
+    output_layer: 0.090956
+  Regime gate grads (epoch avg): tensor([[ 0.0179,  0.0186],
+        [-0.0186, -0.0191]])
+  VSN output std:
+    encoder: 0.166395
+  Attention entropy: 2.976161
+  Regime attention gates: [[0.4778747856616974, 0.4715125858783722], [0.5412639379501343, 0.5462982654571533]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 21
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 21: val_loss=0.4159942865371704
+Epoch 21: train_loss=0.42811962962150574
+
+[CollapseMonitor] Epoch 21
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.013766, range: 0.154708, mean: 0.066411
+  Pos: 99.5%, Neg: 0.5%, Unique: 1256
+  Dir Acc: 54.76%, Pred Sharpe: 76.5846
+  Composite: 0.4250 (dist_match: 0.5523, actual_pos: 54.8%, pred_pos: 99.5%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.546325147151947, 'std': 0.003303831210359931, 'min': 0.543463945388794, 'max': 0.5491863489151001}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch21.npy
+  Gradient norms:
+    lstm_encoder: 0.009262
+    lstm_decoder: 0.005172
+    output_layer: 0.092410
+  Regime gate grads (epoch avg): tensor([[ 0.0234,  0.0243],
+        [-0.0209, -0.0265]])
+  VSN output std:
+    encoder: 0.164400
+  Attention entropy: 2.973013
+  Regime attention gates: [[0.4760730564594269, 0.46953967213630676], [0.543463945388794, 0.5491863489151001]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 22
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 22: val_loss=0.41447585821151733
+Epoch 22: train_loss=0.4279187321662903
+
+[CollapseMonitor] Epoch 22
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.016877, range: 0.159958, mean: 0.062872
+  Pos: 98.8%, Neg: 1.2%, Unique: 1258
+  Dir Acc: 54.52%, Pred Sharpe: 59.1373
+  Composite: 0.4251 (dist_match: 0.5593, actual_pos: 54.8%, pred_pos: 98.8%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5488691926002502, 'std': 0.0032720337621867657, 'min': 0.5460355281829834, 'max': 0.5517028570175171}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch22.npy
+  Gradient norms:
+    lstm_encoder: 0.009342
+    lstm_decoder: 0.005177
+    output_layer: 0.094201
+  Regime gate grads (epoch avg): tensor([[ 0.0136,  0.0212],
+        [-0.0239, -0.0239]])
+  VSN output std:
+    encoder: 0.164375
+  Attention entropy: 2.967956
+  Regime attention gates: [[0.4745016396045685, 0.46738946437835693], [0.5460355281829834, 0.5517028570175171]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 23
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 23: val_loss=0.41354137659072876
+Epoch 23: train_loss=0.428280234336853
+
+[CollapseMonitor] Epoch 23
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.020235, range: 0.177785, mean: 0.070597
+  Pos: 98.6%, Neg: 1.4%, Unique: 1261
+  Dir Acc: 54.60%, Pred Sharpe: 55.3830
+  Composite: 0.4263 (dist_match: 0.5616, actual_pos: 54.8%, pred_pos: 98.6%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.550848126411438, 'std': 0.0034776499960571527, 'min': 0.547836422920227, 'max': 0.5538598895072937}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch23.npy
+  Gradient norms:
+    lstm_encoder: 0.010112
+    lstm_decoder: 0.005652
+    output_layer: 0.099841
+  Regime gate grads (epoch avg): tensor([[ 0.0221,  0.0286],
+        [-0.0184, -0.0219]])
+  VSN output std:
+    encoder: 0.165417
+  Attention entropy: 2.964515
+  Regime attention gates: [[0.4729773998260498, 0.46516403555870056], [0.547836422920227, 0.5538598895072937]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 24
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 24: val_loss=0.4123615026473999
+Epoch 24: train_loss=0.4268418848514557
+
+[CollapseMonitor] Epoch 24
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.022100, range: 0.169738, mean: 0.089890
+  Pos: 99.1%, Neg: 0.9%, Unique: 1266
+  Dir Acc: 54.68%, Pred Sharpe: 64.5680
+  Composite: 0.4255 (dist_match: 0.5562, actual_pos: 54.8%, pred_pos: 99.1%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5530780553817749, 'std': 0.0033878327812999487, 'min': 0.5501440763473511, 'max': 0.556011974811554}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch24.npy
+  Gradient norms:
+    lstm_encoder: 0.009951
+    lstm_decoder: 0.005690
+    output_layer: 0.095741
+  Regime gate grads (epoch avg): tensor([[ 0.0289,  0.0281],
+        [-0.0203, -0.0192]])
+  VSN output std:
+    encoder: 0.166236
+  Attention entropy: 2.956876
+  Regime attention gates: [[0.4702663719654083, 0.46254831552505493], [0.5501440763473511, 0.556011974811554]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 25
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 25: val_loss=0.41344234347343445
+Epoch 25: train_loss=0.42803090810775757
+
+[CollapseMonitor] Epoch 25
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.020667, range: 0.186294, mean: 0.090665
+  Pos: 99.5%, Neg: 0.5%, Unique: 1254
+  Dir Acc: 54.84%, Pred Sharpe: 69.6405
+  Composite: 0.4258 (dist_match: 0.5530, actual_pos: 54.8%, pred_pos: 99.5%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5550081133842468, 'std': 0.0034438222646713257, 'min': 0.5520256757736206, 'max': 0.557990550994873}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch25.npy
+  Gradient norms:
+    lstm_encoder: 0.010922
+    lstm_decoder: 0.006158
+    output_layer: 0.103978
+  Regime gate grads (epoch avg): tensor([[ 0.0335,  0.0355],
+        [-0.0196, -0.0186]])
+  VSN output std:
+    encoder: 0.164369
+  Attention entropy: 2.967661
+  Regime attention gates: [[0.4676571190357208, 0.45985788106918335], [0.5520256757736206, 0.557990550994873]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 26
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 26: val_loss=0.41269758343696594
+Epoch 26: train_loss=0.4258289039134979
+
+[CollapseMonitor] Epoch 26
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.023337, range: 0.211895, mean: 0.038065
+  Pos: 95.1%, Neg: 4.9%, Unique: 1260
+  Dir Acc: 53.59%, Pred Sharpe: 25.8936
+  Composite: 0.4278 (dist_match: 0.5967, actual_pos: 54.8%, pred_pos: 95.1%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5569642782211304, 'std': 0.003693211590871215, 'min': 0.5537658333778381, 'max': 0.5601626634597778}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch26.npy
+  Gradient norms:
+    lstm_encoder: 0.010192
+    lstm_decoder: 0.005836
+    output_layer: 0.094867
+  Regime gate grads (epoch avg): tensor([[ 0.0222,  0.0273],
+        [-0.0161, -0.0209]])
+  VSN output std:
+    encoder: 0.161712
+  Attention entropy: 2.965222
+  Regime attention gates: [[0.4659700393676758, 0.457741379737854], [0.5537658333778381, 0.5601626634597778]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 27
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 27: val_loss=0.4113263785839081
+Epoch 27: train_loss=0.4267393946647644
+
+[CollapseMonitor] Epoch 27
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.024158, range: 0.202490, mean: 0.064111
+  Pos: 96.8%, Neg: 3.2%, Unique: 1255
+  Dir Acc: 54.06%, Pred Sharpe: 42.1288
+  Composite: 0.4269 (dist_match: 0.5796, actual_pos: 54.8%, pred_pos: 96.8%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5587275624275208, 'std': 0.003938058391213417, 'min': 0.5553171038627625, 'max': 0.562138020992279}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch27.npy
+  Gradient norms:
+    lstm_encoder: 0.010513
+    lstm_decoder: 0.005885
+    output_layer: 0.094514
+  Regime gate grads (epoch avg): tensor([[ 0.0253,  0.0318],
+        [-0.0157, -0.0191]])
+  VSN output std:
+    encoder: 0.162026
+  Attention entropy: 2.962408
+  Regime attention gates: [[0.463606595993042, 0.4546504318714142], [0.5553171038627625, 0.562138020992279]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 28
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 28: val_loss=0.4099605679512024
+Epoch 28: train_loss=0.42418962717056274
+
+[CollapseMonitor] Epoch 28
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.026549, range: 0.201881, mean: 0.080995
+  Pos: 98.9%, Neg: 1.1%, Unique: 1254
+  Dir Acc: 54.76%, Pred Sharpe: 48.4297
+  Composite: 0.4267 (dist_match: 0.5585, actual_pos: 54.8%, pred_pos: 98.9%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5604100227355957, 'std': 0.004141093697398901, 'min': 0.55682373046875, 'max': 0.5639963150024414}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch28.npy
+  Gradient norms:
+    lstm_encoder: 0.010427
+    lstm_decoder: 0.005904
+    output_layer: 0.094253
+  Regime gate grads (epoch avg): tensor([[ 0.0234,  0.0283],
+        [-0.0147, -0.0180]])
+  VSN output std:
+    encoder: 0.164022
+  Attention entropy: 2.948765
+  Regime attention gates: [[0.46115055680274963, 0.45190754532814026], [0.55682373046875, 0.5639963150024414]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 29
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 29: val_loss=0.40997251868247986
+Epoch 29: train_loss=0.4262028634548187
+
+[CollapseMonitor] Epoch 29
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.026505, range: 0.209210, mean: 0.055209
+  Pos: 96.6%, Neg: 3.4%, Unique: 1268
+  Dir Acc: 54.45%, Pred Sharpe: 33.0660
+  Composite: 0.4306 (dist_match: 0.5819, actual_pos: 54.8%, pred_pos: 96.6%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5620040893554688, 'std': 0.004472247790545225, 'min': 0.5581310391426086, 'max': 0.5658771991729736}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch29.npy
+  Gradient norms:
+    lstm_encoder: 0.011393
+    lstm_decoder: 0.006417
+    output_layer: 0.094901
+  Regime gate grads (epoch avg): tensor([[ 0.0260,  0.0248],
+        [-0.0127, -0.0185]])
+  VSN output std:
+    encoder: 0.163594
+  Attention entropy: 2.951720
+  Regime attention gates: [[0.4585071802139282, 0.4493808150291443], [0.5581310391426086, 0.5658771991729736]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 30
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 30: val_loss=0.4092279076576233
+Epoch 30: train_loss=0.42606106400489807
+
+[CollapseMonitor] Epoch 30
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.026050, range: 0.207793, mean: 0.041304
+  Pos: 95.2%, Neg: 4.8%, Unique: 1255
+  Dir Acc: 54.06%, Pred Sharpe: 25.1701
+  Composite: 0.4311 (dist_match: 0.5952, actual_pos: 54.8%, pred_pos: 95.2%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5641336441040039, 'std': 0.004726179409772158, 'min': 0.5600406527519226, 'max': 0.5682266354560852}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch30.npy
+  Gradient norms:
+    lstm_encoder: 0.011523
+    lstm_decoder: 0.006423
+    output_layer: 0.090669
+  Regime gate grads (epoch avg): tensor([[ 0.0266,  0.0301],
+        [-0.0183, -0.0254]])
+  VSN output std:
+    encoder: 0.163804
+  Attention entropy: 2.949897
+  Regime attention gates: [[0.45612987875938416, 0.4466977119445801], [0.5600406527519226, 0.5682266354560852]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 31
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 31: val_loss=0.4082564413547516
+Epoch 31: train_loss=0.4242468774318695
+
+[CollapseMonitor] Epoch 31
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.026854, range: 0.209199, mean: 0.071203
+  Pos: 97.0%, Neg: 3.0%, Unique: 1254
+  Dir Acc: 54.52%, Pred Sharpe: 42.0913
+  Composite: 0.4302 (dist_match: 0.5780, actual_pos: 54.8%, pred_pos: 97.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5659345388412476, 'std': 0.005098077934235334, 'min': 0.5615195035934448, 'max': 0.5703496336936951}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch31.npy
+  Gradient norms:
+    lstm_encoder: 0.011599
+    lstm_decoder: 0.006537
+    output_layer: 0.095353
+  Regime gate grads (epoch avg): tensor([[ 0.0248,  0.0272],
+        [-0.0170, -0.0212]])
+  VSN output std:
+    encoder: 0.164566
+  Attention entropy: 2.944323
+  Regime attention gates: [[0.4538918137550354, 0.44431596994400024], [0.5615195035934448, 0.5703496336936951]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 32
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 32: val_loss=0.40841564536094666
+Epoch 32: train_loss=0.42538923025131226
+
+[CollapseMonitor] Epoch 32
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.027782, range: 0.221153, mean: 0.071769
+  Pos: 97.1%, Neg: 2.9%, Unique: 1255
+  Dir Acc: 54.52%, Pred Sharpe: 41.0086
+  Composite: 0.4298 (dist_match: 0.5764, actual_pos: 54.8%, pred_pos: 97.1%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5683183670043945, 'std': 0.005142573732882738, 'min': 0.5638647675514221, 'max': 0.5727719664573669}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch32.npy
+  Gradient norms:
+    lstm_encoder: 0.012316
+    lstm_decoder: 0.006778
+    output_layer: 0.096188
+  Regime gate grads (epoch avg): tensor([[ 0.0254,  0.0268],
+        [-0.0260, -0.0277]])
+  VSN output std:
+    encoder: 0.163251
+  Attention entropy: 2.941548
+  Regime attention gates: [[0.4514675438404083, 0.44177019596099854], [0.5638647675514221, 0.5727719664573669]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 33
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 33: val_loss=0.40775665640830994
+Epoch 33: train_loss=0.4246836006641388
+
+[CollapseMonitor] Epoch 33
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.030001, range: 0.241171, mean: 0.063367
+  Pos: 97.7%, Neg: 2.3%, Unique: 1255
+  Dir Acc: 54.52%, Pred Sharpe: 33.5292
+  Composite: 0.4281 (dist_match: 0.5702, actual_pos: 54.8%, pred_pos: 97.7%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5702655911445618, 'std': 0.0053242044523358345, 'min': 0.5656546950340271, 'max': 0.5748764872550964}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch33.npy
+  Gradient norms:
+    lstm_encoder: 0.012256
+    lstm_decoder: 0.006901
+    output_layer: 0.095580
+  Regime gate grads (epoch avg): tensor([[ 0.0283,  0.0329],
+        [-0.0173, -0.0221]])
+  VSN output std:
+    encoder: 0.163304
+  Attention entropy: 2.942663
+  Regime attention gates: [[0.44861793518066406, 0.43865594267845154], [0.5656546950340271, 0.5748764872550964]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 34
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 34: val_loss=0.4068130850791931
+Epoch 34: train_loss=0.4232045114040375
+
+[CollapseMonitor] Epoch 34
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.032652, range: 0.254959, mean: 0.092632
+  Pos: 98.8%, Neg: 1.2%, Unique: 1263
+  Dir Acc: 54.76%, Pred Sharpe: 45.0346
+  Composite: 0.4271 (dist_match: 0.5601, actual_pos: 54.8%, pred_pos: 98.8%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5726014375686646, 'std': 0.005438729654997587, 'min': 0.5678913593292236, 'max': 0.5773115158081055}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch34.npy
+  Gradient norms:
+    lstm_encoder: 0.013066
+    lstm_decoder: 0.007301
+    output_layer: 0.098057
+  Regime gate grads (epoch avg): tensor([[ 0.0193,  0.0241],
+        [-0.0271, -0.0319]])
+  VSN output std:
+    encoder: 0.164831
+  Attention entropy: 2.944503
+  Regime attention gates: [[0.44681984186172485, 0.43648165464401245], [0.5678913593292236, 0.5773115158081055]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 35
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 35: val_loss=0.4067660868167877
+Epoch 35: train_loss=0.42459800839424133
+
+[CollapseMonitor] Epoch 35
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.040085, range: 0.316857, mean: 0.049395
+  Pos: 91.6%, Neg: 8.4%, Unique: 1270
+  Dir Acc: 53.82%, Pred Sharpe: 19.5612
+  Composite: 0.4391 (dist_match: 0.6318, actual_pos: 54.8%, pred_pos: 91.6%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.57436203956604, 'std': 0.005511375144124031, 'min': 0.5695890784263611, 'max': 0.5791350603103638}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch35.npy
+  Gradient norms:
+    lstm_encoder: 0.013019
+    lstm_decoder: 0.007406
+    output_layer: 0.094138
+  Regime gate grads (epoch avg): tensor([[ 0.0260,  0.0291],
+        [-0.0205, -0.0225]])
+  VSN output std:
+    encoder: 0.165396
+  Attention entropy: 2.933345
+  Regime attention gates: [[0.44414493441581726, 0.4337492883205414], [0.5695890784263611, 0.5791350603103638]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 36
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 36: val_loss=0.4062848389148712
+Epoch 36: train_loss=0.42369797825813293
+
+[CollapseMonitor] Epoch 36
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.039479, range: 0.309358, mean: 0.061058
+  Pos: 93.4%, Neg: 6.6%, Unique: 1264
+  Dir Acc: 54.06%, Pred Sharpe: 24.5511
+  Composite: 0.4362 (dist_match: 0.6139, actual_pos: 54.8%, pred_pos: 93.4%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5764572024345398, 'std': 0.005517122335731983, 'min': 0.5716792345046997, 'max': 0.5812351703643799}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch36.npy
+  Gradient norms:
+    lstm_encoder: 0.012259
+    lstm_decoder: 0.007042
+    output_layer: 0.090538
+  Regime gate grads (epoch avg): tensor([[ 0.0214,  0.0333],
+        [-0.0203, -0.0205]])
+  VSN output std:
+    encoder: 0.163729
+  Attention entropy: 2.934804
+  Regime attention gates: [[0.4419541656970978, 0.4307692050933838], [0.5716792345046997, 0.5812351703643799]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 37
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 37: val_loss=0.40607160329818726
+Epoch 37: train_loss=0.4235747456550598
+
+[CollapseMonitor] Epoch 37
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.039575, range: 0.305154, mean: 0.112952
+  Pos: 99.9%, Neg: 0.1%, Unique: 1270
+  Dir Acc: 54.84%, Pred Sharpe: 45.3078
+  Composite: 0.4245 (dist_match: 0.5484, actual_pos: 54.8%, pred_pos: 99.9%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5785126686096191, 'std': 0.0055192215368151665, 'min': 0.573732852935791, 'max': 0.5832924246788025}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch37.npy
+  Gradient norms:
+    lstm_encoder: 0.014061
+    lstm_decoder: 0.008151
+    output_layer: 0.100403
+  Regime gate grads (epoch avg): tensor([[ 0.0303,  0.0317],
+        [-0.0251, -0.0268]])
+  VSN output std:
+    encoder: 0.164964
+  Attention entropy: 2.926149
+  Regime attention gates: [[0.43942350149154663, 0.4282272160053253], [0.573732852935791, 0.5832924246788025]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 38
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 38: val_loss=0.4049682021141052
+Epoch 38: train_loss=0.42341357469558716
+
+[CollapseMonitor] Epoch 38
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.042717, range: 0.345159, mean: 0.065887
+  Pos: 94.5%, Neg: 5.5%, Unique: 1266
+  Dir Acc: 53.90%, Pred Sharpe: 24.4848
+  Composite: 0.4320 (dist_match: 0.6030, actual_pos: 54.8%, pred_pos: 94.5%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5808485746383667, 'std': 0.00589194567874074, 'min': 0.5757459998130798, 'max': 0.5859511494636536}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch38.npy
+  Gradient norms:
+    lstm_encoder: 0.013636
+    lstm_decoder: 0.007846
+    output_layer: 0.092490
+  Regime gate grads (epoch avg): tensor([[ 0.0294,  0.0374],
+        [-0.0214, -0.0274]])
+  VSN output std:
+    encoder: 0.162684
+  Attention entropy: 2.926895
+  Regime attention gates: [[0.4367537200450897, 0.4252054691314697], [0.5757459998130798, 0.5859511494636536]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 39
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 39: val_loss=0.4044802188873291
+Epoch 39: train_loss=0.4231855571269989
+
+[CollapseMonitor] Epoch 39
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.045806, range: 0.369082, mean: 0.064043
+  Pos: 94.9%, Neg: 5.1%, Unique: 1265
+  Dir Acc: 54.21%, Pred Sharpe: 22.1946
+  Composite: 0.4332 (dist_match: 0.5983, actual_pos: 54.8%, pred_pos: 94.9%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5832270383834839, 'std': 0.006192025262862444, 'min': 0.5778645873069763, 'max': 0.5885894894599915}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch39.npy
+  Gradient norms:
+    lstm_encoder: 0.015246
+    lstm_decoder: 0.008132
+    output_layer: 0.089776
+  Regime gate grads (epoch avg): tensor([[ 0.0367,  0.0426],
+        [-0.0225, -0.0314]])
+  VSN output std:
+    encoder: 0.161683
+  Attention entropy: 2.931790
+  Regime attention gates: [[0.4334183633327484, 0.4215904176235199], [0.5778645873069763, 0.5885894894599915]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 40
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 40: val_loss=0.40457987785339355
+Epoch 40: train_loss=0.42228248715400696
+
+[CollapseMonitor] Epoch 40
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.042582, range: 0.350354, mean: 0.061769
+  Pos: 95.4%, Neg: 4.6%, Unique: 1266
+  Dir Acc: 54.37%, Pred Sharpe: 23.0274
+  Composite: 0.4332 (dist_match: 0.5936, actual_pos: 54.8%, pred_pos: 95.4%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5851823687553406, 'std': 0.006275097373872995, 'min': 0.5797479748725891, 'max': 0.590616762638092}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch40.npy
+  Gradient norms:
+    lstm_encoder: 0.015734
+    lstm_decoder: 0.008558
+    output_layer: 0.091680
+  Regime gate grads (epoch avg): tensor([[ 0.0304,  0.0395],
+        [-0.0247, -0.0288]])
+  VSN output std:
+    encoder: 0.161155
+  Attention entropy: 2.936996
+  Regime attention gates: [[0.43050840497016907, 0.4180935025215149], [0.5797479748725891, 0.590616762638092]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 41
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 41: val_loss=0.4045305848121643
+Epoch 41: train_loss=0.4215348958969116
+
+[CollapseMonitor] Epoch 41
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.041929, range: 0.353679, mean: 0.069738
+  Pos: 96.3%, Neg: 3.7%, Unique: 1269
+  Dir Acc: 54.29%, Pred Sharpe: 26.4035
+  Composite: 0.4303 (dist_match: 0.5850, actual_pos: 54.8%, pred_pos: 96.3%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5874844789505005, 'std': 0.006127260159701109, 'min': 0.5821781158447266, 'max': 0.5927908420562744}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch41.npy
+  Gradient norms:
+    lstm_encoder: 0.016281
+    lstm_decoder: 0.008123
+    output_layer: 0.096471
+  Regime gate grads (epoch avg): tensor([[ 0.0348,  0.0419],
+        [-0.0274, -0.0253]])
+  VSN output std:
+    encoder: 0.158622
+  Attention entropy: 2.943119
+  Regime attention gates: [[0.4275389313697815, 0.4149928390979767], [0.5821781158447266, 0.5927908420562744]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 42
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 42: val_loss=0.40352556109428406
+Epoch 42: train_loss=0.4227706491947174
+
+[CollapseMonitor] Epoch 42
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.043951, range: 0.362537, mean: 0.050063
+  Pos: 91.6%, Neg: 8.4%, Unique: 1260
+  Dir Acc: 54.45%, Pred Sharpe: 18.0820
+  Composite: 0.4442 (dist_match: 0.6318, actual_pos: 54.8%, pred_pos: 91.6%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5890018939971924, 'std': 0.006388969253748655, 'min': 0.5834688544273376, 'max': 0.5945348739624023}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch42.npy
+  Gradient norms:
+    lstm_encoder: 0.019949
+    lstm_decoder: 0.009372
+    output_layer: 0.092011
+  Regime gate grads (epoch avg): tensor([[ 0.0257,  0.0314],
+        [-0.0245, -0.0316]])
+  VSN output std:
+    encoder: 0.158664
+  Attention entropy: 2.936100
+  Regime attention gates: [[0.4247530698776245, 0.4122740924358368], [0.5834688544273376, 0.5945348739624023]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 43
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 43: val_loss=0.40272006392478943
+Epoch 43: train_loss=0.4213951528072357
+
+[CollapseMonitor] Epoch 43
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.045232, range: 0.353951, mean: 0.098338
+  Pos: 99.0%, Neg: 1.0%, Unique: 1272
+  Dir Acc: 54.84%, Pred Sharpe: 34.5127
+  Composite: 0.4271 (dist_match: 0.5577, actual_pos: 54.8%, pred_pos: 99.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5912023186683655, 'std': 0.006364157889038324, 'min': 0.5856907963752747, 'max': 0.5967138409614563}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch43.npy
+  Gradient norms:
+    lstm_encoder: 0.018122
+    lstm_decoder: 0.008695
+    output_layer: 0.089890
+  Regime gate grads (epoch avg): tensor([[ 0.0420,  0.0460],
+        [-0.0309, -0.0290]])
+  VSN output std:
+    encoder: 0.161778
+  Attention entropy: 2.918973
+  Regime attention gates: [[0.42165273427963257, 0.40916740894317627], [0.5856907963752747, 0.5967138409614563]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 44
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 44: val_loss=0.40244582295417786
+Epoch 44: train_loss=0.42388811707496643
+
+[CollapseMonitor] Epoch 44
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.052485, range: 0.387080, mean: 0.059279
+  Pos: 90.6%, Neg: 9.4%, Unique: 1269
+  Dir Acc: 54.29%, Pred Sharpe: 17.9294
+  Composite: 0.4455 (dist_match: 0.6412, actual_pos: 54.8%, pred_pos: 90.6%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5933477282524109, 'std': 0.00649836752563715, 'min': 0.5877199769020081, 'max': 0.5989754796028137}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch44.npy
+  Gradient norms:
+    lstm_encoder: 0.019609
+    lstm_decoder: 0.009576
+    output_layer: 0.097880
+  Regime gate grads (epoch avg): tensor([[ 0.0363,  0.0350],
+        [-0.0310, -0.0366]])
+  VSN output std:
+    encoder: 0.163406
+  Attention entropy: 2.896597
+  Regime attention gates: [[0.4182858169078827, 0.4064311981201172], [0.5877199769020081, 0.5989754796028137]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 45
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 45: val_loss=0.40210771560668945
+Epoch 45: train_loss=0.42232000827789307
+
+[CollapseMonitor] Epoch 45
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.046047, range: 0.361916, mean: 0.106742
+  Pos: 99.4%, Neg: 0.6%, Unique: 1268
+  Dir Acc: 54.91%, Pred Sharpe: 36.7991
+  Composite: 0.4266 (dist_match: 0.5538, actual_pos: 54.8%, pred_pos: 99.4%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5958265066146851, 'std': 0.006803711876273155, 'min': 0.5899342894554138, 'max': 0.6017186641693115}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch45.npy
+  Gradient norms:
+    lstm_encoder: 0.019949
+    lstm_decoder: 0.009458
+    output_layer: 0.095885
+  Regime gate grads (epoch avg): tensor([[ 0.0468,  0.0587],
+        [-0.0274, -0.0365]])
+  VSN output std:
+    encoder: 0.162800
+  Attention entropy: 2.922928
+  Regime attention gates: [[0.41475313901901245, 0.402863085269928], [0.5899342894554138, 0.6017186641693115]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 46
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 46: val_loss=0.4014947712421417
+Epoch 46: train_loss=0.4205985367298126
+
+[CollapseMonitor] Epoch 46
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.055348, range: 0.430846, mean: 0.064587
+  Pos: 93.4%, Neg: 6.6%, Unique: 1263
+  Dir Acc: 55.15%, Pred Sharpe: 18.5244
+  Composite: 0.4450 (dist_match: 0.6139, actual_pos: 54.8%, pred_pos: 93.4%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.5981841087341309, 'std': 0.006924638524651527, 'min': 0.5921871662139893, 'max': 0.6041809916496277}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch46.npy
+  Gradient norms:
+    lstm_encoder: 0.020128
+    lstm_decoder: 0.009298
+    output_layer: 0.090738
+  Regime gate grads (epoch avg): tensor([[ 0.0420,  0.0463],
+        [-0.0356, -0.0405]])
+  VSN output std:
+    encoder: 0.163066
+  Attention entropy: 2.921528
+  Regime attention gates: [[0.4118374288082123, 0.399809330701828], [0.5921871662139893, 0.6041809916496277]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 47
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 47: val_loss=0.40161675214767456
+Epoch 47: train_loss=0.42093050479888916
+
+[CollapseMonitor] Epoch 47
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.063011, range: 0.444709, mean: 0.089235
+  Pos: 97.1%, Neg: 2.9%, Unique: 1268
+  Dir Acc: 54.84%, Pred Sharpe: 22.4811
+  Composite: 0.4322 (dist_match: 0.5764, actual_pos: 54.8%, pred_pos: 97.1%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6000790596008301, 'std': 0.006734852213412523, 'min': 0.594246506690979, 'max': 0.6059116125106812}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch47.npy
+  Gradient norms:
+    lstm_encoder: 0.021169
+    lstm_decoder: 0.009869
+    output_layer: 0.095729
+  Regime gate grads (epoch avg): tensor([[ 0.0561,  0.0586],
+        [-0.0310, -0.0313]])
+  VSN output std:
+    encoder: 0.163490
+  Attention entropy: 2.917105
+  Regime attention gates: [[0.40818291902542114, 0.39690154790878296], [0.594246506690979, 0.6059116125106812]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 48
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 48: val_loss=0.4018700420856476
+Epoch 48: train_loss=0.42164283990859985
+
+[CollapseMonitor] Epoch 48
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.064270, range: 0.465768, mean: 0.056656
+  Pos: 91.2%, Neg: 8.8%, Unique: 1266
+  Dir Acc: 54.68%, Pred Sharpe: 13.9937
+  Composite: 0.4472 (dist_match: 0.6357, actual_pos: 54.8%, pred_pos: 91.2%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6024142503738403, 'std': 0.006676246877759695, 'min': 0.5966324210166931, 'max': 0.6081960201263428}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch48.npy
+  Gradient norms:
+    lstm_encoder: 0.021761
+    lstm_decoder: 0.009769
+    output_layer: 0.095736
+  Regime gate grads (epoch avg): tensor([[ 0.0525,  0.0585],
+        [-0.0368, -0.0373]])
+  VSN output std:
+    encoder: 0.164174
+  Attention entropy: 2.927194
+  Regime attention gates: [[0.40423768758773804, 0.39301544427871704], [0.5966324210166931, 0.6081960201263428]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 49
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 49: val_loss=0.40123286843299866
+Epoch 49: train_loss=0.4201779067516327
+
+[CollapseMonitor] Epoch 49
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.051512, range: 0.395037, mean: 0.097196
+  Pos: 98.4%, Neg: 1.6%, Unique: 1264
+  Dir Acc: 54.91%, Pred Sharpe: 29.9533
+  Composite: 0.4292 (dist_match: 0.5632, actual_pos: 54.8%, pred_pos: 98.4%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6046092510223389, 'std': 0.006772774737328291, 'min': 0.5987438559532166, 'max': 0.6104746460914612}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch49.npy
+  Gradient norms:
+    lstm_encoder: 0.022079
+    lstm_decoder: 0.009601
+    output_layer: 0.088585
+  Regime gate grads (epoch avg): tensor([[ 0.0542,  0.0611],
+        [-0.0329, -0.0367]])
+  VSN output std:
+    encoder: 0.162364
+  Attention entropy: 2.915953
+  Regime attention gates: [[0.4007575809955597, 0.38958802819252014], [0.5987438559532166, 0.6104746460914612]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 50
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 50: val_loss=0.40131402015686035
+Epoch 50: train_loss=0.42017069458961487
+
+[CollapseMonitor] Epoch 50
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.045819, range: 0.350685, mean: 0.056878
+  Pos: 92.7%, Neg: 7.3%, Unique: 1269
+  Dir Acc: 54.45%, Pred Sharpe: 19.7061
+  Composite: 0.4413 (dist_match: 0.6209, actual_pos: 54.8%, pred_pos: 92.7%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6063872575759888, 'std': 0.006873569916933775, 'min': 0.6004345417022705, 'max': 0.6123399138450623}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch50.npy
+  Gradient norms:
+    lstm_encoder: 0.021092
+    lstm_decoder: 0.009527
+    output_layer: 0.091305
+  Regime gate grads (epoch avg): tensor([[ 0.0549,  0.0576],
+        [-0.0258, -0.0280]])
+  VSN output std:
+    encoder: 0.162108
+  Attention entropy: 2.906153
+  Regime attention gates: [[0.39694446325302124, 0.38622739911079407], [0.6004345417022705, 0.6123399138450623]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 51
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 51: val_loss=0.40145429968833923
+Epoch 51: train_loss=0.4207358956336975
+
+[CollapseMonitor] Epoch 51
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.046274, range: 0.357953, mean: 0.033619
+  Pos: 85.3%, Neg: 14.7%, Unique: 1270
+  Dir Acc: 53.12%, Pred Sharpe: 11.5333
+  Composite: 0.4502 (dist_match: 0.6950, actual_pos: 54.8%, pred_pos: 85.3%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6088082194328308, 'std': 0.006844835355877876, 'min': 0.6028804183006287, 'max': 0.614736020565033}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch51.npy
+  Gradient norms:
+    lstm_encoder: 0.023174
+    lstm_decoder: 0.009732
+    output_layer: 0.092996
+  Regime gate grads (epoch avg): tensor([[ 0.0475,  0.0504],
+        [-0.0389, -0.0461]])
+  VSN output std:
+    encoder: 0.162638
+  Attention entropy: 2.906923
+  Regime attention gates: [[0.3936617076396942, 0.3831869065761566], [0.6028804183006287, 0.614736020565033]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 52
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 52: val_loss=0.4010600745677948
+Epoch 52: train_loss=0.4200016260147095
+
+[CollapseMonitor] Epoch 52
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.055053, range: 0.416423, mean: 0.060302
+  Pos: 90.8%, Neg: 9.2%, Unique: 1276
+  Dir Acc: 54.29%, Pred Sharpe: 17.3883
+  Composite: 0.4451 (dist_match: 0.6396, actual_pos: 54.8%, pred_pos: 90.8%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6112790107727051, 'std': 0.006697169970721006, 'min': 0.6054790616035461, 'max': 0.6170789003372192}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch52.npy
+  Gradient norms:
+    lstm_encoder: 0.023421
+    lstm_decoder: 0.010147
+    output_layer: 0.097947
+  Regime gate grads (epoch avg): tensor([[ 0.0568,  0.0697],
+        [-0.0432, -0.0386]])
+  VSN output std:
+    encoder: 0.163052
+  Attention entropy: 2.895551
+  Regime attention gates: [[0.3907081186771393, 0.38000187277793884], [0.6054790616035461, 0.6170789003372192]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 53
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 53: val_loss=0.4007851183414459
+Epoch 53: train_loss=0.42037346959114075
+
+[CollapseMonitor] Epoch 53
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.059773, range: 0.455144, mean: 0.092077
+  Pos: 96.9%, Neg: 3.1%, Unique: 1273
+  Dir Acc: 55.23%, Pred Sharpe: 24.4540
+  Composite: 0.4360 (dist_match: 0.5788, actual_pos: 54.8%, pred_pos: 96.9%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6130486726760864, 'std': 0.006871814839541912, 'min': 0.6070975065231323, 'max': 0.6189998388290405}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch53.npy
+  Gradient norms:
+    lstm_encoder: 0.023422
+    lstm_decoder: 0.010029
+    output_layer: 0.090828
+  Regime gate grads (epoch avg): tensor([[ 0.0603,  0.0669],
+        [-0.0324, -0.0443]])
+  VSN output std:
+    encoder: 0.164226
+  Attention entropy: 2.919156
+  Regime attention gates: [[0.3873361647129059, 0.3766721785068512], [0.6070975065231323, 0.6189998388290405]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 54
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 54: val_loss=0.40052223205566406
+Epoch 54: train_loss=0.4216127097606659
+
+[CollapseMonitor] Epoch 54
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.050493, range: 0.409617, mean: 0.078054
+  Pos: 96.2%, Neg: 3.8%, Unique: 1270
+  Dir Acc: 54.84%, Pred Sharpe: 24.5393
+  Composite: 0.4348 (dist_match: 0.5858, actual_pos: 54.8%, pred_pos: 96.2%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6154719591140747, 'std': 0.007158094551414251, 'min': 0.6092728972434998, 'max': 0.6216710805892944}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch54.npy
+  Gradient norms:
+    lstm_encoder: 0.023046
+    lstm_decoder: 0.009763
+    output_layer: 0.092204
+  Regime gate grads (epoch avg): tensor([[ 0.0634,  0.0704],
+        [-0.0388, -0.0493]])
+  VSN output std:
+    encoder: 0.159812
+  Attention entropy: 2.926059
+  Regime attention gates: [[0.38346943259239197, 0.3727482855319977], [0.6092728972434998, 0.6216710805892944]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 55
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 55: val_loss=0.39951765537261963
+Epoch 55: train_loss=0.41906994581222534
+
+[CollapseMonitor] Epoch 55
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.049686, range: 0.398051, mean: 0.104566
+  Pos: 99.3%, Neg: 0.7%, Unique: 1272
+  Dir Acc: 55.30%, Pred Sharpe: 33.4082
+  Composite: 0.4299 (dist_match: 0.5546, actual_pos: 54.8%, pred_pos: 99.3%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6179474592208862, 'std': 0.0075490232557058334, 'min': 0.6114098429679871, 'max': 0.6244851350784302}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch55.npy
+  Gradient norms:
+    lstm_encoder: 0.023808
+    lstm_decoder: 0.009845
+    output_layer: 0.092096
+  Regime gate grads (epoch avg): tensor([[ 0.0531,  0.0632],
+        [-0.0475, -0.0567]])
+  VSN output std:
+    encoder: 0.160974
+  Attention entropy: 2.927118
+  Regime attention gates: [[0.3803284466266632, 0.36956119537353516], [0.6114098429679871, 0.6244851350784302]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 56
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 56: val_loss=0.3995494246482849
+Epoch 56: train_loss=0.42003294825553894
+
+[CollapseMonitor] Epoch 56
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.058528, range: 0.462364, mean: 0.040958
+  Pos: 83.9%, Neg: 16.1%, Unique: 1274
+  Dir Acc: 53.20%, Pred Sharpe: 11.1091
+  Composite: 0.4544 (dist_match: 0.7083, actual_pos: 54.8%, pred_pos: 83.9%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6201677322387695, 'std': 0.007958260364830494, 'min': 0.6132757067680359, 'max': 0.627059817314148}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch56.npy
+  Gradient norms:
+    lstm_encoder: 0.026826
+    lstm_decoder: 0.010696
+    output_layer: 0.102390
+  Regime gate grads (epoch avg): tensor([[ 0.0659,  0.0774],
+        [-0.0378, -0.0492]])
+  VSN output std:
+    encoder: 0.163289
+  Attention entropy: 2.914231
+  Regime attention gates: [[0.3774576783180237, 0.36656448245048523], [0.6132757067680359, 0.627059817314148]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 57
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 57: val_loss=0.3984743356704712
+Epoch 57: train_loss=0.420575350522995
+
+[CollapseMonitor] Epoch 57
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.053234, range: 0.424008, mean: 0.092738
+  Pos: 97.3%, Neg: 2.7%, Unique: 1274
+  Dir Acc: 55.46%, Pred Sharpe: 27.6547
+  Composite: 0.4367 (dist_match: 0.5749, actual_pos: 54.8%, pred_pos: 97.3%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6222244501113892, 'std': 0.00812282133847475, 'min': 0.6151898503303528, 'max': 0.6292589902877808}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch57.npy
+  Gradient norms:
+    lstm_encoder: 0.024581
+    lstm_decoder: 0.009852
+    output_layer: 0.094624
+  Regime gate grads (epoch avg): tensor([[ 0.0683,  0.0782],
+        [-0.0363, -0.0473]])
+  VSN output std:
+    encoder: 0.158076
+  Attention entropy: 2.924408
+  Regime attention gates: [[0.37409260869026184, 0.36306771636009216], [0.6151898503303528, 0.6292589902877808]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 58
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 58: val_loss=0.3989647626876831
+Epoch 58: train_loss=0.4176367521286011
+
+[CollapseMonitor] Epoch 58
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.058081, range: 0.486743, mean: 0.058578
+  Pos: 89.9%, Neg: 10.1%, Unique: 1273
+  Dir Acc: 54.13%, Pred Sharpe: 16.0104
+  Composite: 0.4463 (dist_match: 0.6490, actual_pos: 54.8%, pred_pos: 89.9%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6244148015975952, 'std': 0.008381020277738571, 'min': 0.6171566247940063, 'max': 0.6316729784011841}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch58.npy
+  Gradient norms:
+    lstm_encoder: 0.026307
+    lstm_decoder: 0.010181
+    output_layer: 0.088946
+  Regime gate grads (epoch avg): tensor([[ 0.0542,  0.0652],
+        [-0.0415, -0.0496]])
+  VSN output std:
+    encoder: 0.158598
+  Attention entropy: 2.939590
+  Regime attention gates: [[0.3715464472770691, 0.36029911041259766], [0.6171566247940063, 0.6316729784011841]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 59
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 59: val_loss=0.3992350697517395
+Epoch 59: train_loss=0.4193880558013916
+
+[CollapseMonitor] Epoch 59
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.054413, range: 0.460651, mean: 0.079487
+  Pos: 94.9%, Neg: 5.1%, Unique: 1274
+  Dir Acc: 54.45%, Pred Sharpe: 23.1896
+  Composite: 0.4353 (dist_match: 0.5991, actual_pos: 54.8%, pred_pos: 94.9%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.626369059085846, 'std': 0.008310474455356598, 'min': 0.6191719770431519, 'max': 0.63356614112854}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch59.npy
+  Gradient norms:
+    lstm_encoder: 0.026305
+    lstm_decoder: 0.010369
+    output_layer: 0.094907
+  Regime gate grads (epoch avg): tensor([[ 0.0845,  0.0936],
+        [-0.0461, -0.0470]])
+  VSN output std:
+    encoder: 0.156878
+  Attention entropy: 2.941895
+  Regime attention gates: [[0.367705374956131, 0.35680222511291504], [0.6191719770431519, 0.63356614112854]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 60
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 60: val_loss=0.39799726009368896
+Epoch 60: train_loss=0.41969379782676697
+
+[CollapseMonitor] Epoch 60
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.063580, range: 0.513853, mean: 0.076461
+  Pos: 94.2%, Neg: 5.8%, Unique: 1271
+  Dir Acc: 54.91%, Pred Sharpe: 19.0905
+  Composite: 0.4408 (dist_match: 0.6053, actual_pos: 54.8%, pred_pos: 94.2%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6284970641136169, 'std': 0.008446955122053623, 'min': 0.6211817860603333, 'max': 0.6358123421669006}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch60.npy
+  Gradient norms:
+    lstm_encoder: 0.026322
+    lstm_decoder: 0.010503
+    output_layer: 0.095944
+  Regime gate grads (epoch avg): tensor([[ 0.0666,  0.0759],
+        [-0.0442, -0.0545]])
+  VSN output std:
+    encoder: 0.160372
+  Attention entropy: 2.935185
+  Regime attention gates: [[0.36476218700408936, 0.35376814007759094], [0.6211817860603333, 0.6358123421669006]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 61
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 61: val_loss=0.3977019488811493
+Epoch 61: train_loss=0.4200723171234131
+
+[CollapseMonitor] Epoch 61
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.066862, range: 0.550420, mean: 0.079122
+  Pos: 91.3%, Neg: 8.7%, Unique: 1277
+  Dir Acc: 54.84%, Pred Sharpe: 18.7853
+  Composite: 0.4481 (dist_match: 0.6342, actual_pos: 54.8%, pred_pos: 91.3%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6311110258102417, 'std': 0.008457623422145844, 'min': 0.6237865090370178, 'max': 0.6384355425834656}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch61.npy
+  Gradient norms:
+    lstm_encoder: 0.028599
+    lstm_decoder: 0.011356
+    output_layer: 0.097788
+  Regime gate grads (epoch avg): tensor([[ 0.0883,  0.1033],
+        [-0.0582, -0.0625]])
+  VSN output std:
+    encoder: 0.160556
+  Attention entropy: 2.920730
+  Regime attention gates: [[0.36159899830818176, 0.35049670934677124], [0.6237865090370178, 0.6384355425834656]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 62
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 62: val_loss=0.39776182174682617
+Epoch 62: train_loss=0.41942936182022095
+
+[CollapseMonitor] Epoch 62
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.067247, range: 0.526394, mean: 0.097941
+  Pos: 97.3%, Neg: 2.7%, Unique: 1275
+  Dir Acc: 55.46%, Pred Sharpe: 23.1203
+  Composite: 0.4367 (dist_match: 0.5749, actual_pos: 54.8%, pred_pos: 97.3%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.633085310459137, 'std': 0.008362575434148312, 'min': 0.6258431077003479, 'max': 0.640327513217926}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch62.npy
+  Gradient norms:
+    lstm_encoder: 0.027285
+    lstm_decoder: 0.011239
+    output_layer: 0.088134
+  Regime gate grads (epoch avg): tensor([[ 0.0888,  0.0895],
+        [-0.0506, -0.0523]])
+  VSN output std:
+    encoder: 0.160898
+  Attention entropy: 2.918165
+  Regime attention gates: [[0.35805758833885193, 0.34726279973983765], [0.6258431077003479, 0.640327513217926]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 63
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 63: val_loss=0.39756715297698975
+Epoch 63: train_loss=0.41891157627105713
+
+[CollapseMonitor] Epoch 63
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.066045, range: 0.555887, mean: 0.108097
+  Pos: 96.9%, Neg: 3.1%, Unique: 1274
+  Dir Acc: 55.54%, Pred Sharpe: 25.9821
+  Composite: 0.4384 (dist_match: 0.5788, actual_pos: 54.8%, pred_pos: 96.9%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6351901888847351, 'std': 0.008484328165650368, 'min': 0.6278425455093384, 'max': 0.6425378322601318}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch63.npy
+  Gradient norms:
+    lstm_encoder: 0.025715
+    lstm_decoder: 0.010981
+    output_layer: 0.097575
+  Regime gate grads (epoch avg): tensor([[ 0.0982,  0.0984],
+        [-0.0442, -0.0523]])
+  VSN output std:
+    encoder: 0.162527
+  Attention entropy: 2.901582
+  Regime attention gates: [[0.35476353764533997, 0.3443635106086731], [0.6278425455093384, 0.6425378322601318]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 64
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 64: val_loss=0.39876264333724976
+Epoch 64: train_loss=0.41917577385902405
+
+[CollapseMonitor] Epoch 64
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.070209, range: 0.587080, mean: 0.098645
+  Pos: 94.1%, Neg: 5.9%, Unique: 1272
+  Dir Acc: 55.69%, Pred Sharpe: 22.3040
+  Composite: 0.4475 (dist_match: 0.6069, actual_pos: 54.8%, pred_pos: 94.1%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6367103457450867, 'std': 0.008606355637311935, 'min': 0.6292570233345032, 'max': 0.6441636681556702}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch64.npy
+  Gradient norms:
+    lstm_encoder: 0.029309
+    lstm_decoder: 0.011284
+    output_layer: 0.102627
+  Regime gate grads (epoch avg): tensor([[ 0.0810,  0.0854],
+        [-0.0439, -0.0521]])
+  VSN output std:
+    encoder: 0.162171
+  Attention entropy: 2.918207
+  Regime attention gates: [[0.35203811526298523, 0.3420058786869049], [0.6292570233345032, 0.6441636681556702]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 65
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 65: val_loss=0.39685556292533875
+Epoch 65: train_loss=0.41821974515914917
+
+[CollapseMonitor] Epoch 65
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.073557, range: 0.615037, mean: 0.101676
+  Pos: 95.6%, Neg: 4.4%, Unique: 1274
+  Dir Acc: 55.54%, Pred Sharpe: 21.9431
+  Composite: 0.4419 (dist_match: 0.5913, actual_pos: 54.8%, pred_pos: 95.6%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6388869285583496, 'std': 0.008655427955091, 'min': 0.6313911080360413, 'max': 0.646382749080658}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch65.npy
+  Gradient norms:
+    lstm_encoder: 0.027588
+    lstm_decoder: 0.011520
+    output_layer: 0.093463
+  Regime gate grads (epoch avg): tensor([[ 0.0989,  0.1046],
+        [-0.0550, -0.0671]])
+  VSN output std:
+    encoder: 0.162350
+  Attention entropy: 2.902008
+  Regime attention gates: [[0.34860676527023315, 0.33894625306129456], [0.6313911080360413, 0.646382749080658]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 66
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 66: val_loss=0.3991926610469818
+Epoch 66: train_loss=0.42000535130500793
+
+[CollapseMonitor] Epoch 66
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.062954, range: 0.584711, mean: 0.110149
+  Pos: 97.0%, Neg: 3.0%, Unique: 1273
+  Dir Acc: 55.69%, Pred Sharpe: 27.7754
+  Composite: 0.4392 (dist_match: 0.5772, actual_pos: 54.8%, pred_pos: 97.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6409859657287598, 'std': 0.008693281561136246, 'min': 0.633457362651825, 'max': 0.6485145688056946}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch66.npy
+  Gradient norms:
+    lstm_encoder: 0.029600
+    lstm_decoder: 0.011818
+    output_layer: 0.094082
+  Regime gate grads (epoch avg): tensor([[ 0.0971,  0.1165],
+        [-0.0565, -0.0627]])
+  VSN output std:
+    encoder: 0.161414
+  Attention entropy: 2.905890
+  Regime attention gates: [[0.3450484871864319, 0.33529892563819885], [0.633457362651825, 0.6485145688056946]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 67
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 67: val_loss=0.3965180814266205
+Epoch 67: train_loss=0.4179115295410156
+
+[CollapseMonitor] Epoch 67
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.079265, range: 0.696207, mean: 0.075835
+  Pos: 90.6%, Neg: 9.4%, Unique: 1279
+  Dir Acc: 55.07%, Pred Sharpe: 15.1876
+  Composite: 0.4519 (dist_match: 0.6412, actual_pos: 54.8%, pred_pos: 90.6%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6432896852493286, 'std': 0.00852441880851984, 'min': 0.6359072923660278, 'max': 0.6506720185279846}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch67.npy
+  Gradient norms:
+    lstm_encoder: 0.028173
+    lstm_decoder: 0.012312
+    output_layer: 0.100864
+  Regime gate grads (epoch avg): tensor([[ 0.0816,  0.1032],
+        [-0.0715, -0.0693]])
+  VSN output std:
+    encoder: 0.162379
+  Attention entropy: 2.894336
+  Regime attention gates: [[0.34240758419036865, 0.33249685168266296], [0.6359072923660278, 0.6506720185279846]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 68
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 68: val_loss=0.39696040749549866
+Epoch 68: train_loss=0.41841810941696167
+
+[CollapseMonitor] Epoch 68
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.075591, range: 0.666244, mean: 0.067308
+  Pos: 90.8%, Neg: 9.2%, Unique: 1276
+  Dir Acc: 55.07%, Pred Sharpe: 14.1351
+  Composite: 0.4515 (dist_match: 0.6396, actual_pos: 54.8%, pred_pos: 90.8%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6449073553085327, 'std': 0.008519635535776615, 'min': 0.6375291347503662, 'max': 0.6522855758666992}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch68.npy
+  Gradient norms:
+    lstm_encoder: 0.027747
+    lstm_decoder: 0.011239
+    output_layer: 0.097682
+  Regime gate grads (epoch avg): tensor([[ 0.1303,  0.1528],
+        [-0.0587, -0.0602]])
+  VSN output std:
+    encoder: 0.162334
+  Attention entropy: 2.905077
+  Regime attention gates: [[0.3393096923828125, 0.32918545603752136], [0.6375291347503662, 0.6522855758666992]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 69
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 69: val_loss=0.39676299691200256
+Epoch 69: train_loss=0.4181555211544037
+
+[CollapseMonitor] Epoch 69
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.083316, range: 0.754498, mean: 0.100796
+  Pos: 93.3%, Neg: 6.7%, Unique: 1281
+  Dir Acc: 55.54%, Pred Sharpe: 19.2050
+  Composite: 0.4484 (dist_match: 0.6147, actual_pos: 54.8%, pred_pos: 93.3%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.647000789642334, 'std': 0.008345162495970726, 'min': 0.6397736668586731, 'max': 0.6542279124259949}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch69.npy
+  Gradient norms:
+    lstm_encoder: 0.028761
+    lstm_decoder: 0.011174
+    output_layer: 0.092603
+  Regime gate grads (epoch avg): tensor([[ 0.0900,  0.1026],
+        [-0.0702, -0.0713]])
+  VSN output std:
+    encoder: 0.162071
+  Attention entropy: 2.894193
+  Regime attention gates: [[0.336571604013443, 0.326425164937973], [0.6397736668586731, 0.6542279124259949]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 70
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 70: val_loss=0.3982603847980499
+Epoch 70: train_loss=0.4182509481906891
+
+[CollapseMonitor] Epoch 70
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.074405, range: 0.719195, mean: 0.085997
+  Pos: 91.9%, Neg: 8.1%, Unique: 1277
+  Dir Acc: 55.54%, Pred Sharpe: 18.3477
+  Composite: 0.4523 (dist_match: 0.6287, actual_pos: 54.8%, pred_pos: 91.9%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6485872864723206, 'std': 0.008451084606349468, 'min': 0.6412684321403503, 'max': 0.6559061408042908}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch70.npy
+  Gradient norms:
+    lstm_encoder: 0.029752
+    lstm_decoder: 0.012295
+    output_layer: 0.094302
+  Regime gate grads (epoch avg): tensor([[ 0.1167,  0.1223],
+        [-0.0559, -0.0694]])
+  VSN output std:
+    encoder: 0.164970
+  Attention entropy: 2.885268
+  Regime attention gates: [[0.3337648808956146, 0.32381585240364075], [0.6412684321403503, 0.6559061408042908]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 71
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 71: val_loss=0.3961489200592041
+Epoch 71: train_loss=0.4179026782512665
+
+[CollapseMonitor] Epoch 71
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.073718, range: 0.707100, mean: 0.087587
+  Pos: 93.0%, Neg: 7.0%, Unique: 1276
+  Dir Acc: 55.69%, Pred Sharpe: 18.8612
+  Composite: 0.4505 (dist_match: 0.6178, actual_pos: 54.8%, pred_pos: 93.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6502752304077148, 'std': 0.008596341125667095, 'min': 0.6428305506706238, 'max': 0.6577198505401611}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch71.npy
+  Gradient norms:
+    lstm_encoder: 0.030157
+    lstm_decoder: 0.012210
+    output_layer: 0.088440
+  Regime gate grads (epoch avg): tensor([[ 0.1193,  0.1243],
+        [-0.0604, -0.0657]])
+  VSN output std:
+    encoder: 0.164555
+  Attention entropy: 2.876225
+  Regime attention gates: [[0.3305799961090088, 0.32110533118247986], [0.6428305506706238, 0.6577198505401611]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 72
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 72: val_loss=0.39639243483543396
+Epoch 72: train_loss=0.4180103838443756
+
+[CollapseMonitor] Epoch 72
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.079052, range: 0.742634, mean: 0.083253
+  Pos: 92.7%, Neg: 7.3%, Unique: 1279
+  Dir Acc: 55.54%, Pred Sharpe: 16.7181
+  Composite: 0.4501 (dist_match: 0.6209, actual_pos: 54.8%, pred_pos: 92.7%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6522228121757507, 'std': 0.008566574193537235, 'min': 0.6448039412498474, 'max': 0.659641683101654}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch72.npy
+  Gradient norms:
+    lstm_encoder: 0.032346
+    lstm_decoder: 0.013724
+    output_layer: 0.099991
+  Regime gate grads (epoch avg): tensor([[ 0.1186,  0.1229],
+        [-0.0651, -0.0664]])
+  VSN output std:
+    encoder: 0.165400
+  Attention entropy: 2.880381
+  Regime attention gates: [[0.32780885696411133, 0.31842777132987976], [0.6448039412498474, 0.659641683101654]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 73
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 73: val_loss=0.3954989016056061
+Epoch 73: train_loss=0.4157956838607788
+
+[CollapseMonitor] Epoch 73
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.081552, range: 0.757012, mean: 0.095503
+  Pos: 94.5%, Neg: 5.5%, Unique: 1276
+  Dir Acc: 55.77%, Pred Sharpe: 18.5900
+  Composite: 0.4470 (dist_match: 0.6030, actual_pos: 54.8%, pred_pos: 94.5%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6537237167358398, 'std': 0.008797381073236465, 'min': 0.6461049318313599, 'max': 0.661342442035675}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch73.npy
+  Gradient norms:
+    lstm_encoder: 0.031718
+    lstm_decoder: 0.012895
+    output_layer: 0.090980
+  Regime gate grads (epoch avg): tensor([[ 0.1439,  0.1478],
+        [-0.0384, -0.0557]])
+  VSN output std:
+    encoder: 0.164291
+  Attention entropy: 2.876818
+  Regime attention gates: [[0.32469311356544495, 0.31569480895996094], [0.6461049318313599, 0.661342442035675]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 74
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 74: val_loss=0.3979180157184601
+Epoch 74: train_loss=0.4163605272769928
+
+[CollapseMonitor] Epoch 74
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.088797, range: 0.817204, mean: 0.066442
+  Pos: 87.8%, Neg: 12.2%, Unique: 1274
+  Dir Acc: 54.13%, Pred Sharpe: 11.8780
+  Composite: 0.4518 (dist_match: 0.6693, actual_pos: 54.8%, pred_pos: 87.8%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6557753682136536, 'std': 0.009208166040480137, 'min': 0.647800862789154, 'max': 0.6637498736381531}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch74.npy
+  Gradient norms:
+    lstm_encoder: 0.029621
+    lstm_decoder: 0.012506
+    output_layer: 0.092991
+  Regime gate grads (epoch avg): tensor([[ 0.1402,  0.1394],
+        [-0.0625, -0.0873]])
+  VSN output std:
+    encoder: 0.162850
+  Attention entropy: 2.907429
+  Regime attention gates: [[0.3218137323856354, 0.3131793141365051], [0.647800862789154, 0.6637498736381531]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 75
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 75: val_loss=0.3971427083015442
+Epoch 75: train_loss=0.4160228967666626
+
+[CollapseMonitor] Epoch 75
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.084798, range: 0.820312, mean: 0.080468
+  Pos: 90.1%, Neg: 9.9%, Unique: 1273
+  Dir Acc: 54.68%, Pred Sharpe: 15.0640
+  Composite: 0.4502 (dist_match: 0.6466, actual_pos: 54.8%, pred_pos: 90.1%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6573072075843811, 'std': 0.009415192529559135, 'min': 0.6491534113883972, 'max': 0.665461003780365}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch75.npy
+  Gradient norms:
+    lstm_encoder: 0.028170
+    lstm_decoder: 0.012161
+    output_layer: 0.082487
+  Regime gate grads (epoch avg): tensor([[ 0.1304,  0.1291],
+        [-0.0523, -0.0608]])
+  VSN output std:
+    encoder: 0.164728
+  Attention entropy: 2.867152
+  Regime attention gates: [[0.31868574023246765, 0.31054815649986267], [0.6491534113883972, 0.665461003780365]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 76
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 76: val_loss=0.3959188163280487
+Epoch 76: train_loss=0.41673311591148376
+
+[CollapseMonitor] Epoch 76
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.079602, range: 0.767539, mean: 0.096310
+  Pos: 94.4%, Neg: 5.6%, Unique: 1277
+  Dir Acc: 55.85%, Pred Sharpe: 19.2064
+  Composite: 0.4478 (dist_match: 0.6037, actual_pos: 54.8%, pred_pos: 94.4%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6587181091308594, 'std': 0.009278126992285252, 'min': 0.6506829857826233, 'max': 0.6667531728744507}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch76.npy
+  Gradient norms:
+    lstm_encoder: 0.031987
+    lstm_decoder: 0.013064
+    output_layer: 0.093336
+  Regime gate grads (epoch avg): tensor([[ 0.1138,  0.1189],
+        [-0.0552, -0.0565]])
+  VSN output std:
+    encoder: 0.163759
+  Attention entropy: 2.850533
+  Regime attention gates: [[0.3160865008831024, 0.30819350481033325], [0.6506829857826233, 0.6667531728744507]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 77
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 77: val_loss=0.39506566524505615
+Epoch 77: train_loss=0.4171111285686493
+
+[CollapseMonitor] Epoch 77
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.080341, range: 0.782819, mean: 0.065553
+  Pos: 89.9%, Neg: 10.1%, Unique: 1276
+  Dir Acc: 55.23%, Pred Sharpe: 12.9525
+  Composite: 0.4553 (dist_match: 0.6490, actual_pos: 54.8%, pred_pos: 89.9%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6601269245147705, 'std': 0.009111776016652584, 'min': 0.6522358655929565, 'max': 0.6680179238319397}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch77.npy
+  Gradient norms:
+    lstm_encoder: 0.031626
+    lstm_decoder: 0.013512
+    output_layer: 0.091477
+  Regime gate grads (epoch avg): tensor([[ 0.1316,  0.1504],
+        [-0.0520, -0.0545]])
+  VSN output std:
+    encoder: 0.167440
+  Attention entropy: 2.839061
+  Regime attention gates: [[0.3140619099140167, 0.3060542643070221], [0.6522358655929565, 0.6680179238319397]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 78
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 78: val_loss=0.395025372505188
+Epoch 78: train_loss=0.41684871912002563
+
+[CollapseMonitor] Epoch 78
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.083500, range: 0.826785, mean: 0.093208
+  Pos: 93.6%, Neg: 6.4%, Unique: 1267
+  Dir Acc: 56.16%, Pred Sharpe: 17.7200
+  Composite: 0.4525 (dist_match: 0.6115, actual_pos: 54.8%, pred_pos: 93.6%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6614972352981567, 'std': 0.009027808904647827, 'min': 0.6536788940429688, 'max': 0.6693155169487}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch78.npy
+  Gradient norms:
+    lstm_encoder: 0.033312
+    lstm_decoder: 0.013564
+    output_layer: 0.094059
+  Regime gate grads (epoch avg): tensor([[ 0.1148,  0.1447],
+        [-0.0573, -0.0611]])
+  VSN output std:
+    encoder: 0.163973
+  Attention entropy: 2.857520
+  Regime attention gates: [[0.3123842179775238, 0.30400198698043823], [0.6536788940429688, 0.6693155169487]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 79
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 79: val_loss=0.3973284065723419
+Epoch 79: train_loss=0.41593247652053833
+
+[CollapseMonitor] Epoch 79
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.093434, range: 0.896611, mean: 0.081700
+  Pos: 89.6%, Neg: 10.4%, Unique: 1274
+  Dir Acc: 54.84%, Pred Sharpe: 13.8808
+  Composite: 0.4528 (dist_match: 0.6513, actual_pos: 54.8%, pred_pos: 89.6%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6629023551940918, 'std': 0.009121411480009556, 'min': 0.655003011226654, 'max': 0.6708017587661743}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch79.npy
+  Gradient norms:
+    lstm_encoder: 0.030847
+    lstm_decoder: 0.013280
+    output_layer: 0.093077
+  Regime gate grads (epoch avg): tensor([[ 0.1251,  0.1364],
+        [-0.0656, -0.0740]])
+  VSN output std:
+    encoder: 0.165223
+  Attention entropy: 2.881287
+  Regime attention gates: [[0.31026825308799744, 0.3017413318157196], [0.655003011226654, 0.6708017587661743]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 80
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 80: val_loss=0.39440205693244934
+Epoch 80: train_loss=0.4169332981109619
+
+[CollapseMonitor] Epoch 80
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.089883, range: 0.855036, mean: 0.068858
+  Pos: 90.7%, Neg: 9.3%, Unique: 1270
+  Dir Acc: 54.52%, Pred Sharpe: 12.1613
+  Composite: 0.4472 (dist_match: 0.6404, actual_pos: 54.8%, pred_pos: 90.7%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6641623377799988, 'std': 0.008956539444625378, 'min': 0.6564057469367981, 'max': 0.6719189286231995}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch80.npy
+  Gradient norms:
+    lstm_encoder: 0.031441
+    lstm_decoder: 0.013165
+    output_layer: 0.091566
+  Regime gate grads (epoch avg): tensor([[ 0.1302,  0.1361],
+        [-0.0616, -0.0599]])
+  VSN output std:
+    encoder: 0.166398
+  Attention entropy: 2.884402
+  Regime attention gates: [[0.30792558193206787, 0.2995413839817047], [0.6564057469367981, 0.6719189286231995]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 81
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 81: val_loss=0.39765071868896484
+Epoch 81: train_loss=0.41754186153411865
+
+[CollapseMonitor] Epoch 81
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.080970, range: 0.816493, mean: 0.082369
+  Pos: 92.0%, Neg: 8.0%, Unique: 1273
+  Dir Acc: 55.38%, Pred Sharpe: 16.1488
+  Composite: 0.4506 (dist_match: 0.6271, actual_pos: 54.8%, pred_pos: 92.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6658765077590942, 'std': 0.008952513337135315, 'min': 0.6581234335899353, 'max': 0.673629641532898}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch81.npy
+  Gradient norms:
+    lstm_encoder: 0.031482
+    lstm_decoder: 0.013726
+    output_layer: 0.097990
+  Regime gate grads (epoch avg): tensor([[ 0.0894,  0.1009],
+        [-0.0709, -0.0736]])
+  VSN output std:
+    encoder: 0.168032
+  Attention entropy: 2.900792
+  Regime attention gates: [[0.3057100176811218, 0.2973652482032776], [0.6581234335899353, 0.673629641532898]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 82
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 82: val_loss=0.3960772156715393
+Epoch 82: train_loss=0.4164307415485382
+
+[CollapseMonitor] Epoch 82
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.081596, range: 0.845055, mean: 0.100248
+  Pos: 95.5%, Neg: 4.5%, Unique: 1276
+  Dir Acc: 55.69%, Pred Sharpe: 19.5032
+  Composite: 0.4436 (dist_match: 0.5928, actual_pos: 54.8%, pred_pos: 95.5%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6671258807182312, 'std': 0.008977462537586689, 'min': 0.6593511700630188, 'max': 0.6749005913734436}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch82.npy
+  Gradient norms:
+    lstm_encoder: 0.029186
+    lstm_decoder: 0.012612
+    output_layer: 0.089756
+  Regime gate grads (epoch avg): tensor([[ 0.1172,  0.1217],
+        [-0.0563, -0.0626]])
+  VSN output std:
+    encoder: 0.165186
+  Attention entropy: 2.890268
+  Regime attention gates: [[0.30365851521492004, 0.2954029440879822], [0.6593511700630188, 0.6749005913734436]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 83
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 83: val_loss=0.3957828879356384
+Epoch 83: train_loss=0.4185607135295868
+
+[CollapseMonitor] Epoch 83
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.085451, range: 0.863114, mean: 0.070225
+  Pos: 91.0%, Neg: 9.0%, Unique: 1275
+  Dir Acc: 55.07%, Pred Sharpe: 13.0459
+  Composite: 0.4510 (dist_match: 0.6381, actual_pos: 54.8%, pred_pos: 91.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6686842441558838, 'std': 0.008854953572154045, 'min': 0.6610156297683716, 'max': 0.676352858543396}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch83.npy
+  Gradient norms:
+    lstm_encoder: 0.031109
+    lstm_decoder: 0.013631
+    output_layer: 0.101020
+  Regime gate grads (epoch avg): tensor([[ 0.1801,  0.1939],
+        [-0.0600, -0.0615]])
+  VSN output std:
+    encoder: 0.164567
+  Attention entropy: 2.898350
+  Regime attention gates: [[0.3010215163230896, 0.2927405834197998], [0.6610156297683716, 0.676352858543396]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 84
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 84: val_loss=0.39680132269859314
+Epoch 84: train_loss=0.4161410629749298
+
+[CollapseMonitor] Epoch 84
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.096417, range: 0.914483, mean: 0.039026
+  Pos: 84.1%, Neg: 15.9%, Unique: 1274
+  Dir Acc: 54.13%, Pred Sharpe: 6.4254
+  Composite: 0.4620 (dist_match: 0.7067, actual_pos: 54.8%, pred_pos: 84.1%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6699579954147339, 'std': 0.008929559960961342, 'min': 0.6622247695922852, 'max': 0.6776912212371826}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch84.npy
+  Gradient norms:
+    lstm_encoder: 0.034043
+    lstm_decoder: 0.014226
+    output_layer: 0.100242
+  Regime gate grads (epoch avg): tensor([[ 0.1310,  0.1394],
+        [-0.0511, -0.0602]])
+  VSN output std:
+    encoder: 0.165199
+  Attention entropy: 2.907792
+  Regime attention gates: [[0.2989546060562134, 0.2904197871685028], [0.6622247695922852, 0.6776912212371826]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 85
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 85: val_loss=0.3953239321708679
+Epoch 85: train_loss=0.41762596368789673
+
+[CollapseMonitor] Epoch 85
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.090283, range: 0.881499, mean: 0.060074
+  Pos: 90.6%, Neg: 9.4%, Unique: 1277
+  Dir Acc: 54.99%, Pred Sharpe: 10.5629
+  Composite: 0.4515 (dist_match: 0.6420, actual_pos: 54.8%, pred_pos: 90.6%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6713804006576538, 'std': 0.009116971865296364, 'min': 0.6634848117828369, 'max': 0.6792758703231812}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch85.npy
+  Gradient norms:
+    lstm_encoder: 0.035604
+    lstm_decoder: 0.014554
+    output_layer: 0.096334
+  Regime gate grads (epoch avg): tensor([[ 0.1320,  0.1448],
+        [-0.0641, -0.0795]])
+  VSN output std:
+    encoder: 0.164368
+  Attention entropy: 2.891427
+  Regime attention gates: [[0.2969408929347992, 0.2885463833808899], [0.6634848117828369, 0.6792758703231812]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 86
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 86: val_loss=0.3954450488090515
+Epoch 86: train_loss=0.4155568778514862
+
+[CollapseMonitor] Epoch 86
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.089208, range: 0.873719, mean: 0.080938
+  Pos: 93.1%, Neg: 6.9%, Unique: 1277
+  Dir Acc: 55.85%, Pred Sharpe: 14.4029
+  Composite: 0.4513 (dist_match: 0.6162, actual_pos: 54.8%, pred_pos: 93.1%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6722159385681152, 'std': 0.00903878640383482, 'min': 0.664388120174408, 'max': 0.6800437569618225}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch86.npy
+  Gradient norms:
+    lstm_encoder: 0.033921
+    lstm_decoder: 0.012889
+    output_layer: 0.093327
+  Regime gate grads (epoch avg): tensor([[ 0.1466,  0.1576],
+        [-0.0707, -0.0642]])
+  VSN output std:
+    encoder: 0.163837
+  Attention entropy: 2.895705
+  Regime attention gates: [[0.2958351969718933, 0.2874149680137634], [0.664388120174408, 0.6800437569618225]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 87
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 87: val_loss=0.3958626091480255
+Epoch 87: train_loss=0.4147675633430481
+
+[CollapseMonitor] Epoch 87
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.095381, range: 0.909518, mean: 0.070131
+  Pos: 90.2%, Neg: 9.8%, Unique: 1273
+  Dir Acc: 55.07%, Pred Sharpe: 11.6721
+  Composite: 0.4532 (dist_match: 0.6459, actual_pos: 54.8%, pred_pos: 90.2%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6730610132217407, 'std': 0.009011393412947655, 'min': 0.665256917476654, 'max': 0.6808651089668274}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch87.npy
+  Gradient norms:
+    lstm_encoder: 0.035015
+    lstm_decoder: 0.014694
+    output_layer: 0.097502
+  Regime gate grads (epoch avg): tensor([[ 0.1270,  0.1545],
+        [-0.0565, -0.0627]])
+  VSN output std:
+    encoder: 0.162670
+  Attention entropy: 2.907357
+  Regime attention gates: [[0.2947680354118347, 0.286285400390625], [0.665256917476654, 0.6808651089668274]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 88
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 88: val_loss=0.39482811093330383
+Epoch 88: train_loss=0.415204256772995
+
+[CollapseMonitor] Epoch 88
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.103043, range: 0.944383, mean: 0.068984
+  Pos: 88.6%, Neg: 11.4%, Unique: 1270
+  Dir Acc: 54.76%, Pred Sharpe: 10.6275
+  Composite: 0.4549 (dist_match: 0.6615, actual_pos: 54.8%, pred_pos: 88.6%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6736476421356201, 'std': 0.00906793400645256, 'min': 0.6657945513725281, 'max': 0.6815006732940674}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch88.npy
+  Gradient norms:
+    lstm_encoder: 0.035338
+    lstm_decoder: 0.014484
+    output_layer: 0.096098
+  Regime gate grads (epoch avg): tensor([[ 0.1021,  0.1259],
+        [-0.0586, -0.0657]])
+  VSN output std:
+    encoder: 0.163653
+  Attention entropy: 2.896043
+  Regime attention gates: [[0.2941741943359375, 0.2854848802089691], [0.6657945513725281, 0.6815006732940674]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 89
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 89: val_loss=0.3946858048439026
+Epoch 89: train_loss=0.41448163986206055
+
+[CollapseMonitor] Epoch 89
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.095217, range: 0.943424, mean: 0.072396
+  Pos: 91.2%, Neg: 8.8%, Unique: 1275
+  Dir Acc: 54.84%, Pred Sharpe: 12.0698
+  Composite: 0.4485 (dist_match: 0.6357, actual_pos: 54.8%, pred_pos: 91.2%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6739867925643921, 'std': 0.009028428234159946, 'min': 0.6661679744720459, 'max': 0.6818056702613831}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch89.npy
+  Gradient norms:
+    lstm_encoder: 0.033063
+    lstm_decoder: 0.014279
+    output_layer: 0.094446
+  Regime gate grads (epoch avg): tensor([[ 0.1560,  0.1645],
+        [-0.0389, -0.0365]])
+  VSN output std:
+    encoder: 0.162171
+  Attention entropy: 2.880850
+  Regime attention gates: [[0.2932586967945099, 0.2845064103603363], [0.6661679744720459, 0.6818056702613831]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 90
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 90: val_loss=0.39538413286209106
+Epoch 90: train_loss=0.4163013994693756
+
+[CollapseMonitor] Epoch 90
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.090762, range: 0.935042, mean: 0.088536
+  Pos: 93.3%, Neg: 6.7%, Unique: 1272
+  Dir Acc: 55.54%, Pred Sharpe: 15.4852
+  Composite: 0.4484 (dist_match: 0.6147, actual_pos: 54.8%, pred_pos: 93.3%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Regime distribution: {'regime_0_fraction': 0.0, 'regime_1_fraction': 1.0}
+  Regime gates: {'mean': 0.6745126247406006, 'std': 0.008985893800854683, 'min': 0.6667305827140808, 'max': 0.6822946071624756}
+  Saved validation predictions to: experiments/test_regime_attention/collapse_monitoring/val_predictions_epoch90.npy
+  Gradient norms:
+    lstm_encoder: 0.034827
+    lstm_decoder: 0.014108
+    output_layer: 0.088123
+  Regime gate grads (epoch avg): tensor([[ 0.1391,  0.1477],
+        [-0.0497, -0.0466]])
+  VSN output std:
+    encoder: 0.161989
+  Attention entropy: 2.877491
+  Regime attention gates: [[0.2922508120536804, 0.28348156809806824], [0.6667305827140808, 0.6822946071624756]]
+  Saved to: experiments/test_regime_attention/collapse_monitoring/collapse_monitor_latest.json
+Final gate values: tensor([[0.2923, 0.2835],
+        [0.6667, 0.6823]], grad_fn=<SigmoidBackward0>)
+
+
+======================================================================
+Training complete
+======================================================================
+
+Best val_loss checkpoint: experiments/test_regime_attention/checkpoints/tft-epoch=epoch=80-valloss=val_loss=0.3944.ckpt
+Best validation loss: 0.394402
+Checkpoints saved:
+  - Best val_loss: experiments/test_regime_attention/checkpoints/tft-epoch=epoch=80-valloss=val_loss=0.3944.ckpt
+  - Best pred_std: experiments/test_regime_attention/checkpoints/tft-epoch=epoch=88-predstd=val_pred_std=0.1030.ckpt
+  - Best unique: experiments/test_regime_attention/checkpoints/tft-epoch=epoch=69-unique=val_num_unique=1281.ckpt
+  - Best dir_acc: experiments/test_regime_attention/checkpoints/tft-epoch=epoch=78-diracc=val_dir_acc=0.5616.ckpt
+  - Best sharpe: experiments/test_regime_attention/checkpoints/tft-epoch=epoch=00-sharpe=val_sharpe=115.3635.ckpt
+  - Best composite: experiments/test_regime_attention/checkpoints/tft-epoch=epoch=84-composite=val_composite=0.4620.ckpt
+Completed at: 2025-12-01 16:55:23
+Log saved to: experiments/test_regime_attention/training_20251201_165009.log
+======================================================================

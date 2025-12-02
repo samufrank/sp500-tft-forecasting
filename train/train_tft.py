@@ -189,6 +189,12 @@ def parse_args():
     parser.add_argument('--classification-thresholds', type=float, nargs='+', default=None,
                         help='Thresholds for multi-class classification (e.g., -0.01 0.01 for direction_3class)')
 
+    # Regime attention args
+    parser.add_argument('--regime-attention', action='store_true',
+                        help='Enable regime-aware attention gating')
+    parser.add_argument('--regime-attention-vix-threshold', type=float, default=25.0,
+                        help='VIX threshold for regime switching (default: 25.0)')
+
     return parser.parse_args()
 
 
@@ -431,7 +437,7 @@ def prepare_tft_data(train_df, val_df, args, features, add_staleness=True):
 # MODEL SETUP
 # ============================================================================
 
-def create_model(training_dataset, args):
+def create_model(training_dataset, args, raw_vix_train, raw_vix_val):
     """Initialize TFT model with EnhancedQuantileLoss."""
     
     # Create loss function with configured penalties
@@ -590,6 +596,26 @@ def create_model(training_dataset, args):
 
     else:
         print(f"\n[REGIME OUTPUT] Disabled (using baseline output layer)")
+   
+    # REGIME ATTENTION
+    if args.regime_attention:
+        from src.regime_attention import replace_attention_module
+        from train.regime_attention_training import patch_forward_for_regime
+        
+        tft = replace_attention_module(
+            tft,
+            regime_mode='vix_threshold',
+            vix_threshold=args.regime_attention_vix_threshold,
+            num_regimes=2
+        )
+        tft = patch_forward_for_regime(
+            tft, 
+            vix_feature_name='VIX',
+            raw_vix_train=raw_vix_train,
+            raw_vix_val=raw_vix_val
+        )
+        
+        print(f"\n[REGIME ATTENTION] Enabled: vix_threshold={args.regime_attention_vix_threshold}")
     
     # DEBUG: Show what the model actually received
     print("\n" + "="*80)
@@ -728,6 +754,12 @@ def save_config(args, features, output_dir):
             'load_balance_weight': args.load_balance_weight if args.regime_output else None,
             'expert_hidden_size': getattr(args, 'expert_hidden_size', 0) if args.regime_output else None,
             'hard_routing_train': getattr(args, 'hard_routing_train', False) if args.regime_output else None,
+        },
+        'regime_attention': {
+            'enabled': args.regime_attention,
+            'vix_threshold': args.regime_attention_vix_threshold,
+            'num_regimes': 2,
+            'gate_grad_scale': 100,  # document the gradient scaling
         },
         'transfer_learning': {
             'freeze_backbone': getattr(args, 'freeze_backbone', False),
@@ -887,7 +919,7 @@ def train():
     
     # Initialize model
     print("\nInitializing model...")
-    tft = create_model(training, args)
+    tft = create_model(training, args, raw_vix_train, raw_vix_val)
     
     # Load checkpoint if specified (transfer learning)
     if args.load_checkpoint:
@@ -1087,6 +1119,9 @@ def train():
         train_dataloaders=train_dataloader,
         val_dataloaders=val_dataloader,
     )
+
+    if args.regime_attention and hasattr(tft.multihead_attn, 'regime_gates'):
+        print(f"Final gate values: {torch.sigmoid(tft.multihead_attn.regime_gates)}") 
 
     print()
     print("\n" + "="*70)
