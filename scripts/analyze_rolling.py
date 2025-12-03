@@ -4,15 +4,15 @@ Analyze rolling evaluation results and compare to fixed-split baselines.
 
 Usage:
     # Analyze single rolling experiment
-    python analyze_rolling.py experiments/06_rolling/daily_baseline
+    python scripts/analyze_rolling.py experiments/06b_rolling/daily_baseline
     
     # Compare rolling to fixed-split baseline
-    python analyze_rolling.py experiments/06_rolling/daily_baseline \
+    python scripts/analyze_rolling.py experiments/06b_rolling/daily_baseline \
         --compare experiments/02b_vintage_sweep/baseline_h16_drop0.10
     
     # Compare multiple rolling experiments
-    python analyze_rolling.py experiments/06_rolling/daily_baseline \
-        experiments/06_rolling/weekly_baseline \
+    python scripts/analyze_rolling.py experiments/06b_rolling/daily_baseline \
+        experiments/06b_rolling/weekly_baseline \
         --output reports/rolling_comparison.csv
 """
 
@@ -235,36 +235,95 @@ def plot_fold_performance(df, output_path=None):
     plt.close()
 
 
-def plot_rolling_comparison(dfs, output_path=None):
-    """Compare multiple rolling experiments."""
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+def plot_rolling_comparison(dfs, output_path=None, presentation=False, name_map=None, market_baselines=None):
+    """Compare multiple rolling experiments.
     
-    metrics = [
-        ('directional_accuracy', 'Directional Accuracy'),
-        ('sharpe_ratio', 'Sharpe Ratio'),
-        ('healthy_pct', 'Healthy %'),
-    ]
+    Args:
+        dfs: List of DataFrames with rolling results
+        output_path: Path to save figure
+        presentation: If True, use simplified 2-panel layout
+        name_map: Dict mapping experiment names to display names
+        market_baselines: Dict mapping experiment names to market positive rates (for dir acc)
+    """
+    if presentation:
+        fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+        metrics = [
+            ('directional_accuracy', 'Directional Accuracy'),
+            ('sharpe_ratio', 'Sharpe Ratio'),
+        ]
+    else:
+        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+        metrics = [
+            ('directional_accuracy', 'Directional Accuracy'),
+            ('sharpe_ratio', 'Sharpe Ratio'),
+            ('healthy_pct', 'Healthy %'),
+        ]
+    
+    colors = ['#2E86AB', '#A23B72', '#F18F01', '#5C946E']  # Presentation colors
     
     for (metric, title), ax in zip(metrics, axes):
         data = []
         labels = []
+        exp_names = []  # Track original names for baseline lookup
         for df in dfs:
             if metric in df.columns:
+                exp_name = df['experiment'].iloc[0]
+                display_name = name_map.get(exp_name, exp_name) if name_map else exp_name
                 data.append(df[metric].values)
-                labels.append(df['experiment'].iloc[0])
+                labels.append(display_name)
+                exp_names.append(exp_name)
         
         if data:
             bp = ax.boxplot(data, labels=labels, patch_artist=True)
-            ax.set_ylabel(title)
-            ax.set_title(title)
+            
+            # Style boxes
+            for i, patch in enumerate(bp['boxes']):
+                patch.set_facecolor(colors[i % len(colors)])
+                patch.set_alpha(0.7)
+            
+            ax.set_ylabel(title, fontsize=12 if presentation else 10)
+            ax.set_title(title, fontsize=14 if presentation else 12, 
+                        fontweight='bold' if presentation else 'normal')
             ax.grid(axis='y', alpha=0.3)
-            plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
+            
+            # Reference lines
+            if metric == 'directional_accuracy':
+                ax.axhline(0.5, color='gray', linestyle='--', alpha=0.5, label='Random')
+                
+                # Add market baseline lines per boxplot
+                if market_baselines:
+                    n_boxes = len(exp_names)
+                    for i, exp_name in enumerate(exp_names):
+                        if exp_name in market_baselines:
+                            baseline = market_baselines[exp_name]
+                            # Draw short horizontal line spanning just this boxplot
+                            ax.hlines(baseline, i + 0.6, i + 1.4, colors='#E63946', 
+                                     linestyles=':', linewidth=2, label='Market +rate' if i == 0 else '')
+                            # Annotation: left side for last box, right side for others
+                            if i == n_boxes - 1:
+                                ax.annotate(f'{baseline:.1%}', xy=(i + 0.58, baseline), 
+                                           fontsize=9, color='#E63946', va='center', ha='right')
+                            else:
+                                ax.annotate(f'{baseline:.1%}', xy=(i + 1.42, baseline), 
+                                           fontsize=9, color='#E63946', va='center')
+                    
+            elif metric == 'sharpe_ratio':
+                ax.axhline(0, color='gray', linestyle='--', alpha=0.5)
+            
+            if not presentation:
+                plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
+            
+            # Add legend for directional accuracy panel
+            if metric == 'directional_accuracy' and market_baselines:
+                ax.legend(loc='lower left', fontsize=9)
     
-    plt.suptitle("Rolling Evaluation Comparison", fontsize=14)
+    plt.suptitle("Rolling Evaluation Comparison", fontsize=14, 
+                 fontweight='bold' if presentation else 'normal')
     plt.tight_layout()
     
     if output_path:
-        plt.savefig(output_path, dpi=150, bbox_inches='tight')
+        plt.savefig(output_path, dpi=200 if presentation else 150, 
+                    bbox_inches='tight', facecolor='white')
         print(f"Saved comparison plot to: {output_path}")
     else:
         plt.show()
@@ -293,6 +352,14 @@ def main():
                         help='Directory to save plots')
     parser.add_argument('--no-plots', action='store_true',
                         help='Skip generating plots')
+    parser.add_argument('--presentation', action='store_true',
+                        help='Simplified plot for presentation (2 panels, clean names)')
+    parser.add_argument('--name-map', type=str, default=None,
+                        help='JSON mapping of experiment names, e.g. \'{"daily_h16_baseline":"Daily"}\'')
+    parser.add_argument('--market-baseline', type=str, default=None,
+                        help='JSON mapping of experiment names to market positive rates, e.g. \'{"daily_h16_baseline":0.539}\'')
+
+
     
     args = parser.parse_args()
     
@@ -372,8 +439,27 @@ def main():
         print(comparison_df.to_string(index=False))
         
         if not args.no_plots:
+            # Parse name map if provided
+            name_map = None
+            if args.name_map:
+                import json as json_module
+                name_map = json_module.loads(args.name_map)
+            
+            # Parse market baselines if provided
+            market_baselines = None
+            if args.market_baseline:
+                import json as json_module
+                market_baselines = json_module.loads(args.market_baseline)
+            
             plot_dir = Path(args.plot_dir) if args.plot_dir else Path(args.experiments[0]).parent
-            plot_rolling_comparison(all_dfs, plot_dir / 'rolling_comparison.png')
+            suffix = '_presentation' if args.presentation else ''
+            plot_rolling_comparison(
+                all_dfs, 
+                plot_dir / f'rolling_comparison{suffix}.png',
+                presentation=args.presentation,
+                name_map=name_map,
+                market_baselines=market_baselines
+            )
     
     # Save combined results
     if args.output:

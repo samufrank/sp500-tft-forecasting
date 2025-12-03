@@ -1,0 +1,993 @@
+
+[INFO] Using AUTO device selection.
+
+[INFO] Patched matplotlib.Axes.errorbar to abs() negative yerr for robustness.
+======================================================================
+Training TFT: 05_frozen_diagnostic/frozen_vix18
+======================================================================
+Logging to: experiments/05_frozen_diagnostic/frozen_vix18/training_20251126_182235.log
+Started at: 2025-11-26 18:22:35
+======================================================================
+Configuration saved to: experiments/05_frozen_diagnostic/frozen_vix18/config.json
+
+Loading data splits...
+Train: 6074 samples
+Val: 1302 samples
+Test: 1302 samples
+
+Preparing TimeSeriesDataSet...
+
+Dropping source columns (used for staleness only): ['CPI']
+
+Final features for TFT: ['SP500_Returns', 'VIX', 'Treasury_10Y', 'Yield_Spread', 'Inflation_YoY']
+
+======================================================================
+FEATURE STATISTICS - BEFORE NORMALIZATION
+======================================================================
+VIX                             mean= 19.7438  std=  8.0295  min=  9.3100  max= 80.8600
+Treasury_10Y                    mean=  4.7672  std=  1.6903  min=  1.4300  max=  8.3600
+Yield_Spread                    mean=  1.2778  std=  0.9179  min= -0.5200  max=  2.9100
+Inflation_YoY                   mean=  2.5322  std=  1.1865  min= -2.1498  max=  6.7300
+
+======================================================================
+FEATURES AFTER GROUPNORMALIZER (first batch, last timestep)
+======================================================================
+VIX                             normalized_value=  1.0000
+Treasury_10Y                    normalized_value= -0.0500
+Yield_Spread                    normalized_value=  0.0817
+Inflation_YoY                   normalized_value=  0.8774
+======================================================================
+
+[DEBUG] VIX train values: [28.95 30.38 33.3  31.33 32.63]
+[DEBUG] VIX val values: [14.31 15.15 15.13 12.86 13.85]
+Batches per epoch: 94
+[DEBUG] Validation batches: 21
+[DEBUG] Validation dataset size: 1282
+[DEBUG] Batch size: 64
+
+Initializing model...
+
+Using standard QuantileLoss (no penalties)
+
+[REGIME OUTPUT] Replaced output layer:
+  Mode: learned
+  Strategy: vix_threshold
+  VIX threshold: 18.0
+  Experts: 2
+  Parameters: {'total': 272, 'experts': 238, 'router': 34}
+
+[REGIME OUTPUT] Enabled with 2 regimes, mode=learned, strategy=vix_threshold
+
+================================================================================
+BASELINE MODEL FEATURE CONFIGURATION (after from_dataset)
+================================================================================
+tft.hparams.time_varying_reals_encoder: ['relative_time_idx', 'VIX', 'Treasury_10Y', 'Yield_Spread', 'Inflation_YoY']
+  Count: 5
+
+tft.hparams.time_varying_reals_decoder: ['relative_time_idx']
+  Count: 1
+
+tft.hparams.x_reals (all reals passed to model): ['encoder_length', 'relative_time_idx', 'VIX', 'Treasury_10Y', 'Yield_Spread', 'Inflation_YoY']
+  Count: 6
+
+Encoder VSN configuration:
+  num_inputs: 5
+  input_sizes: {'relative_time_idx': 16, 'VIX': 16, 'Treasury_10Y': 16, 'Yield_Spread': 16, 'Inflation_YoY': 16}
+  flattened_grn.fc1: in_features=80, out_features=5
+  -> Params in fc1: 400 (should be 5*16*5=400 if 5 features)
+================================================================================
+
+
+[TRANSFER LEARNING] Loading checkpoint: experiments/02b_vintage_sweep/baseline_h16_drop0.25/checkpoints/last.ckpt
+  Filtered out output_layer weights (using fresh regime experts)
+  Missing keys: 6 (expected if output_layer filtered)
+  Backbone loaded successfully
+
+[FREEZE BACKBONE] Parameter status:
+  Frozen: 22,496 (98.8%)
+  Trainable: 272 (1.2%)
+  Total: 22,768
+Model parameters: 22,768
+
+Starting training...
+Checkpoints will be saved to: experiments/05_frozen_diagnostic/frozen_vix18/checkpoints/
+Logs will be saved to: experiments/05_frozen_diagnostic/frozen_vix18/logs/
+
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 0
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+[DEBUG] VIX routing - batch vix: min=11.9, max=40.7, mean=16.3
+Epoch 0: val_loss=N/A
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 0
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 0: val_loss=0.9141678810119629
+Epoch 0: train_loss=1.1521046161651611
+
+[CollapseMonitor] Epoch 0
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.536871, range: 1.328434, mean: 0.063460
+  Pos: 26.9%, Neg: 73.1%, Unique: 1273
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch0.npy
+  Gradient norms:
+    output_layer: 0.543792
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.045057, mean=-0.242469
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.018632, mean=0.764160
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch0.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 1
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 1: val_loss=0.8540792465209961
+Epoch 1: train_loss=1.0908374786376953
+
+[CollapseMonitor] Epoch 1
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.456415, range: 1.143405, mean: 0.100046
+  Pos: 26.9%, Neg: 73.1%, Unique: 1271
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch1.npy
+  Gradient norms:
+    output_layer: 0.516808
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.043794, mean=-0.167419
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.016613, mean=0.685728
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch1.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 2
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 2: val_loss=0.7872392535209656
+Epoch 2: train_loss=1.0101934671401978
+
+[CollapseMonitor] Epoch 2
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.360929, range: 0.923585, mean: 0.136116
+  Pos: 27.2%, Neg: 72.8%, Unique: 1270
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch2.npy
+  Gradient norms:
+    output_layer: 0.480294
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.042421, mean=-0.084793
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.014712, mean=0.586532
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch2.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 3
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 3: val_loss=0.7178667783737183
+Epoch 3: train_loss=0.9212376475334167
+
+[CollapseMonitor] Epoch 3
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.258699, range: 0.688928, mean: 0.160331
+  Pos: 73.5%, Neg: 26.5%, Unique: 1268
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch3.npy
+  Gradient norms:
+    output_layer: 0.436936
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.041687, mean=-0.008786
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.013743, mean=0.467817
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch3.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 4
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 4: val_loss=0.6574621796607971
+Epoch 4: train_loss=0.831760585308075
+
+[CollapseMonitor] Epoch 4
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.171326, range: 0.492052, mean: 0.164583
+  Pos: 100.0%, Neg: 0.0%, Unique: 1272
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch4.npy
+  Gradient norms:
+    output_layer: 0.385238
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.041688, mean=0.041989
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.014131, mean=0.350478
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch4.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 5
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 5: val_loss=0.6049233078956604
+Epoch 5: train_loss=0.7478038668632507
+
+[CollapseMonitor] Epoch 5
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.101829, range: 0.341149, mean: 0.147370
+  Pos: 100.0%, Neg: 0.0%, Unique: 1272
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch5.npy
+  Gradient norms:
+    output_layer: 0.331491
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.042996, mean=0.065000
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.015184, mean=0.237536
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch5.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 6
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 6: val_loss=0.5578607320785522
+Epoch 6: train_loss=0.6720139980316162
+
+[CollapseMonitor] Epoch 6
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.046740, range: 0.215993, mean: 0.116485
+  Pos: 100.0%, Neg: 0.0%, Unique: 1278
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch6.npy
+  Gradient norms:
+    output_layer: 0.279340
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.045389, mean=0.070312
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.016663, mean=0.127832
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch6.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 7
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 7: val_loss=0.5217943787574768
+Epoch 7: train_loss=0.6073774099349976
+
+[CollapseMonitor] Epoch 7
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.028010, range: 0.222171, mean: 0.097640
+  Pos: 100.0%, Neg: 0.0%, Unique: 1268
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch7.npy
+  Gradient norms:
+    output_layer: 0.225965
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.047933, mean=0.076120
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.017250, mean=0.051433
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch7.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 8
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 8: val_loss=0.4925217628479004
+Epoch 8: train_loss=0.5531772971153259
+
+[CollapseMonitor] Epoch 8
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.043767, range: 0.301142, mean: 0.074222
+  Pos: 92.2%, Neg: 7.8%, Unique: 1276
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch8.npy
+  Gradient norms:
+    output_layer: 0.187612
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.051944, mean=0.071834
+    Expert 1: std=0.017400, mean=-0.014439
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch8.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 9
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 9: val_loss=0.46821948885917664
+Epoch 9: train_loss=0.5119023323059082
+
+[CollapseMonitor] Epoch 9
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.057206, range: 0.350709, mean: 0.076690
+  Pos: 85.1%, Neg: 14.9%, Unique: 1276
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch9.npy
+  Gradient norms:
+    output_layer: 0.150210
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.057285, mean=0.082812
+    Expert 1: std=0.016960, mean=-0.040082
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch9.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 10
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 10: val_loss=0.4503667950630188
+Epoch 10: train_loss=0.4833841621875763
+
+[CollapseMonitor] Epoch 10
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.055837, range: 0.351517, mean: 0.068580
+  Pos: 83.6%, Neg: 16.4%, Unique: 1271
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch10.npy
+  Gradient norms:
+    output_layer: 0.121450
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.061817, mean=0.073449
+    Expert 1: std=0.016951, mean=-0.048894
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch10.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 11
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 11: val_loss=0.436909556388855
+Epoch 11: train_loss=0.462361603975296
+
+[CollapseMonitor] Epoch 11
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.065396, range: 0.387612, mean: 0.063522
+  Pos: 79.6%, Neg: 20.4%, Unique: 1280
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch11.npy
+  Gradient norms:
+    output_layer: 0.101341
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.067174, mean=0.074483
+    Expert 1: std=0.017979, mean=-0.074655
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch11.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 12
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 12: val_loss=0.42649510502815247
+Epoch 12: train_loss=0.44852009415626526
+
+[CollapseMonitor] Epoch 12
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.068725, range: 0.403035, mean: 0.077781
+  Pos: 81.4%, Neg: 18.6%, Unique: 1279
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch12.npy
+  Gradient norms:
+    output_layer: 0.083518
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.071863, mean=0.087995
+    Expert 1: std=0.019798, mean=-0.072245
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch12.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 13
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 13: val_loss=0.420148640871048
+Epoch 13: train_loss=0.4393007457256317
+
+[CollapseMonitor] Epoch 13
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.072111, range: 0.419807, mean: 0.080358
+  Pos: 81.7%, Neg: 18.3%, Unique: 1277
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch13.npy
+  Gradient norms:
+    output_layer: 0.080983
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.077232, mean=0.091307
+    Expert 1: std=0.021914, mean=-0.078576
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch13.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 14
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 14: val_loss=0.4154190421104431
+Epoch 14: train_loss=0.4334348440170288
+
+[CollapseMonitor] Epoch 14
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.073271, range: 0.432344, mean: 0.073175
+  Pos: 81.3%, Neg: 18.7%, Unique: 1275
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch14.npy
+  Gradient norms:
+    output_layer: 0.077270
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.081891, mean=0.085523
+    Expert 1: std=0.022502, mean=-0.086091
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch14.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 15
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 15: val_loss=0.41155868768692017
+Epoch 15: train_loss=0.4312512278556824
+
+[CollapseMonitor] Epoch 15
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.072179, range: 0.430951, mean: 0.071715
+  Pos: 82.3%, Neg: 17.7%, Unique: 1278
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch15.npy
+  Gradient norms:
+    output_layer: 0.070239
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.086841, mean=0.080096
+    Expert 1: std=0.025805, mean=-0.084790
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch15.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 16
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 16: val_loss=0.40864017605781555
+Epoch 16: train_loss=0.427528977394104
+
+[CollapseMonitor] Epoch 16
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.075453, range: 0.444656, mean: 0.082456
+  Pos: 83.3%, Neg: 16.7%, Unique: 1276
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch16.npy
+  Gradient norms:
+    output_layer: 0.069079
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.090315, mean=0.089919
+    Expert 1: std=0.028615, mean=-0.082965
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch16.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 17
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 17: val_loss=0.4069356620311737
+Epoch 17: train_loss=0.425607830286026
+
+[CollapseMonitor] Epoch 17
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.078212, range: 0.456970, mean: 0.084929
+  Pos: 83.5%, Neg: 16.5%, Unique: 1277
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch17.npy
+  Gradient norms:
+    output_layer: 0.069327
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.093981, mean=0.092180
+    Expert 1: std=0.031006, mean=-0.086202
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch17.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 18
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 18: val_loss=0.40518680214881897
+Epoch 18: train_loss=0.42497578263282776
+
+[CollapseMonitor] Epoch 18
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.084211, range: 0.487233, mean: 0.084627
+  Pos: 82.4%, Neg: 17.6%, Unique: 1277
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch18.npy
+  Gradient norms:
+    output_layer: 0.066350
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.097470, mean=0.096780
+    Expert 1: std=0.032266, mean=-0.101417
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch18.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 19
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 19: val_loss=0.4038155972957611
+Epoch 19: train_loss=0.42208030819892883
+
+[CollapseMonitor] Epoch 19
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.086064, range: 0.499429, mean: 0.078144
+  Pos: 82.2%, Neg: 17.8%, Unique: 1277
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch19.npy
+  Gradient norms:
+    output_layer: 0.065222
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.101516, mean=0.091604
+    Expert 1: std=0.033523, mean=-0.109871
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch19.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 20
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 20: val_loss=0.40276607871055603
+Epoch 20: train_loss=0.42231714725494385
+
+[CollapseMonitor] Epoch 20
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.082044, range: 0.481750, mean: 0.077403
+  Pos: 84.3%, Neg: 15.7%, Unique: 1279
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch20.npy
+  Gradient norms:
+    output_layer: 0.066115
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.104690, mean=0.081972
+    Expert 1: std=0.036483, mean=-0.092596
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch20.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 21
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 21: val_loss=0.40170711278915405
+Epoch 21: train_loss=0.42152976989746094
+
+[CollapseMonitor] Epoch 21
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.088612, range: 0.518821, mean: 0.097579
+  Pos: 84.2%, Neg: 15.8%, Unique: 1275
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch21.npy
+  Gradient norms:
+    output_layer: 0.064534
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.107695, mean=0.107784
+    Expert 1: std=0.037010, mean=-0.096466
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch21.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 22
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 22: val_loss=0.4006839096546173
+Epoch 22: train_loss=0.4213707745075226
+
+[CollapseMonitor] Epoch 22
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.094280, range: 0.549766, mean: 0.091138
+  Pos: 82.5%, Neg: 17.5%, Unique: 1280
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch22.npy
+  Gradient norms:
+    output_layer: 0.065654
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.111712, mean=0.106523
+    Expert 1: std=0.038389, mean=-0.115712
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch22.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 23
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 23: val_loss=0.39972105622291565
+Epoch 23: train_loss=0.42064136266708374
+
+[CollapseMonitor] Epoch 23
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.093038, range: 0.547640, mean: 0.079519
+  Pos: 82.5%, Neg: 17.5%, Unique: 1276
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch23.npy
+  Gradient norms:
+    output_layer: 0.066147
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.115431, mean=0.093317
+    Expert 1: std=0.039604, mean=-0.118920
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch23.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 24
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 24: val_loss=0.39909231662750244
+Epoch 24: train_loss=0.41981956362724304
+
+[CollapseMonitor] Epoch 24
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.091627, range: 0.544406, mean: 0.086132
+  Pos: 84.2%, Neg: 15.8%, Unique: 1279
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch24.npy
+  Gradient norms:
+    output_layer: 0.064629
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.119582, mean=0.095839
+    Expert 1: std=0.040504, mean=-0.104176
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch24.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 25
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 25: val_loss=0.3985744118690491
+Epoch 25: train_loss=0.41998693346977234
+
+[CollapseMonitor] Epoch 25
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.099048, range: 0.585587, mean: 0.100411
+  Pos: 83.5%, Neg: 16.5%, Unique: 1281
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch25.npy
+  Gradient norms:
+    output_layer: 0.065721
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.121371, mean=0.116261
+    Expert 1: std=0.041755, mean=-0.115390
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch25.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 26
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 26: val_loss=0.3981326222419739
+Epoch 26: train_loss=0.41940340399742126
+
+[CollapseMonitor] Epoch 26
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.100110, range: 0.594202, mean: 0.100927
+  Pos: 83.5%, Neg: 16.5%, Unique: 1279
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch26.npy
+  Gradient norms:
+    output_layer: 0.064021
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.123517, mean=0.117414
+    Expert 1: std=0.042107, mean=-0.116647
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch26.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 27
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 27: val_loss=0.3974899351596832
+Epoch 27: train_loss=0.41910430788993835
+
+[CollapseMonitor] Epoch 27
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.101626, range: 0.607078, mean: 0.086554
+  Pos: 82.3%, Neg: 17.7%, Unique: 1279
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch27.npy
+  Gradient norms:
+    output_layer: 0.064953
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.127603, mean=0.106028
+    Expert 1: std=0.042104, mean=-0.130519
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch27.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 28
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 28: val_loss=0.3970396816730499
+Epoch 28: train_loss=0.41712847352027893
+
+[CollapseMonitor] Epoch 28
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.103378, range: 0.619750, mean: 0.095591
+  Pos: 82.6%, Neg: 17.4%, Unique: 1278
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch28.npy
+  Gradient norms:
+    output_layer: 0.064874
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.130220, mean=0.115239
+    Expert 1: std=0.042703, mean=-0.126254
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch28.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 29
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 29: val_loss=0.39655831456184387
+Epoch 29: train_loss=0.4174574911594391
+
+[CollapseMonitor] Epoch 29
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.100184, range: 0.607588, mean: 0.092986
+  Pos: 83.6%, Neg: 16.4%, Unique: 1275
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/val_predictions_epoch29.npy
+  Gradient norms:
+    output_layer: 0.065213
+  VSN output std:
+    encoder: 0.167822
+  Attention entropy: 2.947516
+  Regime diagnostics:
+    Routing entropy: 0.0000 (normalized: 0.0000)
+    Dominant regime: 82.3%
+    Regime assignments: 0=82.3%, 1=17.7%
+    Avg routing weights: R0=0.8234, R1=0.1766
+    Expert 0: std=0.133259, mean=0.108258
+    Expert 1: std=0.043279, mean=-0.115610
+      WARNING: Expert 1 collapsed (std < 0.05)
+    VIX correlation (regime_1): 0.829
+  Saved to: experiments/05_frozen_diagnostic/frozen_vix18/collapse_monitoring/collapse_monitor_epoch29.json
+
+
+======================================================================
+Training complete
+======================================================================
+
+Best val_loss checkpoint: experiments/05_frozen_diagnostic/frozen_vix18/checkpoints/tft-epoch=epoch=29-valloss=val_loss=0.3966.ckpt
+Best validation loss: 0.396558
+Checkpoints saved:
+  - Best val_loss: experiments/05_frozen_diagnostic/frozen_vix18/checkpoints/tft-epoch=epoch=29-valloss=val_loss=0.3966.ckpt
+  - Best pred_std: experiments/05_frozen_diagnostic/frozen_vix18/checkpoints/tft-epoch=epoch=00-predstd=val_pred_std=0.5369.ckpt
+  - Best unique: experiments/05_frozen_diagnostic/frozen_vix18/checkpoints/tft-epoch=epoch=25-unique=val_num_unique=1281.ckpt
+  - Last epoch: experiments/05_frozen_diagnostic/frozen_vix18/checkpoints/tft-last-v1.ckpt
+Completed at: 2025-11-26 18:28:23
+Log saved to: experiments/05_frozen_diagnostic/frozen_vix18/training_20251126_182235.log
+======================================================================

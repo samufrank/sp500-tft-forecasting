@@ -1,0 +1,2112 @@
+
+[INFO] Using AUTO device selection.
+
+[INFO] Patched matplotlib.Axes.errorbar to abs() negative yerr for robustness.
+======================================================================
+Training TFT: 05a_regime_output/learn3r_d025_lb0_mlp
+======================================================================
+Logging to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/training_20251127_220227.log
+Started at: 2025-11-27 22:02:27
+======================================================================
+Configuration saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/config.json
+
+Loading data splits...
+Train: 6074 samples
+Val: 1302 samples
+Test: 1302 samples
+
+Preparing TimeSeriesDataSet...
+
+Dropping source columns (used for staleness only): ['CPI']
+
+Final features for TFT: ['SP500_Returns', 'VIX', 'Treasury_10Y', 'Yield_Spread', 'Inflation_YoY']
+
+======================================================================
+FEATURE STATISTICS - BEFORE NORMALIZATION
+======================================================================
+VIX                             mean= 19.7438  std=  8.0295  min=  9.3100  max= 80.8600
+Treasury_10Y                    mean=  4.7672  std=  1.6903  min=  1.4300  max=  8.3600
+Yield_Spread                    mean=  1.2778  std=  0.9179  min= -0.5200  max=  2.9100
+Inflation_YoY                   mean=  2.5322  std=  1.1865  min= -2.1498  max=  6.7300
+
+======================================================================
+FEATURES AFTER GROUPNORMALIZER (first batch, last timestep)
+======================================================================
+VIX                             normalized_value=  1.0000
+Treasury_10Y                    normalized_value= -0.0500
+Yield_Spread                    normalized_value=  0.0817
+Inflation_YoY                   normalized_value=  0.8774
+======================================================================
+
+[DEBUG] VIX train values: [28.95 30.38 33.3  31.33 32.63]
+[DEBUG] VIX val values: [14.31 15.15 15.13 12.86 13.85]
+Batches per epoch: 94
+[DEBUG] Validation batches: 21
+[DEBUG] Validation dataset size: 1282
+[DEBUG] Batch size: 64
+
+Initializing model...
+
+Using standard QuantileLoss (no penalties)
+
+[REGIME OUTPUT] Replaced output layer:
+  Mode: learned
+  Strategy: learned
+  Experts: 3 x MLP(16)
+  Training routing: soft
+  Load balance weight: 0.0
+  Parameters: {'total': 1224, 'experts': 1173, 'router': 51, 'expert_type': 'mlp', 'expert_hidden_size': 16}
+
+[REGIME OUTPUT] Enabled with 3 regimes, mode=learned, strategy=learned, training=soft
+
+================================================================================
+BASELINE MODEL FEATURE CONFIGURATION (after from_dataset)
+================================================================================
+tft.hparams.time_varying_reals_encoder: ['relative_time_idx', 'VIX', 'Treasury_10Y', 'Yield_Spread', 'Inflation_YoY']
+  Count: 5
+
+tft.hparams.time_varying_reals_decoder: ['relative_time_idx']
+  Count: 1
+
+tft.hparams.x_reals (all reals passed to model): ['encoder_length', 'relative_time_idx', 'VIX', 'Treasury_10Y', 'Yield_Spread', 'Inflation_YoY']
+  Count: 6
+
+Encoder VSN configuration:
+  num_inputs: 5
+  input_sizes: {'relative_time_idx': 16, 'VIX': 16, 'Treasury_10Y': 16, 'Yield_Spread': 16, 'Inflation_YoY': 16}
+  flattened_grn.fc1: in_features=80, out_features=5
+  -> Params in fc1: 400 (should be 5*16*5=400 if 5 features)
+================================================================================
+
+Model parameters: 23,720
+
+Starting training...
+Checkpoints will be saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/checkpoints/
+Logs will be saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/logs/
+
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 0
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 0: val_loss=N/A
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 0
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 0: val_loss=0.7229089736938477
+Epoch 0: train_loss=0.7988170981407166
+
+[CollapseMonitor] Epoch 0
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.007148, range: 0.028844, mean: -0.083280
+  Pos: 0.0%, Neg: 100.0%, Unique: 1231
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch0.npy
+  Gradient norms:
+    lstm_encoder: 0.004772
+    lstm_decoder: 0.004799
+    output_layer: 0.094288
+  VSN output std:
+    encoder: 0.154355
+  Attention entropy: 2.990700
+  Regime diagnostics:
+    Routing entropy: 1.0979 (normalized: 0.9993)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.3427, R1=0.3422, R2=0.3152
+    Expert 0: std=0.030639, mean=0.038844
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.021675, mean=-0.041530
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.004008, mean=-0.343344
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.476
+  Expert weight divergence (0 vs 1): diff=3.2065, cosine=0.0217
+  Expert weight divergence (0 vs 2): diff=3.0849, cosine=0.1236
+  Expert weight divergence (1 vs 2): diff=3.2086, cosine=0.0603
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch0.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 1
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 1: val_loss=0.6684635877609253
+Epoch 1: train_loss=0.7549869418144226
+
+[CollapseMonitor] Epoch 1
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.005702, range: 0.021793, mean: -0.026626
+  Pos: 0.0%, Neg: 100.0%, Unique: 1211
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch1.npy
+  Gradient norms:
+    lstm_encoder: 0.002978
+    lstm_decoder: 0.003134
+    output_layer: 0.084181
+  VSN output std:
+    encoder: 0.159674
+  Attention entropy: 2.991959
+  Regime diagnostics:
+    Routing entropy: 1.0932 (normalized: 0.9951)
+    Dominant regime: 100.0%
+    Regime assignments: 0=0.0%, 1=100.0%, 2=0.0%
+    Avg routing weights: R0=0.3568, R1=0.3583, R2=0.2849
+    Expert 0: std=0.018765, mean=0.032623
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.008579, mean=0.012382
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.002336, mean=-0.259256
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.635
+  Expert weight divergence (0 vs 1): diff=3.2065, cosine=0.0237
+  Expert weight divergence (0 vs 2): diff=3.0775, cosine=0.1270
+  Expert weight divergence (1 vs 2): diff=3.2067, cosine=0.0618
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch1.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 2
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 2: val_loss=0.6162675619125366
+Epoch 2: train_loss=0.6997144222259521
+
+[CollapseMonitor] Epoch 2
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.003732, range: 0.017815, mean: 0.037115
+  Pos: 100.0%, Neg: 0.0%, Unique: 1183
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch2.npy
+  Gradient norms:
+    lstm_encoder: 0.001823
+    lstm_decoder: 0.002036
+    output_layer: 0.078708
+  VSN output std:
+    encoder: 0.174393
+  Attention entropy: 2.994505
+  Regime diagnostics:
+    Routing entropy: 1.0799 (normalized: 0.9829)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.3841, R1=0.3712, R2=0.2447
+    Expert 0: std=0.007698, mean=0.087399
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.001176, mean=-0.002040
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.002148, mean=-0.133578
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.575
+  Expert weight divergence (0 vs 1): diff=3.2156, cosine=0.0262
+  Expert weight divergence (0 vs 2): diff=3.0770, cosine=0.1307
+  Expert weight divergence (1 vs 2): diff=3.2172, cosine=0.0615
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch2.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 3
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 3: val_loss=0.5565889477729797
+Epoch 3: train_loss=0.6368369460105896
+
+[CollapseMonitor] Epoch 3
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.002375, range: 0.012013, mean: 0.052769
+  Pos: 100.0%, Neg: 0.0%, Unique: 1167
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch3.npy
+  Gradient norms:
+    lstm_encoder: 0.001467
+    lstm_decoder: 0.001775
+    output_layer: 0.075975
+  VSN output std:
+    encoder: 0.192852
+  Attention entropy: 2.995234
+  Regime diagnostics:
+    Routing entropy: 1.0525 (normalized: 0.9580)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.4434, R1=0.3525, R2=0.2040
+    Expert 0: std=0.004337, mean=0.076477
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.000726, mean=-0.024475
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.000787, mean=-0.050595
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.434
+  Expert weight divergence (0 vs 1): diff=3.2297, cosine=0.0348
+  Expert weight divergence (0 vs 2): diff=3.0908, cosine=0.1357
+  Expert weight divergence (1 vs 2): diff=3.2414, cosine=0.0604
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch3.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 4
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 4: val_loss=0.5104756951332092
+Epoch 4: train_loss=0.5684625506401062
+
+[CollapseMonitor] Epoch 4
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.001869, range: 0.008721, mean: 0.048754
+  Pos: 100.0%, Neg: 0.0%, Unique: 1141
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch4.npy
+  Gradient norms:
+    lstm_encoder: 0.001175
+    lstm_decoder: 0.001288
+    output_layer: 0.065086
+  VSN output std:
+    encoder: 0.202700
+  Attention entropy: 2.995364
+  Regime diagnostics:
+    Routing entropy: 1.0166 (normalized: 0.9253)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.4913, R1=0.3395, R2=0.1692
+    Expert 0: std=0.002837, mean=0.047884
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.000617, mean=-0.040426
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.001471, mean=0.011898
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.459
+  Expert weight divergence (0 vs 1): diff=3.2478, cosine=0.0465
+  Expert weight divergence (0 vs 2): diff=3.1130, cosine=0.1409
+  Expert weight divergence (1 vs 2): diff=3.2738, cosine=0.0592
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch4.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 5
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 5: val_loss=0.47871676087379456
+Epoch 5: train_loss=0.5153123140335083
+
+[CollapseMonitor] Epoch 5
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.001706, range: 0.007782, mean: 0.056860
+  Pos: 100.0%, Neg: 0.0%, Unique: 1134
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch5.npy
+  Gradient norms:
+    lstm_encoder: 0.000901
+    lstm_decoder: 0.000886
+    output_layer: 0.049206
+  VSN output std:
+    encoder: 0.203920
+  Attention entropy: 2.995335
+  Regime diagnostics:
+    Routing entropy: 0.9653 (normalized: 0.8787)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.5574, R1=0.2991, R2=0.1434
+    Expert 0: std=0.002256, mean=0.050886
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.000634, mean=-0.032491
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.001278, mean=0.003053
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.491
+  Expert weight divergence (0 vs 1): diff=3.2664, cosine=0.0610
+  Expert weight divergence (0 vs 2): diff=3.1338, cosine=0.1509
+  Expert weight divergence (1 vs 2): diff=3.3017, cosine=0.0614
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch5.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 6
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 6: val_loss=0.4610869586467743
+Epoch 6: train_loss=0.4820515513420105
+
+[CollapseMonitor] Epoch 6
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.001847, range: 0.009006, mean: 0.043004
+  Pos: 100.0%, Neg: 0.0%, Unique: 1156
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch6.npy
+  Gradient norms:
+    lstm_encoder: 0.000801
+    lstm_decoder: 0.000758
+    output_layer: 0.036592
+  VSN output std:
+    encoder: 0.198329
+  Attention entropy: 2.995182
+  Regime diagnostics:
+    Routing entropy: 0.8656 (normalized: 0.7879)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.6576, R1=0.2203, R2=0.1221
+    Expert 0: std=0.002049, mean=0.025448
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.000753, mean=-0.048218
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.001181, mean=0.010907
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.559
+  Expert weight divergence (0 vs 1): diff=3.2857, cosine=0.0760
+  Expert weight divergence (0 vs 2): diff=3.1587, cosine=0.1627
+  Expert weight divergence (1 vs 2): diff=3.3266, cosine=0.0650
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch6.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 7
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 7: val_loss=0.4521726667881012
+Epoch 7: train_loss=0.46366849541664124
+
+[CollapseMonitor] Epoch 7
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.002488, range: 0.012393, mean: 0.032192
+  Pos: 100.0%, Neg: 0.0%, Unique: 1151
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch7.npy
+  Gradient norms:
+    lstm_encoder: 0.000730
+    lstm_decoder: 0.000690
+    output_layer: 0.027374
+  VSN output std:
+    encoder: 0.189902
+  Attention entropy: 2.995074
+  Regime diagnostics:
+    Routing entropy: 0.7503 (normalized: 0.6830)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.7383, R1=0.1586, R2=0.1032
+    Expert 0: std=0.001822, mean=0.009298
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.000812, mean=-0.077341
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.001328, mean=0.039831
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.562
+  Expert weight divergence (0 vs 1): diff=3.3040, cosine=0.0860
+  Expert weight divergence (0 vs 2): diff=3.1788, cosine=0.1727
+  Expert weight divergence (1 vs 2): diff=3.3417, cosine=0.0675
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch7.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 8
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 8: val_loss=0.4489085376262665
+Epoch 8: train_loss=0.45713236927986145
+
+[CollapseMonitor] Epoch 8
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.004636, range: 0.022665, mean: 0.059981
+  Pos: 100.0%, Neg: 0.0%, Unique: 1205
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch8.npy
+  Gradient norms:
+    lstm_encoder: 0.000759
+    lstm_decoder: 0.000663
+    output_layer: 0.024163
+  VSN output std:
+    encoder: 0.177980
+  Attention entropy: 2.994977
+  Regime diagnostics:
+    Routing entropy: 0.6883 (normalized: 0.6265)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.7738, R1=0.1319, R2=0.0943
+    Expert 0: std=0.002508, mean=0.039877
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.001588, mean=-0.095208
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.001848, mean=0.070117
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.533
+  Expert weight divergence (0 vs 1): diff=3.3150, cosine=0.0907
+  Expert weight divergence (0 vs 2): diff=3.1903, cosine=0.1784
+  Expert weight divergence (1 vs 2): diff=3.3503, cosine=0.0684
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch8.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 9
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 9: val_loss=0.4468357563018799
+Epoch 9: train_loss=0.4533834755420685
+
+[CollapseMonitor] Epoch 9
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.018866, range: 0.081228, mean: 0.087224
+  Pos: 100.0%, Neg: 0.0%, Unique: 1253
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch9.npy
+  Gradient norms:
+    lstm_encoder: 0.000882
+    lstm_decoder: 0.000727
+    output_layer: 0.024314
+  VSN output std:
+    encoder: 0.159438
+  Attention entropy: 2.994238
+  Regime diagnostics:
+    Routing entropy: 0.6586 (normalized: 0.5995)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.7891, R1=0.1220, R2=0.0888
+    Expert 0: std=0.014201, mean=0.082780
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.006743, mean=-0.128911
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.007078, mean=0.062048
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.695
+  Expert weight divergence (0 vs 1): diff=3.3241, cosine=0.0933
+  Expert weight divergence (0 vs 2): diff=3.2007, cosine=0.1806
+  Expert weight divergence (1 vs 2): diff=3.3560, cosine=0.0682
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch9.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 10
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 10: val_loss=0.43640032410621643
+Epoch 10: train_loss=0.4500335454940796
+
+[CollapseMonitor] Epoch 10
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.037274, range: 0.144749, mean: 0.089360
+  Pos: 92.4%, Neg: 7.6%, Unique: 1249
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch10.npy
+  Gradient norms:
+    lstm_encoder: 0.001535
+    lstm_decoder: 0.001090
+    output_layer: 0.025110
+  VSN output std:
+    encoder: 0.165980
+  Attention entropy: 2.991483
+  Regime diagnostics:
+    Routing entropy: 0.7531 (normalized: 0.6855)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.7370, R1=0.1544, R2=0.1085
+    Expert 0: std=0.039604, mean=0.141252
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.024476, mean=-0.227414
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.051609, mean=-0.123222
+    VIX correlation (regime_1): -0.756
+  Expert weight divergence (0 vs 1): diff=3.3352, cosine=0.0955
+  Expert weight divergence (0 vs 2): diff=3.2116, cosine=0.1821
+  Expert weight divergence (1 vs 2): diff=3.3623, cosine=0.0668
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch10.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 11
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 11: val_loss=0.4313691556453705
+Epoch 11: train_loss=0.4429779350757599
+
+[CollapseMonitor] Epoch 11
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.036535, range: 0.150154, mean: 0.069964
+  Pos: 90.7%, Neg: 9.3%, Unique: 1258
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch11.npy
+  Gradient norms:
+    lstm_encoder: 0.001939
+    lstm_decoder: 0.001421
+    output_layer: 0.024097
+  VSN output std:
+    encoder: 0.158863
+  Attention entropy: 2.992193
+  Regime diagnostics:
+    Routing entropy: 0.7811 (normalized: 0.7110)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.7187, R1=0.1664, R2=0.1149
+    Expert 0: std=0.042321, mean=0.137349
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.031114, mean=-0.255640
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.052092, mean=-0.146705
+    VIX correlation (regime_1): -0.711
+  Expert weight divergence (0 vs 1): diff=3.3507, cosine=0.0984
+  Expert weight divergence (0 vs 2): diff=3.2224, cosine=0.1864
+  Expert weight divergence (1 vs 2): diff=3.3681, cosine=0.0661
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch11.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 12
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 12: val_loss=0.4258079528808594
+Epoch 12: train_loss=0.4370352625846863
+
+[CollapseMonitor] Epoch 12
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.022385, range: 0.112736, mean: 0.044328
+  Pos: 91.7%, Neg: 8.3%, Unique: 1250
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch12.npy
+  Gradient norms:
+    lstm_encoder: 0.002415
+    lstm_decoder: 0.001805
+    output_layer: 0.022736
+  VSN output std:
+    encoder: 0.171460
+  Attention entropy: 2.987824
+  Regime diagnostics:
+    Routing entropy: 0.7870 (normalized: 0.7163)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.7135, R1=0.1672, R2=0.1193
+    Expert 0: std=0.037692, mean=0.115202
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.037490, mean=-0.260678
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.081788, mean=-0.206797
+    VIX correlation (regime_1): -0.738
+  Expert weight divergence (0 vs 1): diff=3.3638, cosine=0.1001
+  Expert weight divergence (0 vs 2): diff=3.2322, cosine=0.1901
+  Expert weight divergence (1 vs 2): diff=3.3717, cosine=0.0664
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch12.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 13
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 13: val_loss=0.42471742630004883
+Epoch 13: train_loss=0.4346558153629303
+
+[CollapseMonitor] Epoch 13
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.020145, range: 0.129872, mean: 0.061466
+  Pos: 96.6%, Neg: 3.4%, Unique: 1256
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch13.npy
+  Gradient norms:
+    lstm_encoder: 0.002942
+    lstm_decoder: 0.002208
+    output_layer: 0.023969
+  VSN output std:
+    encoder: 0.143042
+  Attention entropy: 2.974730
+  Regime diagnostics:
+    Routing entropy: 0.8198 (normalized: 0.7462)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.6930, R1=0.1773, R2=0.1297
+    Expert 0: std=0.024768, mean=0.142263
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.027373, mean=-0.241666
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.067491, mean=-0.216993
+    VIX correlation (regime_1): -0.750
+  Expert weight divergence (0 vs 1): diff=3.3725, cosine=0.1011
+  Expert weight divergence (0 vs 2): diff=3.2409, cosine=0.1916
+  Expert weight divergence (1 vs 2): diff=3.3686, cosine=0.0692
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch13.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 14
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 14: val_loss=0.42255306243896484
+Epoch 14: train_loss=0.4335947334766388
+
+[CollapseMonitor] Epoch 14
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.024435, range: 0.140232, mean: 0.040516
+  Pos: 91.5%, Neg: 8.5%, Unique: 1250
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch14.npy
+  Gradient norms:
+    lstm_encoder: 0.003234
+    lstm_decoder: 0.002424
+    output_layer: 0.025548
+  VSN output std:
+    encoder: 0.165635
+  Attention entropy: 2.969134
+  Regime diagnostics:
+    Routing entropy: 0.7930 (normalized: 0.7218)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.7094, R1=0.1671, R2=0.1235
+    Expert 0: std=0.032934, mean=0.111361
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.030856, mean=-0.239459
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.086074, mean=-0.224032
+    VIX correlation (regime_1): -0.778
+  Expert weight divergence (0 vs 1): diff=3.3783, cosine=0.1035
+  Expert weight divergence (0 vs 2): diff=3.2488, cosine=0.1927
+  Expert weight divergence (1 vs 2): diff=3.3711, cosine=0.0690
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch14.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 15
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 15: val_loss=0.42171555757522583
+Epoch 15: train_loss=0.43166786432266235
+
+[CollapseMonitor] Epoch 15
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.022805, range: 0.134420, mean: 0.047254
+  Pos: 96.4%, Neg: 3.6%, Unique: 1258
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch15.npy
+  Gradient norms:
+    lstm_encoder: 0.003939
+    lstm_decoder: 0.002870
+    output_layer: 0.023664
+  VSN output std:
+    encoder: 0.160925
+  Attention entropy: 2.965250
+  Regime diagnostics:
+    Routing entropy: 0.7990 (normalized: 0.7273)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.7066, R1=0.1692, R2=0.1242
+    Expert 0: std=0.014396, mean=0.115647
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.023141, mean=-0.249675
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.063898, mean=-0.216845
+    VIX correlation (regime_1): -0.812
+  Expert weight divergence (0 vs 1): diff=3.3848, cosine=0.1050
+  Expert weight divergence (0 vs 2): diff=3.2539, cosine=0.1945
+  Expert weight divergence (1 vs 2): diff=3.3748, cosine=0.0680
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch15.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 16
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 16: val_loss=0.41782331466674805
+Epoch 16: train_loss=0.4307577311992645
+
+[CollapseMonitor] Epoch 16
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.025454, range: 0.141743, mean: 0.084767
+  Pos: 100.0%, Neg: 0.0%, Unique: 1261
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch16.npy
+  Gradient norms:
+    lstm_encoder: 0.004678
+    lstm_decoder: 0.003158
+    output_layer: 0.024622
+  VSN output std:
+    encoder: 0.174746
+  Attention entropy: 2.965462
+  Regime diagnostics:
+    Routing entropy: 0.8021 (normalized: 0.7301)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.7035, R1=0.1691, R2=0.1274
+    Expert 0: std=0.016105, mean=0.156964
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.024239, mean=-0.233097
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.066739, mean=-0.195941
+    VIX correlation (regime_1): -0.832
+  Expert weight divergence (0 vs 1): diff=3.3936, cosine=0.1058
+  Expert weight divergence (0 vs 2): diff=3.2606, cosine=0.1963
+  Expert weight divergence (1 vs 2): diff=3.3764, cosine=0.0675
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch16.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 17
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 17: val_loss=0.41769757866859436
+Epoch 17: train_loss=0.42819008231163025
+
+[CollapseMonitor] Epoch 17
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.021401, range: 0.139845, mean: 0.069268
+  Pos: 96.9%, Neg: 3.1%, Unique: 1265
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch17.npy
+  Gradient norms:
+    lstm_encoder: 0.005188
+    lstm_decoder: 0.003582
+    output_layer: 0.023619
+  VSN output std:
+    encoder: 0.162462
+  Attention entropy: 2.963134
+  Regime diagnostics:
+    Routing entropy: 0.8351 (normalized: 0.7601)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.6826, R1=0.1819, R2=0.1355
+    Expert 0: std=0.014794, mean=0.141702
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.012524, mean=-0.210377
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.040820, mean=-0.194164
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.831
+  Expert weight divergence (0 vs 1): diff=3.3993, cosine=0.1077
+  Expert weight divergence (0 vs 2): diff=3.2678, cosine=0.1969
+  Expert weight divergence (1 vs 2): diff=3.3776, cosine=0.0673
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch17.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 18
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 18: val_loss=0.4151460826396942
+Epoch 18: train_loss=0.4280865490436554
+
+[CollapseMonitor] Epoch 18
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.023439, range: 0.143166, mean: 0.057446
+  Pos: 96.2%, Neg: 3.8%, Unique: 1257
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch18.npy
+  Gradient norms:
+    lstm_encoder: 0.006179
+    lstm_decoder: 0.004425
+    output_layer: 0.025447
+  VSN output std:
+    encoder: 0.158336
+  Attention entropy: 2.962371
+  Regime diagnostics:
+    Routing entropy: 0.8539 (normalized: 0.7773)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.6682, R1=0.1895, R2=0.1422
+    Expert 0: std=0.015124, mean=0.131499
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.011769, mean=-0.202702
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.045352, mean=-0.196670
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.837
+  Expert weight divergence (0 vs 1): diff=3.4063, cosine=0.1095
+  Expert weight divergence (0 vs 2): diff=3.2766, cosine=0.1977
+  Expert weight divergence (1 vs 2): diff=3.3788, cosine=0.0675
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch18.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 19
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 19: val_loss=0.41447147727012634
+Epoch 19: train_loss=0.4281390309333801
+
+[CollapseMonitor] Epoch 19
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.021880, range: 0.139445, mean: 0.064322
+  Pos: 96.7%, Neg: 3.3%, Unique: 1267
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch19.npy
+  Gradient norms:
+    lstm_encoder: 0.006268
+    lstm_decoder: 0.004242
+    output_layer: 0.023966
+  VSN output std:
+    encoder: 0.162032
+  Attention entropy: 2.960332
+  Regime diagnostics:
+    Routing entropy: 0.8590 (normalized: 0.7819)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.6651, R1=0.1912, R2=0.1437
+    Expert 0: std=0.014780, mean=0.136135
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.009799, mean=-0.195178
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.035723, mean=-0.179863
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.853
+  Expert weight divergence (0 vs 1): diff=3.4137, cosine=0.1100
+  Expert weight divergence (0 vs 2): diff=3.2836, cosine=0.1982
+  Expert weight divergence (1 vs 2): diff=3.3795, cosine=0.0674
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch19.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 20
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 20: val_loss=0.4129883944988251
+Epoch 20: train_loss=0.4270152747631073
+
+[CollapseMonitor] Epoch 20
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.022875, range: 0.147627, mean: 0.074382
+  Pos: 96.8%, Neg: 3.2%, Unique: 1265
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch20.npy
+  Gradient norms:
+    lstm_encoder: 0.006853
+    lstm_decoder: 0.005084
+    output_layer: 0.024355
+  VSN output std:
+    encoder: 0.172115
+  Attention entropy: 2.957983
+  Regime diagnostics:
+    Routing entropy: 0.8394 (normalized: 0.7640)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.6790, R1=0.1830, R2=0.1380
+    Expert 0: std=0.016201, mean=0.140399
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.009452, mean=-0.185452
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.034408, mean=-0.176147
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.862
+  Expert weight divergence (0 vs 1): diff=3.4211, cosine=0.1111
+  Expert weight divergence (0 vs 2): diff=3.2910, cosine=0.1989
+  Expert weight divergence (1 vs 2): diff=3.3806, cosine=0.0673
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch20.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 21
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 21: val_loss=0.41170716285705566
+Epoch 21: train_loss=0.4248223900794983
+
+[CollapseMonitor] Epoch 21
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.020608, range: 0.112913, mean: 0.039462
+  Pos: 97.0%, Neg: 3.0%, Unique: 1272
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch21.npy
+  Gradient norms:
+    lstm_encoder: 0.007058
+    lstm_decoder: 0.005100
+    output_layer: 0.023623
+  VSN output std:
+    encoder: 0.159451
+  Attention entropy: 2.955122
+  Regime diagnostics:
+    Routing entropy: 0.8959 (normalized: 0.8155)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.6355, R1=0.2087, R2=0.1558
+    Expert 0: std=0.012198, mean=0.119546
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.009886, mean=-0.207260
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.035727, mean=-0.194487
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.854
+  Expert weight divergence (0 vs 1): diff=3.4262, cosine=0.1109
+  Expert weight divergence (0 vs 2): diff=3.2951, cosine=0.1995
+  Expert weight divergence (1 vs 2): diff=3.3826, cosine=0.0665
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch21.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 22
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 22: val_loss=0.41078346967697144
+Epoch 22: train_loss=0.42469897866249084
+
+[CollapseMonitor] Epoch 22
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.017852, range: 0.090095, mean: 0.060432
+  Pos: 100.0%, Neg: 0.0%, Unique: 1272
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch22.npy
+  Gradient norms:
+    lstm_encoder: 0.007443
+    lstm_decoder: 0.005760
+    output_layer: 0.024446
+  VSN output std:
+    encoder: 0.180805
+  Attention entropy: 2.959554
+  Regime diagnostics:
+    Routing entropy: 0.8819 (normalized: 0.8027)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.6463, R1=0.2040, R2=0.1498
+    Expert 0: std=0.011906, mean=0.128528
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.006713, mean=-0.183016
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.030700, mean=-0.165818
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.866
+  Expert weight divergence (0 vs 1): diff=3.4327, cosine=0.1111
+  Expert weight divergence (0 vs 2): diff=3.3003, cosine=0.2002
+  Expert weight divergence (1 vs 2): diff=3.3819, cosine=0.0668
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch22.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 23
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 23: val_loss=0.4098515510559082
+Epoch 23: train_loss=0.4249361753463745
+
+[CollapseMonitor] Epoch 23
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.016932, range: 0.093923, mean: 0.075762
+  Pos: 100.0%, Neg: 0.0%, Unique: 1269
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch23.npy
+  Gradient norms:
+    lstm_encoder: 0.007135
+    lstm_decoder: 0.005476
+    output_layer: 0.023230
+  VSN output std:
+    encoder: 0.169860
+  Attention entropy: 2.956297
+  Regime diagnostics:
+    Routing entropy: 0.8666 (normalized: 0.7888)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.6579, R1=0.1965, R2=0.1456
+    Expert 0: std=0.011683, mean=0.131920
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.004946, mean=-0.154855
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.032762, mean=-0.147397
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.870
+  Expert weight divergence (0 vs 1): diff=3.4389, cosine=0.1118
+  Expert weight divergence (0 vs 2): diff=3.3061, cosine=0.2013
+  Expert weight divergence (1 vs 2): diff=3.3818, cosine=0.0673
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch23.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 24
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 24: val_loss=0.4083278179168701
+Epoch 24: train_loss=0.42449951171875
+
+[CollapseMonitor] Epoch 24
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.023083, range: 0.086692, mean: 0.075774
+  Pos: 100.0%, Neg: 0.0%, Unique: 1265
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch24.npy
+  Gradient norms:
+    lstm_encoder: 0.008053
+    lstm_decoder: 0.006328
+    output_layer: 0.023163
+  VSN output std:
+    encoder: 0.157736
+  Attention entropy: 2.956338
+  Regime diagnostics:
+    Routing entropy: 0.8914 (normalized: 0.8114)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.6380, R1=0.2089, R2=0.1531
+    Expert 0: std=0.007675, mean=0.140974
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.004472, mean=-0.159287
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.036061, mean=-0.168152
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.865
+  Expert weight divergence (0 vs 1): diff=3.4453, cosine=0.1123
+  Expert weight divergence (0 vs 2): diff=3.3109, cosine=0.2022
+  Expert weight divergence (1 vs 2): diff=3.3818, cosine=0.0677
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch24.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 25
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 25: val_loss=0.41008931398391724
+Epoch 25: train_loss=0.4241294860839844
+
+[CollapseMonitor] Epoch 25
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.016017, range: 0.078826, mean: 0.055221
+  Pos: 100.0%, Neg: 0.0%, Unique: 1267
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch25.npy
+  Gradient norms:
+    lstm_encoder: 0.008519
+    lstm_decoder: 0.006722
+    output_layer: 0.024141
+  VSN output std:
+    encoder: 0.168523
+  Attention entropy: 2.958509
+  Regime diagnostics:
+    Routing entropy: 0.8661 (normalized: 0.7884)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.6583, R1=0.1971, R2=0.1446
+    Expert 0: std=0.009975, mean=0.109591
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.002980, mean=-0.168419
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.030488, mean=-0.165441
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.874
+  Expert weight divergence (0 vs 1): diff=3.4479, cosine=0.1132
+  Expert weight divergence (0 vs 2): diff=3.3143, cosine=0.2028
+  Expert weight divergence (1 vs 2): diff=3.3810, cosine=0.0682
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch25.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 26
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 26: val_loss=0.4083731770515442
+Epoch 26: train_loss=0.4238429665565491
+
+[CollapseMonitor] Epoch 26
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.016361, range: 0.100154, mean: 0.086865
+  Pos: 100.0%, Neg: 0.0%, Unique: 1267
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch26.npy
+  Gradient norms:
+    lstm_encoder: 0.008212
+    lstm_decoder: 0.006693
+    output_layer: 0.023844
+  VSN output std:
+    encoder: 0.158850
+  Attention entropy: 2.959038
+  Regime diagnostics:
+    Routing entropy: 0.8957 (normalized: 0.8153)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.6361, R1=0.2082, R2=0.1558
+    Expert 0: std=0.011275, mean=0.141458
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.002888, mean=-0.117035
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.031548, mean=-0.139519
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.879
+  Expert weight divergence (0 vs 1): diff=3.4523, cosine=0.1139
+  Expert weight divergence (0 vs 2): diff=3.3179, cosine=0.2042
+  Expert weight divergence (1 vs 2): diff=3.3758, cosine=0.0704
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch26.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 27
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 27: val_loss=0.4067835211753845
+Epoch 27: train_loss=0.42500537633895874
+
+[CollapseMonitor] Epoch 27
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.016524, range: 0.088374, mean: 0.073126
+  Pos: 100.0%, Neg: 0.0%, Unique: 1267
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch27.npy
+  Gradient norms:
+    lstm_encoder: 0.008784
+    lstm_decoder: 0.006891
+    output_layer: 0.022621
+  VSN output std:
+    encoder: 0.146604
+  Attention entropy: 2.954835
+  Regime diagnostics:
+    Routing entropy: 0.9016 (normalized: 0.8207)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.6300, R1=0.2133, R2=0.1566
+    Expert 0: std=0.009335, mean=0.123785
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.003281, mean=-0.115690
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.028629, mean=-0.143870
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.874
+  Expert weight divergence (0 vs 1): diff=3.4588, cosine=0.1142
+  Expert weight divergence (0 vs 2): diff=3.3231, cosine=0.2049
+  Expert weight divergence (1 vs 2): diff=3.3759, cosine=0.0708
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch27.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 28
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 28: val_loss=0.40727370977401733
+Epoch 28: train_loss=0.4244031608104706
+
+[CollapseMonitor] Epoch 28
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.014208, range: 0.063188, mean: 0.068131
+  Pos: 100.0%, Neg: 0.0%, Unique: 1259
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch28.npy
+  Gradient norms:
+    lstm_encoder: 0.009062
+    lstm_decoder: 0.007275
+    output_layer: 0.022537
+  VSN output std:
+    encoder: 0.153397
+  Attention entropy: 2.955920
+  Regime diagnostics:
+    Routing entropy: 0.9146 (normalized: 0.8325)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.6199, R1=0.2195, R2=0.1607
+    Expert 0: std=0.008855, mean=0.116147
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.004595, mean=-0.107523
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.026295, mean=-0.141646
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.880
+  Expert weight divergence (0 vs 1): diff=3.4605, cosine=0.1143
+  Expert weight divergence (0 vs 2): diff=3.3238, cosine=0.2059
+  Expert weight divergence (1 vs 2): diff=3.3740, cosine=0.0717
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch28.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 29
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 29: val_loss=0.4072253704071045
+Epoch 29: train_loss=0.42316102981567383
+
+[CollapseMonitor] Epoch 29
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.014456, range: 0.065053, mean: 0.082794
+  Pos: 100.0%, Neg: 0.0%, Unique: 1263
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch29.npy
+  Gradient norms:
+    lstm_encoder: 0.008522
+    lstm_decoder: 0.006938
+    output_layer: 0.023218
+  VSN output std:
+    encoder: 0.158484
+  Attention entropy: 2.955621
+  Regime diagnostics:
+    Routing entropy: 0.9359 (normalized: 0.8519)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.5999, R1=0.2312, R2=0.1689
+    Expert 0: std=0.010273, mean=0.130378
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.005995, mean=-0.078698
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.028282, mean=-0.129348
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.882
+  Expert weight divergence (0 vs 1): diff=3.4622, cosine=0.1145
+  Expert weight divergence (0 vs 2): diff=3.3240, cosine=0.2068
+  Expert weight divergence (1 vs 2): diff=3.3709, cosine=0.0726
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch29.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 30
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 30: val_loss=0.4052526652812958
+Epoch 30: train_loss=0.42286404967308044
+
+[CollapseMonitor] Epoch 30
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.014190, range: 0.067830, mean: 0.075297
+  Pos: 100.0%, Neg: 0.0%, Unique: 1264
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch30.npy
+  Gradient norms:
+    lstm_encoder: 0.009196
+    lstm_decoder: 0.007665
+    output_layer: 0.021813
+  VSN output std:
+    encoder: 0.168081
+  Attention entropy: 2.957690
+  Regime diagnostics:
+    Routing entropy: 0.9308 (normalized: 0.8472)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.6027, R1=0.2294, R2=0.1679
+    Expert 0: std=0.011281, mean=0.118492
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.006823, mean=-0.077302
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.030265, mean=-0.128849
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.882
+  Expert weight divergence (0 vs 1): diff=3.4689, cosine=0.1152
+  Expert weight divergence (0 vs 2): diff=3.3315, cosine=0.2068
+  Expert weight divergence (1 vs 2): diff=3.3708, cosine=0.0729
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch30.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 31
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 31: val_loss=0.4052955210208893
+Epoch 31: train_loss=0.42252084612846375
+
+[CollapseMonitor] Epoch 31
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.014824, range: 0.072847, mean: 0.054959
+  Pos: 100.0%, Neg: 0.0%, Unique: 1258
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch31.npy
+  Gradient norms:
+    lstm_encoder: 0.009381
+    lstm_decoder: 0.007807
+    output_layer: 0.022060
+  VSN output std:
+    encoder: 0.165661
+  Attention entropy: 2.959181
+  Regime diagnostics:
+    Routing entropy: 0.9260 (normalized: 0.8429)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.6071, R1=0.2292, R2=0.1637
+    Expert 0: std=0.009451, mean=0.096116
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.007711, mean=-0.098201
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.025245, mean=-0.136640
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.881
+  Expert weight divergence (0 vs 1): diff=3.4771, cosine=0.1151
+  Expert weight divergence (0 vs 2): diff=3.3381, cosine=0.2074
+  Expert weight divergence (1 vs 2): diff=3.3735, cosine=0.0719
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch31.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 32
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 32: val_loss=0.40465593338012695
+Epoch 32: train_loss=0.42183932662010193
+
+[CollapseMonitor] Epoch 32
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.012494, range: 0.067907, mean: 0.088402
+  Pos: 100.0%, Neg: 0.0%, Unique: 1264
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch32.npy
+  Gradient norms:
+    lstm_encoder: 0.009578
+    lstm_decoder: 0.007824
+    output_layer: 0.021903
+  VSN output std:
+    encoder: 0.168987
+  Attention entropy: 2.959204
+  Regime diagnostics:
+    Routing entropy: 0.9232 (normalized: 0.8403)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.6101, R1=0.2265, R2=0.1634
+    Expert 0: std=0.011960, mean=0.129125
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.005407, mean=-0.070371
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.024414, mean=-0.112043
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.887
+  Expert weight divergence (0 vs 1): diff=3.4813, cosine=0.1157
+  Expert weight divergence (0 vs 2): diff=3.3401, cosine=0.2088
+  Expert weight divergence (1 vs 2): diff=3.3693, cosine=0.0733
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch32.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 33
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 33: val_loss=0.4057474434375763
+Epoch 33: train_loss=0.42190834879875183
+
+[CollapseMonitor] Epoch 33
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.011356, range: 0.064362, mean: 0.085022
+  Pos: 100.0%, Neg: 0.0%, Unique: 1259
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch33.npy
+  Gradient norms:
+    lstm_encoder: 0.010218
+    lstm_decoder: 0.008703
+    output_layer: 0.022998
+  VSN output std:
+    encoder: 0.173574
+  Attention entropy: 2.959175
+  Regime diagnostics:
+    Routing entropy: 0.9226 (normalized: 0.8398)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.6118, R1=0.2262, R2=0.1620
+    Expert 0: std=0.011536, mean=0.125864
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.004978, mean=-0.072411
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.022654, mean=-0.115957
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.886
+  Expert weight divergence (0 vs 1): diff=3.4846, cosine=0.1155
+  Expert weight divergence (0 vs 2): diff=3.3440, cosine=0.2088
+  Expert weight divergence (1 vs 2): diff=3.3687, cosine=0.0738
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch33.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 34
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 34: val_loss=0.40407466888427734
+Epoch 34: train_loss=0.4220663905143738
+
+[CollapseMonitor] Epoch 34
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.018865, range: 0.098359, mean: 0.062091
+  Pos: 100.0%, Neg: 0.0%, Unique: 1261
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch34.npy
+  Gradient norms:
+    lstm_encoder: 0.010799
+    lstm_decoder: 0.008861
+    output_layer: 0.022792
+  VSN output std:
+    encoder: 0.167558
+  Attention entropy: 2.958493
+  Regime diagnostics:
+    Routing entropy: 0.9524 (normalized: 0.8669)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.5827, R1=0.2445, R2=0.1729
+    Expert 0: std=0.010254, mean=0.116119
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.005196, mean=-0.097494
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.025071, mean=-0.145245
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.891
+  Expert weight divergence (0 vs 1): diff=3.4881, cosine=0.1151
+  Expert weight divergence (0 vs 2): diff=3.3462, cosine=0.2095
+  Expert weight divergence (1 vs 2): diff=3.3690, cosine=0.0736
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch34.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 35
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 35: val_loss=0.40500563383102417
+Epoch 35: train_loss=0.42141813039779663
+
+[CollapseMonitor] Epoch 35
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.011147, range: 0.065399, mean: 0.072595
+  Pos: 100.0%, Neg: 0.0%, Unique: 1256
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch35.npy
+  Gradient norms:
+    lstm_encoder: 0.010351
+    lstm_decoder: 0.008432
+    output_layer: 0.022123
+  VSN output std:
+    encoder: 0.161202
+  Attention entropy: 2.957370
+  Regime diagnostics:
+    Routing entropy: 0.9381 (normalized: 0.8539)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.5966, R1=0.2375, R2=0.1659
+    Expert 0: std=0.012319, mean=0.110756
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.004839, mean=-0.063927
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.024177, mean=-0.124997
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.894
+  Expert weight divergence (0 vs 1): diff=3.4945, cosine=0.1154
+  Expert weight divergence (0 vs 2): diff=3.3531, cosine=0.2094
+  Expert weight divergence (1 vs 2): diff=3.3688, cosine=0.0741
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch35.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 36
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 36: val_loss=0.40329185128211975
+Epoch 36: train_loss=0.42212942242622375
+
+[CollapseMonitor] Epoch 36
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.015214, range: 0.079087, mean: 0.078506
+  Pos: 100.0%, Neg: 0.0%, Unique: 1258
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch36.npy
+  Gradient norms:
+    lstm_encoder: 0.010892
+    lstm_decoder: 0.008890
+    output_layer: 0.021894
+  VSN output std:
+    encoder: 0.151596
+  Attention entropy: 2.953509
+  Regime diagnostics:
+    Routing entropy: 0.9556 (normalized: 0.8699)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.5788, R1=0.2469, R2=0.1743
+    Expert 0: std=0.012295, mean=0.128200
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.004105, mean=-0.069919
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.024618, mean=-0.132249
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.895
+  Expert weight divergence (0 vs 1): diff=3.4993, cosine=0.1152
+  Expert weight divergence (0 vs 2): diff=3.3568, cosine=0.2101
+  Expert weight divergence (1 vs 2): diff=3.3693, cosine=0.0739
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch36.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 37
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 37: val_loss=0.4040736258029938
+Epoch 37: train_loss=0.4210495352745056
+
+[CollapseMonitor] Epoch 37
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.017065, range: 0.090118, mean: 0.071687
+  Pos: 100.0%, Neg: 0.0%, Unique: 1262
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch37.npy
+  Gradient norms:
+    lstm_encoder: 0.011610
+    lstm_decoder: 0.009285
+    output_layer: 0.021746
+  VSN output std:
+    encoder: 0.143229
+  Attention entropy: 2.954966
+  Regime diagnostics:
+    Routing entropy: 0.9533 (normalized: 0.8677)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.5812, R1=0.2491, R2=0.1697
+    Expert 0: std=0.010391, mean=0.123917
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.004598, mean=-0.088650
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.022888, mean=-0.135370
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.896
+  Expert weight divergence (0 vs 1): diff=3.5045, cosine=0.1152
+  Expert weight divergence (0 vs 2): diff=3.3612, cosine=0.2103
+  Expert weight divergence (1 vs 2): diff=3.3699, cosine=0.0739
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch37.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 38
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 38: val_loss=0.4035053551197052
+Epoch 38: train_loss=0.42223647236824036
+
+[CollapseMonitor] Epoch 38
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.014763, range: 0.085934, mean: 0.076424
+  Pos: 100.0%, Neg: 0.0%, Unique: 1264
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch38.npy
+  Gradient norms:
+    lstm_encoder: 0.011991
+    lstm_decoder: 0.010103
+    output_layer: 0.023773
+  VSN output std:
+    encoder: 0.157355
+  Attention entropy: 2.960355
+  Regime diagnostics:
+    Routing entropy: 0.9507 (normalized: 0.8654)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.5836, R1=0.2456, R2=0.1708
+    Expert 0: std=0.013067, mean=0.128259
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.004466, mean=-0.084284
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.026295, mean=-0.126540
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.892
+  Expert weight divergence (0 vs 1): diff=3.5107, cosine=0.1159
+  Expert weight divergence (0 vs 2): diff=3.3696, cosine=0.2105
+  Expert weight divergence (1 vs 2): diff=3.3707, cosine=0.0743
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch38.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 39
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 39: val_loss=0.4026336371898651
+Epoch 39: train_loss=0.42048367857933044
+
+[CollapseMonitor] Epoch 39
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.018619, range: 0.105203, mean: 0.073436
+  Pos: 100.0%, Neg: 0.0%, Unique: 1261
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch39.npy
+  Gradient norms:
+    lstm_encoder: 0.011991
+    lstm_decoder: 0.010227
+    output_layer: 0.022468
+  VSN output std:
+    encoder: 0.165658
+  Attention entropy: 2.963308
+  Regime diagnostics:
+    Routing entropy: 0.9756 (normalized: 0.8881)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.5560, R1=0.2645, R2=0.1795
+    Expert 0: std=0.012572, mean=0.128221
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.005217, mean=-0.071194
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.027764, mean=-0.130662
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.893
+  Expert weight divergence (0 vs 1): diff=3.5155, cosine=0.1159
+  Expert weight divergence (0 vs 2): diff=3.3755, cosine=0.2106
+  Expert weight divergence (1 vs 2): diff=3.3705, cosine=0.0748
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch39.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 40
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 40: val_loss=0.40246471762657166
+Epoch 40: train_loss=0.4207991659641266
+
+[CollapseMonitor] Epoch 40
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.020352, range: 0.116150, mean: 0.077868
+  Pos: 100.0%, Neg: 0.0%, Unique: 1262
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch40.npy
+  Gradient norms:
+    lstm_encoder: 0.012245
+    lstm_decoder: 0.009692
+    output_layer: 0.021159
+  VSN output std:
+    encoder: 0.174526
+  Attention entropy: 2.960334
+  Regime diagnostics:
+    Routing entropy: 0.9550 (normalized: 0.8692)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.5781, R1=0.2501, R2=0.1718
+    Expert 0: std=0.011965, mean=0.125024
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.006696, mean=-0.068747
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.027028, mean=-0.129011
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.896
+  Expert weight divergence (0 vs 1): diff=3.5230, cosine=0.1160
+  Expert weight divergence (0 vs 2): diff=3.3818, cosine=0.2116
+  Expert weight divergence (1 vs 2): diff=3.3708, cosine=0.0753
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch40.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 41
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 41: val_loss=0.40282049775123596
+Epoch 41: train_loss=0.42010030150413513
+
+[CollapseMonitor] Epoch 41
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.015955, range: 0.093678, mean: 0.079355
+  Pos: 100.0%, Neg: 0.0%, Unique: 1253
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch41.npy
+  Gradient norms:
+    lstm_encoder: 0.012413
+    lstm_decoder: 0.010606
+    output_layer: 0.022521
+  VSN output std:
+    encoder: 0.181371
+  Attention entropy: 2.969571
+  Regime diagnostics:
+    Routing entropy: 0.9684 (normalized: 0.8814)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.5640, R1=0.2592, R2=0.1769
+    Expert 0: std=0.017292, mean=0.130267
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.006370, mean=-0.054994
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.026938, mean=-0.129050
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.899
+  Expert weight divergence (0 vs 1): diff=3.5243, cosine=0.1167
+  Expert weight divergence (0 vs 2): diff=3.3804, cosine=0.2134
+  Expert weight divergence (1 vs 2): diff=3.3677, cosine=0.0764
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch41.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 42
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 42: val_loss=0.4005410373210907
+Epoch 42: train_loss=0.42030659317970276
+
+[CollapseMonitor] Epoch 42
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.018585, range: 0.101575, mean: 0.031614
+  Pos: 100.0%, Neg: 0.0%, Unique: 1266
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch42.npy
+  Gradient norms:
+    lstm_encoder: 0.012454
+    lstm_decoder: 0.010509
+    output_layer: 0.022117
+  VSN output std:
+    encoder: 0.158044
+  Attention entropy: 2.960294
+  Regime diagnostics:
+    Routing entropy: 0.9740 (normalized: 0.8866)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.5565, R1=0.2629, R2=0.1806
+    Expert 0: std=0.013979, mean=0.091601
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.007564, mean=-0.113212
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.027888, mean=-0.161743
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.900
+  Expert weight divergence (0 vs 1): diff=3.5296, cosine=0.1165
+  Expert weight divergence (0 vs 2): diff=3.3851, cosine=0.2136
+  Expert weight divergence (1 vs 2): diff=3.3714, cosine=0.0747
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch42.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 43
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 43: val_loss=0.4011625051498413
+Epoch 43: train_loss=0.4209316372871399
+
+[CollapseMonitor] Epoch 43
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.019475, range: 0.108126, mean: 0.071641
+  Pos: 100.0%, Neg: 0.0%, Unique: 1254
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch43.npy
+  Gradient norms:
+    lstm_encoder: 0.014019
+    lstm_decoder: 0.011831
+    output_layer: 0.024363
+  VSN output std:
+    encoder: 0.152635
+  Attention entropy: 2.962652
+  Regime diagnostics:
+    Routing entropy: 0.9817 (normalized: 0.8936)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.5477, R1=0.2701, R2=0.1823
+    Expert 0: std=0.012887, mean=0.123383
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.007815, mean=-0.065054
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.027773, mean=-0.127078
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.898
+  Expert weight divergence (0 vs 1): diff=3.5313, cosine=0.1167
+  Expert weight divergence (0 vs 2): diff=3.3857, cosine=0.2145
+  Expert weight divergence (1 vs 2): diff=3.3675, cosine=0.0767
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch43.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 44
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 44: val_loss=0.40167954564094543
+Epoch 44: train_loss=0.42034265398979187
+
+[CollapseMonitor] Epoch 44
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.020331, range: 0.109927, mean: 0.038202
+  Pos: 100.0%, Neg: 0.0%, Unique: 1257
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch44.npy
+  Gradient norms:
+    lstm_encoder: 0.012531
+    lstm_decoder: 0.010688
+    output_layer: 0.022363
+  VSN output std:
+    encoder: 0.162058
+  Attention entropy: 2.964827
+  Regime diagnostics:
+    Routing entropy: 0.9888 (normalized: 0.9000)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.5387, R1=0.2755, R2=0.1858
+    Expert 0: std=0.013037, mean=0.095671
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.008767, mean=-0.101896
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.026680, mean=-0.139524
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.899
+  Expert weight divergence (0 vs 1): diff=3.5364, cosine=0.1161
+  Expert weight divergence (0 vs 2): diff=3.3909, cosine=0.2141
+  Expert weight divergence (1 vs 2): diff=3.3685, cosine=0.0761
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch44.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 45
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 45: val_loss=0.4046717584133148
+Epoch 45: train_loss=0.4199575185775757
+
+[CollapseMonitor] Epoch 45
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.020434, range: 0.114217, mean: 0.067462
+  Pos: 100.0%, Neg: 0.0%, Unique: 1255
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch45.npy
+  Gradient norms:
+    lstm_encoder: 0.012999
+    lstm_decoder: 0.010803
+    output_layer: 0.023785
+  VSN output std:
+    encoder: 0.170361
+  Attention entropy: 2.969008
+  Regime diagnostics:
+    Routing entropy: 0.9630 (normalized: 0.8766)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.5685, R1=0.2570, R2=0.1745
+    Expert 0: std=0.011614, mean=0.114225
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.008856, mean=-0.082469
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.026627, mean=-0.115137
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.900
+  Expert weight divergence (0 vs 1): diff=3.5383, cosine=0.1163
+  Expert weight divergence (0 vs 2): diff=3.3911, cosine=0.2152
+  Expert weight divergence (1 vs 2): diff=3.3676, cosine=0.0769
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch45.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 46
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 46: val_loss=0.40344563126564026
+Epoch 46: train_loss=0.42060256004333496
+
+[CollapseMonitor] Epoch 46
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.016023, range: 0.090777, mean: 0.075996
+  Pos: 100.0%, Neg: 0.0%, Unique: 1250
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch46.npy
+  Gradient norms:
+    lstm_encoder: 0.013414
+    lstm_decoder: 0.011273
+    output_layer: 0.022422
+  VSN output std:
+    encoder: 0.174446
+  Attention entropy: 2.971303
+  Regime diagnostics:
+    Routing entropy: 0.9864 (normalized: 0.8978)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.5440, R1=0.2688, R2=0.1872
+    Expert 0: std=0.015161, mean=0.127195
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.009325, mean=-0.057720
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.026473, mean=-0.107081
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.897
+  Expert weight divergence (0 vs 1): diff=3.5383, cosine=0.1165
+  Expert weight divergence (0 vs 2): diff=3.3915, cosine=0.2159
+  Expert weight divergence (1 vs 2): diff=3.3639, cosine=0.0780
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch46.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 47
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 47: val_loss=0.40202927589416504
+Epoch 47: train_loss=0.41981181502342224
+
+[CollapseMonitor] Epoch 47
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.020808, range: 0.112802, mean: 0.066566
+  Pos: 100.0%, Neg: 0.0%, Unique: 1257
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch47.npy
+  Gradient norms:
+    lstm_encoder: 0.013214
+    lstm_decoder: 0.010902
+    output_layer: 0.023641
+  VSN output std:
+    encoder: 0.168780
+  Attention entropy: 2.967242
+  Regime diagnostics:
+    Routing entropy: 0.9830 (normalized: 0.8948)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.5462, R1=0.2707, R2=0.1831
+    Expert 0: std=0.013128, mean=0.126234
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.010065, mean=-0.087250
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.026431, mean=-0.122901
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.899
+  Expert weight divergence (0 vs 1): diff=3.5425, cosine=0.1166
+  Expert weight divergence (0 vs 2): diff=3.3959, cosine=0.2157
+  Expert weight divergence (1 vs 2): diff=3.3658, cosine=0.0771
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch47.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 48
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 48: val_loss=0.4019441306591034
+Epoch 48: train_loss=0.42001983523368835
+
+[CollapseMonitor] Epoch 48
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.023925, range: 0.125165, mean: 0.078838
+  Pos: 100.0%, Neg: 0.0%, Unique: 1263
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch48.npy
+  Gradient norms:
+    lstm_encoder: 0.014461
+    lstm_decoder: 0.011885
+    output_layer: 0.024361
+  VSN output std:
+    encoder: 0.169120
+  Attention entropy: 2.967228
+  Regime diagnostics:
+    Routing entropy: 0.9787 (normalized: 0.8909)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.5516, R1=0.2660, R2=0.1823
+    Expert 0: std=0.012902, mean=0.140680
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.010021, mean=-0.085826
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.026977, mean=-0.121529
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.900
+  Expert weight divergence (0 vs 1): diff=3.5439, cosine=0.1166
+  Expert weight divergence (0 vs 2): diff=3.3966, cosine=0.2163
+  Expert weight divergence (1 vs 2): diff=3.3646, cosine=0.0776
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch48.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 49
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 49: val_loss=0.40230122208595276
+Epoch 49: train_loss=0.4208904504776001
+
+[CollapseMonitor] Epoch 49
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.022446, range: 0.119985, mean: 0.067297
+  Pos: 100.0%, Neg: 0.0%, Unique: 1261
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch49.npy
+  Gradient norms:
+    lstm_encoder: 0.014632
+    lstm_decoder: 0.011761
+    output_layer: 0.022368
+  VSN output std:
+    encoder: 0.173125
+  Attention entropy: 2.967578
+  Regime diagnostics:
+    Routing entropy: 0.9836 (normalized: 0.8953)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.5459, R1=0.2692, R2=0.1849
+    Expert 0: std=0.014216, mean=0.128111
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.010402, mean=-0.086931
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.026891, mean=-0.124546
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.901
+  Expert weight divergence (0 vs 1): diff=3.5453, cosine=0.1162
+  Expert weight divergence (0 vs 2): diff=3.3975, cosine=0.2163
+  Expert weight divergence (1 vs 2): diff=3.3646, cosine=0.0774
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch49.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 50
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 50: val_loss=0.401231974363327
+Epoch 50: train_loss=0.4196056127548218
+
+[CollapseMonitor] Epoch 50
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.021581, range: 0.112707, mean: 0.071593
+  Pos: 100.0%, Neg: 0.0%, Unique: 1259
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch50.npy
+  Gradient norms:
+    lstm_encoder: 0.014299
+    lstm_decoder: 0.011695
+    output_layer: 0.023006
+  VSN output std:
+    encoder: 0.168754
+  Attention entropy: 2.966586
+  Regime diagnostics:
+    Routing entropy: 0.9971 (normalized: 0.9076)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.5290, R1=0.2778, R2=0.1932
+    Expert 0: std=0.016344, mean=0.138744
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.010476, mean=-0.078162
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.028319, mean=-0.125137
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.900
+  Expert weight divergence (0 vs 1): diff=3.5466, cosine=0.1161
+  Expert weight divergence (0 vs 2): diff=3.3989, cosine=0.2166
+  Expert weight divergence (1 vs 2): diff=3.3630, cosine=0.0779
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch50.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 51
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 51: val_loss=0.4024880528450012
+Epoch 51: train_loss=0.4207337498664856
+
+[CollapseMonitor] Epoch 51
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.023890, range: 0.133398, mean: 0.067426
+  Pos: 100.0%, Neg: 0.0%, Unique: 1261
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch51.npy
+  Gradient norms:
+    lstm_encoder: 0.014592
+    lstm_decoder: 0.012114
+    output_layer: 0.022666
+  VSN output std:
+    encoder: 0.178061
+  Attention entropy: 2.968976
+  Regime diagnostics:
+    Routing entropy: 0.9957 (normalized: 0.9063)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.5324, R1=0.2769, R2=0.1907
+    Expert 0: std=0.014982, mean=0.136883
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.010276, mean=-0.087879
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.026499, mean=-0.131089
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.900
+  Expert weight divergence (0 vs 1): diff=3.5479, cosine=0.1164
+  Expert weight divergence (0 vs 2): diff=3.3995, cosine=0.2174
+  Expert weight divergence (1 vs 2): diff=3.3636, cosine=0.0781
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch51.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 52
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 52: val_loss=0.40258750319480896
+Epoch 52: train_loss=0.4187715947628021
+
+[CollapseMonitor] Epoch 52
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  [DEBUG] All predictions list length: 21
+  [DEBUG] First batch shape: (64,)
+  Pred std: 0.028482, range: 0.159402, mean: 0.072445
+  Pos: 100.0%, Neg: 0.0%, Unique: 1258
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/val_predictions_epoch52.npy
+  Gradient norms:
+    lstm_encoder: 0.015297
+    lstm_decoder: 0.012431
+    output_layer: 0.022920
+  VSN output std:
+    encoder: 0.172529
+  Attention entropy: 2.970042
+  Regime diagnostics:
+    Routing entropy: 0.9870 (normalized: 0.8984)
+    Dominant regime: 100.0%
+    Regime assignments: 0=100.0%, 1=0.0%, 2=0.0%
+    Avg routing weights: R0=0.5423, R1=0.2725, R2=0.1852
+    Expert 0: std=0.012820, mean=0.140532
+      WARNING: Expert 0 collapsed (std < 0.05)
+    Expert 1: std=0.010577, mean=-0.093147
+      WARNING: Expert 1 collapsed (std < 0.05)
+    Expert 2: std=0.026675, mean=-0.133301
+      WARNING: Expert 2 collapsed (std < 0.05)
+    VIX correlation (regime_1): -0.901
+  Expert weight divergence (0 vs 1): diff=3.5502, cosine=0.1163
+  Expert weight divergence (0 vs 2): diff=3.4016, cosine=0.2174
+  Expert weight divergence (1 vs 2): diff=3.3643, cosine=0.0782
+    INFO: Good expert divergence (cosine < 0.5) - experts learning different functions
+  Saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/collapse_monitoring/collapse_monitor_epoch52.json
+
+
+======================================================================
+Training complete
+======================================================================
+
+Best val_loss checkpoint: experiments/05a_regime_output/learn3r_d025_lb0_mlp/checkpoints/tft-epoch=epoch=42-valloss=val_loss=0.4005.ckpt
+Best validation loss: 0.400541
+Checkpoints saved:
+  - Best val_loss: experiments/05a_regime_output/learn3r_d025_lb0_mlp/checkpoints/tft-epoch=epoch=42-valloss=val_loss=0.4005.ckpt
+  - Best pred_std: experiments/05a_regime_output/learn3r_d025_lb0_mlp/checkpoints/tft-epoch=epoch=10-predstd=val_pred_std=0.0373.ckpt
+  - Best unique: experiments/05a_regime_output/learn3r_d025_lb0_mlp/checkpoints/tft-epoch=epoch=21-unique=val_num_unique=1272.ckpt
+  - Last epoch: experiments/05a_regime_output/learn3r_d025_lb0_mlp/checkpoints/tft-last.ckpt
+Completed at: 2025-11-27 22:22:46
+Log saved to: experiments/05a_regime_output/learn3r_d025_lb0_mlp/training_20251127_220227.log
+======================================================================

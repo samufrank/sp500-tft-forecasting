@@ -331,7 +331,37 @@ def load_model(checkpoint_path, config):
     
     # Case 1: Baseline model (no regime output, no dist loss)
     if not uses_dist_loss and not use_regime_output:
-        model = TemporalFusionTransformer.load_from_checkpoint(checkpoint_path)
+        # Check if regime attention is used
+        regime_attn_config = config.get('regime_attention', {})
+        use_regime_attention = regime_attn_config.get('enabled', False)
+        
+        if use_regime_attention:
+            print(f"  Detected regime attention checkpoint, applying architecture modification...")
+            
+            # Load checkpoint dict first
+            checkpoint = torch.load(checkpoint_path, map_location='cpu')
+            hparams = checkpoint['hyper_parameters']
+            
+            # Create baseline model
+            model = TemporalFusionTransformer(**hparams)
+            
+            # Apply regime attention modification
+            from src.regime_attention import replace_attention_module
+            
+            model = replace_attention_module(
+                model,
+                regime_mode=regime_attn_config.get('regime_mode', 'vix_threshold'),
+                vix_threshold=regime_attn_config.get('vix_threshold', 25.0),
+                num_regimes=regime_attn_config.get('num_regimes', 2)
+            )
+            
+            # Load weights
+            model.load_state_dict(checkpoint['state_dict'])
+            print(f"  Successfully loaded regime attention state_dict")
+        else:
+            # Standard baseline loading
+            model = TemporalFusionTransformer.load_from_checkpoint(checkpoint_path)
+        
         model.eval()
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         model = model.to(device)
@@ -366,6 +396,21 @@ def load_model(checkpoint_path, config):
             routing_strategy=routing_strategy,
             vix_threshold=vix_threshold
         )
+        
+        # Check if regime attention is also used
+        regime_attn_config = config.get('regime_attention', {})
+        use_regime_attention = regime_attn_config.get('enabled', False)
+        
+        if use_regime_attention:
+            print(f"  Detected regime attention, applying attention modification...")
+            from regime_attention import replace_attention_module
+            
+            model = replace_attention_module(
+                model,
+                regime_mode=regime_attn_config.get('regime_mode', 'vix_threshold'),
+                vix_threshold=regime_attn_config.get('vix_threshold', 25.0),
+                num_regimes=regime_attn_config.get('num_regimes', 2)
+            )
         
         # NOW load the MoE weights
         model.load_state_dict(checkpoint['state_dict'])
@@ -434,13 +479,49 @@ def load_model(checkpoint_path, config):
                 vix_threshold=vix_threshold
             )
             
+            # Check if regime attention is also used
+            regime_attn_config = config.get('regime_attention', {})
+            use_regime_attention = regime_attn_config.get('enabled', False)
+            
+            if use_regime_attention:
+                print(f"  Detected regime attention, applying attention modification...")
+                from regime_attention import replace_attention_module
+                
+                model = replace_attention_module(
+                    model,
+                    regime_mode=regime_attn_config.get('regime_mode', 'vix_threshold'),
+                    vix_threshold=regime_attn_config.get('vix_threshold', 25.0),
+                    num_regimes=regime_attn_config.get('num_regimes', 2)
+                )
+            
             # Now load the state dict with MoE architecture
             model.load_state_dict(checkpoint['state_dict'])
             print(f"  Successfully loaded regime output state_dict")
         else:
-            # No regime output - use standard checkpoint loading
-            torch.save(checkpoint, tmp_path)
-            model = TemporalFusionTransformer.load_from_checkpoint(tmp_path)
+            # Check if regime attention is used without regime output
+            regime_attn_config = config.get('regime_attention', {})
+            use_regime_attention = regime_attn_config.get('enabled', False)
+            
+            if use_regime_attention:
+                print(f"  Detected regime attention, applying attention modification...")
+                hparams = checkpoint['hyper_parameters']
+                model = TemporalFusionTransformer(**hparams)
+                
+                from regime_attention import replace_attention_module
+                
+                model = replace_attention_module(
+                    model,
+                    regime_mode=regime_attn_config.get('regime_mode', 'vix_threshold'),
+                    vix_threshold=regime_attn_config.get('vix_threshold', 25.0),
+                    num_regimes=regime_attn_config.get('num_regimes', 2)
+                )
+                
+                model.load_state_dict(checkpoint['state_dict'])
+                print(f"  Successfully loaded regime attention state_dict")
+            else:
+                # Standard loading
+                torch.save(checkpoint, tmp_path)
+                model = TemporalFusionTransformer.load_from_checkpoint(tmp_path)
         
     finally:
         import os

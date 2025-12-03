@@ -214,7 +214,7 @@ def run_command(cmd, logger, description, dry_run=False):
             logger.error(f"  STDERR: {result.stderr[:1000] if result.stderr else 'None'}")
             return False, result.returncode
         
-        logger.info(f"  ✓ Completed successfully")
+        logger.info(f"  âœ“ Completed successfully")
         return True, 0
         
     except subprocess.TimeoutExpired:
@@ -293,6 +293,63 @@ def train_fold(fold, args, splits_base_dir, logger, dry_run=False):
         '--gradient-clip', str(args.gradient_clip),
     ]
     
+    # Custom loss modifications (only add if non-default)
+    if args.directional_weight > 0:
+        cmd.extend(['--directional-weight', str(args.directional_weight)])
+        cmd.extend(['--directional-threshold', str(args.directional_threshold)])
+        cmd.extend(['--directional-window', str(args.directional_window)])
+    
+    if args.collapse_threshold != 0.005:
+        cmd.extend(['--collapse-threshold', str(args.collapse_threshold)])
+    
+    if args.dist_loss_mean_weight > 0:
+        cmd.extend(['--dist-loss-mean-weight', str(args.dist_loss_mean_weight)])
+    
+    if args.dist_loss_std_weight > 0:
+        cmd.extend(['--dist-loss-std-weight', str(args.dist_loss_std_weight)])
+    
+    if args.temporal_consistency_weight > 0:
+        cmd.extend(['--temporal-consistency-weight', str(args.temporal_consistency_weight)])
+    
+    if args.magnitude_weight_alpha > 0:
+        cmd.extend(['--magnitude-weight-alpha', str(args.magnitude_weight_alpha)])
+    
+    if args.extreme_move_weight != 1.0:
+        cmd.extend(['--extreme-move-weight', str(args.extreme_move_weight)])
+        cmd.extend(['--extreme-move-percentile', str(args.extreme_move_percentile)])
+    
+    # Regime output
+    if args.regime_output:
+        cmd.append('--regime-output')
+        cmd.extend(['--num-regimes', str(args.num_regimes)])
+        cmd.extend(['--routing-strategy', args.routing_strategy])
+        cmd.extend(['--load-balance-weight', str(args.load_balance_weight)])
+        cmd.extend(['--vix-threshold', str(args.vix_threshold)])
+        if args.vix_threshold_low is not None:
+            cmd.extend(['--vix-threshold-low', str(args.vix_threshold_low)])
+        if args.vix_threshold_high is not None:
+            cmd.extend(['--vix-threshold-high', str(args.vix_threshold_high)])
+        if args.expert_hidden_size > 0:
+            cmd.extend(['--expert-hidden-size', str(args.expert_hidden_size)])
+        if args.hard_routing_train:
+            cmd.append('--hard-routing-train')
+    
+    # Regime-aware attention
+    if args.regime_attention:
+        cmd.append('--regime-attention')
+        cmd.extend(['--regime-attention-vix-threshold', str(args.regime_attention_vix_threshold)])
+    
+    # Classification head
+    if args.classification:
+        cmd.append('--classification')
+        cmd.extend(['--classification-mode', args.classification_mode])
+        cmd.extend(['--classification-weight', str(args.classification_weight)])
+        cmd.extend(['--regression-weight', str(args.regression_weight)])
+    
+    # Other options
+    if args.staleness:
+        cmd.append('--staleness')
+    
     if args.overwrite:
         cmd.append('--overwrite')
     
@@ -327,20 +384,20 @@ def run_fold(fold, args, splits_base_dir, logger, dry_run=False):
     
     # Step 1: Create splits
     if not create_fold_splits(fold, args, splits_base_dir, logger, dry_run):
-        logger.error(f"  ✗ Failed to create splits for {fold['fold_id']}")
+        logger.error(f"  âœ— Failed to create splits for {fold['fold_id']}")
         return {'fold_id': fold['fold_id'], 'status': 'split_failed'}
     
     # Step 2: Train
     if not train_fold(fold, args, splits_base_dir, logger, dry_run):
-        logger.error(f"  ✗ Failed to train {fold['fold_id']}")
+        logger.error(f"  âœ— Failed to train {fold['fold_id']}")
         return {'fold_id': fold['fold_id'], 'status': 'train_failed'}
     
     # Step 3: Evaluate
     if not evaluate_fold(fold, args, logger, dry_run):
-        logger.error(f"  ✗ Failed to evaluate {fold['fold_id']}")
+        logger.error(f"  âœ— Failed to evaluate {fold['fold_id']}")
         return {'fold_id': fold['fold_id'], 'status': 'eval_failed'}
     
-    logger.info(f"  ✓ {fold['fold_id']} completed successfully")
+    logger.info(f"  âœ“ {fold['fold_id']} completed successfully")
     return {'fold_id': fold['fold_id'], 'status': 'success', **fold}
 
 
@@ -429,7 +486,7 @@ def aggregate_results(folds, args, logger):
         if metric in df.columns:
             mean = df[metric].mean()
             std = df[metric].std()
-            logger.info(f"  {metric:<25}: {mean:>8.4f} ± {std:.4f}")
+            logger.info(f"  {metric:<25}: {mean:>8.4f} Â± {std:.4f}")
     
     logger.info("-"*60)
     
@@ -509,6 +566,70 @@ def parse_args():
     # Evaluation
     parser.add_argument('--eval-batch-size', type=int, default=128,
                         help='Evaluation batch size')
+    
+    # Custom loss modifications (pass through to train_tft.py)
+    parser.add_argument('--directional-weight', type=float, default=0.0,
+                        help='Weight for directional diversity penalty')
+    parser.add_argument('--directional-threshold', type=float, default=0.90,
+                        help='Threshold for directional penalty activation')
+    parser.add_argument('--directional-window', type=int, default=30,
+                        help='Window size for directional penalty calculation')
+    parser.add_argument('--collapse-threshold', type=float, default=0.005,
+                        help='Std threshold for variance collapse penalty')
+    parser.add_argument('--dist-loss-mean-weight', type=float, default=0.0,
+                        help='Weight for distribution mean constraint')
+    parser.add_argument('--dist-loss-std-weight', type=float, default=0.0,
+                        help='Weight for distribution std constraint')
+    parser.add_argument('--temporal-consistency-weight', type=float, default=0.0,
+                        help='Weight for temporal consistency penalty')
+    parser.add_argument('--magnitude-weight-alpha', type=float, default=0.0,
+                        help='Alpha for linear magnitude weighting')
+    parser.add_argument('--extreme-move-weight', type=float, default=1.0,
+                        help='Weight multiplier for extreme moves')
+    parser.add_argument('--extreme-move-percentile', type=int, default=95,
+                        help='Percentile threshold for extreme moves')
+    
+    # Regime output (pass through to train_tft.py)
+    parser.add_argument('--regime-output', action='store_true',
+                        help='Enable regime-conditional output layer')
+    parser.add_argument('--num-regimes', type=int, default=2,
+                        help='Number of regime experts')
+    parser.add_argument('--routing-strategy', type=str, default='learned',
+                        choices=['learned', 'vix_threshold'],
+                        help='Routing strategy for regime selection')
+    parser.add_argument('--load-balance-weight', type=float, default=0.5,
+                        help='Weight for load balancing loss')
+    parser.add_argument('--vix-threshold', type=float, default=25.0,
+                        help='VIX threshold for 2-regime routing')
+    parser.add_argument('--vix-threshold-low', type=float, default=None,
+                        help='Low VIX threshold for 3-regime routing')
+    parser.add_argument('--vix-threshold-high', type=float, default=None,
+                        help='High VIX threshold for 3-regime routing')
+    parser.add_argument('--expert-hidden-size', type=int, default=0,
+                        help='Hidden size for MLP experts (0 for linear)')
+    parser.add_argument('--hard-routing-train', action='store_true',
+                        help='Use hard routing during training')
+    
+    # Regime-aware attention (pass through to train_tft.py)
+    parser.add_argument('--regime-attention', action='store_true',
+                        help='Enable regime-aware attention gating')
+    parser.add_argument('--regime-attention-vix-threshold', type=float, default=25.0,
+                        help='VIX threshold for regime switching')
+    
+    # Classification head (pass through to train_tft.py)
+    parser.add_argument('--classification', action='store_true',
+                        help='Enable parallel classification head')
+    parser.add_argument('--classification-mode', type=str, default='direction',
+                        choices=['direction', 'direction_3class', 'regime_volatility'],
+                        help='Classification target mode')
+    parser.add_argument('--classification-weight', type=float, default=1.0,
+                        help='Weight for classification loss')
+    parser.add_argument('--regression-weight', type=float, default=1.0,
+                        help='Weight for regression loss')
+    
+    # Other model options
+    parser.add_argument('--staleness', action='store_true',
+                        help='Include staleness features')
     
     # Execution control
     parser.add_argument('--dry-run', action='store_true',
