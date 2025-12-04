@@ -38,6 +38,7 @@ warnings.filterwarnings('ignore', category=FutureWarning)
 # Custom components
 from src.custom_losses import create_loss_from_args
 from src.regime_output import replace_output_layer
+from src.quantile_config import get_quantiles, get_median_index, get_output_size
 
 # in same /train dir
 from collapse_monitor import CollapseMonitor
@@ -75,6 +76,8 @@ def parse_args():
     # TFT architecture
     parser.add_argument('--max-encoder-length', type=int, default=20,
                         help='Lookback window length')
+    parser.add_argument('--max-prediction-length', type=int, default=1,
+                        help='Forecast horizon (1=single-step, >1=multi-horizon)')
     parser.add_argument('--hidden-size', type=int, default=16,
                         help='Hidden layer size')
     parser.add_argument('--attention-heads', type=int, default=2,
@@ -99,6 +102,11 @@ def parse_args():
     # Include staleness features
     parser.add_argument('--staleness', action='store_true',
                         help='Enable staleness features (experimental)')    
+    
+    # Quantile configuration
+    parser.add_argument('--quantiles', type=str, default='7q',
+                        choices=['median', '1q', '3q', '7q'],
+                        help='Quantile preset: median/1q (single), 3q (standard), 7q (full distribution)')
     
     # Paths
     parser.add_argument('--splits-dir', type=str, default='data/splits',
@@ -194,14 +202,7 @@ def parse_args():
                         help='Enable regime-aware attention gating')
     parser.add_argument('--regime-attention-vix-threshold', type=float, default=25.0,
                         help='VIX threshold for regime switching (default: 25.0)')
-    parser.add_argument('--regime-attention-grad-scale', type=float, default=100.0,
-                        help='Gradient scaling factor for regime gates (default: 100.0)')
-    parser.add_argument('--regime-gate-init', type=str, default='neutral',
-                        choices=['neutral', 'separated'],
-                        help='Gate initialization: neutral (0.5) or separated (0.38/0.62)')
-    parser.add_argument('--gate-separation-weight', type=float, default=0.0,
-                    help='Weight for regime gate separation reward (0.0 = disabled)')
-    
+
     return parser.parse_args()
 
 
@@ -402,7 +403,7 @@ def prepare_tft_data(train_df, val_df, args, features, add_staleness=True):
         target="SP500_Returns",
         group_ids=["group"],
         max_encoder_length=args.max_encoder_length,
-        max_prediction_length=1,  # Always predict 1 step ahead
+        max_prediction_length=args.max_prediction_length,
         time_varying_known_reals=[],  # No known future inputs
         time_varying_unknown_reals=features['all'],
         target_normalizer=GroupNormalizer(groups=["group"]),
@@ -447,8 +448,18 @@ def prepare_tft_data(train_df, val_df, args, features, add_staleness=True):
 def create_model(training_dataset, args, raw_vix_train, raw_vix_val):
     """Initialize TFT model with EnhancedQuantileLoss."""
     
-    # Create loss function with configured penalties
-    loss_fn = create_loss_from_args(args)
+    # Get quantile configuration
+    quantiles = get_quantiles(args.quantiles)
+    output_size = get_output_size(quantiles)
+    median_idx = get_median_index(quantiles)
+    
+    print(f"\nQuantile configuration: {args.quantiles}")
+    print(f"  Quantiles: {quantiles}")
+    print(f"  Output size: {output_size}")
+    print(f"  Median index: {median_idx}")
+    
+    # Create loss function with configured penalties and quantiles
+    loss_fn = create_loss_from_args(args, quantiles=quantiles)
     
     # Log which penalties are active
     active_penalties = []
@@ -469,7 +480,20 @@ def create_model(training_dataset, args, raw_vix_train, raw_vix_val):
         print(f"\nActive loss penalties: {', '.join(active_penalties)}")
     else:
         print("\nUsing standard QuantileLoss (no penalties)")
-
+    """
+    tft = TemporalFusionTransformer.from_dataset(
+        training_dataset,
+        learning_rate=args.learning_rate,
+        hidden_size=args.hidden_size,
+        attention_head_size=args.attention_heads,
+        dropout=args.dropout,
+        hidden_continuous_size=args.hidden_continuous_size,
+        output_size=7,
+        loss=loss_fn,  # Use custom loss instead of QuantileLoss()
+        log_interval=10,
+        reduce_on_plateau_patience=4,
+    )
+    """
     # Common TFT kwargs
     tft_kwargs = dict(
         learning_rate=args.learning_rate,
@@ -477,7 +501,7 @@ def create_model(training_dataset, args, raw_vix_train, raw_vix_val):
         attention_head_size=args.attention_heads,
         dropout=args.dropout,
         hidden_continuous_size=args.hidden_continuous_size,
-        output_size=7,
+        output_size=output_size,
         loss=loss_fn,
         log_interval=-1 if args.classification else 10, # disable interpretation logging for classification
         reduce_on_plateau_patience=4,
@@ -600,9 +624,7 @@ def create_model(training_dataset, args, raw_vix_train, raw_vix_val):
             tft,
             regime_mode='vix_threshold',
             vix_threshold=args.regime_attention_vix_threshold,
-            num_regimes=2,
-            gate_grad_scale=args.regime_attention_grad_scale,
-            gate_init=args.regime_gate_init
+            num_regimes=2
         )
         tft = patch_forward_for_regime(
             tft, 
@@ -612,11 +634,6 @@ def create_model(training_dataset, args, raw_vix_train, raw_vix_val):
         )
         
         print(f"\n[REGIME ATTENTION] Enabled: vix_threshold={args.regime_attention_vix_threshold}")
-        
-        # Connect loss to model for gate separation penalty
-        if args.gate_separation_weight > 0 and hasattr(tft, 'loss') and hasattr(tft.loss, 'set_model'):
-            tft.loss.set_model(tft)
-            print(f"[GATE SEPARATION] Enabled: weight={args.gate_separation_weight}")
     
     # DEBUG: Show what the model actually received
     print("\n" + "="*80)
@@ -641,6 +658,11 @@ def create_model(training_dataset, args, raw_vix_train, raw_vix_val):
             print(f"  flattened_grn.fc1: in_features={fc1_in}, out_features={fc1_out}")
             print(f"  -> Params in fc1: {fc1_in * fc1_out} (should be 5*16*5=400 if 5 features)")
     print("="*80 + "\n")
+    
+    # Store quantile and horizon configuration on model for downstream components
+    tft._quantiles = quantiles
+    tft._median_idx = median_idx
+    tft._max_prediction_length = args.max_prediction_length
     
     return tft
 
@@ -719,7 +741,7 @@ def save_config(args, features, output_dir):
         },
         'architecture': {
             'max_encoder_length': args.max_encoder_length,
-            'max_prediction_length': 1,
+            'max_prediction_length': args.max_prediction_length,
             'hidden_size': args.hidden_size,
             'attention_head_size': args.attention_heads,
             'dropout': args.dropout,
@@ -734,6 +756,8 @@ def save_config(args, features, output_dir):
         },
         'loss': {
             'type': 'EnhancedQuantileLoss',
+            'quantile_preset': args.quantiles,
+            'quantiles': get_quantiles(args.quantiles),
             'dist_loss_mean_weight': args.dist_loss_mean_weight,
             'dist_loss_std_weight': args.dist_loss_std_weight,
             'collapse_threshold': getattr(args, 'collapse_threshold', 0.005),
@@ -760,7 +784,7 @@ def save_config(args, features, output_dir):
             'enabled': args.regime_attention,
             'vix_threshold': args.regime_attention_vix_threshold,
             'num_regimes': 2,
-            'gate_grad_scale': args.regime_attention_grad_scale if args.regime_attention else None, 
+            'gate_grad_scale': 100,  # document the gradient scaling
         },
         'transfer_learning': {
             'freeze_backbone': getattr(args, 'freeze_backbone', False),
@@ -979,7 +1003,9 @@ def train():
     collapse_monitor = CollapseMonitor(
         val_dataloader=val_dataloader,
         log_dir=f'{output_dir}/collapse_monitoring',
-        log_every_n_epochs=args.monitor_every_n_epochs
+        log_every_n_epochs=args.monitor_every_n_epochs,
+        quantiles=tft._quantiles,  # Use quantiles stored on model
+        max_prediction_length=tft._max_prediction_length  # Use prediction length stored on model
     )
         
     # Multiple checkpoints tracking different metrics

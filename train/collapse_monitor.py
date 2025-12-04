@@ -13,6 +13,14 @@ import json
 import os
 from pathlib import Path
 
+# Quantile configuration utilities
+try:
+    from src.quantile_config import get_median_index
+except ImportError:
+    # Fallback for standalone usage
+    def get_median_index(quantiles):
+        return quantiles.index(0.5)
+
 
 class CollapseMonitor(Callback):
     """
@@ -26,12 +34,21 @@ class CollapseMonitor(Callback):
     - Attention weight entropy
     """
     
-    def __init__(self, val_dataloader, log_dir, log_every_n_epochs=1):
+    def __init__(self, val_dataloader, log_dir, log_every_n_epochs=1, quantiles=None, max_prediction_length=1):
         super().__init__()
         self.val_dataloader = val_dataloader
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.log_every_n_epochs = log_every_n_epochs
+        
+        # Quantile configuration for median index lookup
+        if quantiles is None:
+            quantiles = [0.02, 0.1, 0.25, 0.5, 0.75, 0.9, 0.98]  # Default 7q
+        self.quantiles = quantiles
+        self.median_idx = get_median_index(quantiles)
+        
+        # Multi-horizon configuration
+        self.max_prediction_length = max_prediction_length
         
         # Buffer to store gradients captured during training
         self._current_epoch_gradients = {}
@@ -139,15 +156,24 @@ class CollapseMonitor(Callback):
         """
         Measure diversity of predictions on validation set.
         
-        Metrics:
+        Metrics (per horizon if multi-horizon):
         - std/range/mean: Basic statistics over all validation predictions
         - Pos/Neg %: Percentage of predictions above/below zero
         - Unique: Number of distinct prediction values across entire val set
           (1 = collapsed to constant, hundreds = healthy diversity)
+        - Directional accuracy: % of times sign(pred) == sign(actual)
+        
+        For multi-horizon (max_prediction_length > 1):
+        - Per-horizon metrics stored with suffix (e.g., prediction_std_h1, prediction_std_h2)
+        - Aggregate metrics computed as mean across horizons
+        - Primary metrics (for checkpointing) use horizon 0 (next-step prediction)
         """
         pl_module.eval()
-        all_predictions = []
-        all_actuals = []
+        
+        # Collect predictions and actuals for all horizons
+        # predictions_by_horizon[h] = list of batch predictions for horizon h
+        predictions_by_horizon = {h: [] for h in range(self.max_prediction_length)}
+        actuals_by_horizon = {h: [] for h in range(self.max_prediction_length)}
         
         with torch.no_grad():
             batch_count = 0
@@ -160,126 +186,186 @@ class CollapseMonitor(Callback):
                      for k, v in x.items()}
                 
                 # Get predictions - handle different output formats
+                # Shape: [batch, max_prediction_length, num_quantiles]
                 output = pl_module(x)
                 if isinstance(output, dict):
-                    # pytorch-forecasting TFT model - returns dict with 'prediction' key
-                    preds = output['prediction'][:, 0, 3]
+                    pred_tensor = output['prediction']
                 elif hasattr(output, 'prediction'):
-                    # pytorch-forecasting namedtuple output
-                    preds = output.prediction[:, 0, 3]
+                    pred_tensor = output.prediction
                 else:
-                    # Custom TFT model - returns predictions tensor directly
-                    # Shape: [batch, max_prediction_length, num_quantiles]
-                    # Extract median quantile (index 3 for 7 quantiles) at first timestep
-                    preds = output[:, 0, 3]
-                    
-                all_predictions.append(preds.cpu().numpy())
+                    pred_tensor = output
                 
-                # Collect actuals - handle different shapes
-                y_np = y[0].cpu().numpy() if isinstance(y, (list, tuple)) else y.cpu().numpy()
-                y_np = y_np.flatten()
-                all_actuals.append(y_np)
+                # Extract median predictions for each horizon
+                for h in range(self.max_prediction_length):
+                    preds_h = pred_tensor[:, h, self.median_idx]
+                    predictions_by_horizon[h].append(preds_h.cpu().numpy())
+                
+                # Collect actuals - shape depends on prediction length
+                y_tensor = y[0] if isinstance(y, (list, tuple)) else y
+                # y_tensor shape: [batch, prediction_length] for multi-horizon, [batch, 1] for single
+                for h in range(self.max_prediction_length):
+                    if y_tensor.ndim == 2 and y_tensor.shape[1] > h:
+                        actuals_h = y_tensor[:, h].cpu().numpy()
+                    else:
+                        actuals_h = y_tensor.flatten().cpu().numpy()
+                    actuals_by_horizon[h].append(actuals_h)
 
-        print(f"  [DEBUG] Processed {batch_count} batches from val_dataloader")
-           
-        predictions = np.concatenate(all_predictions)
-        actuals = np.concatenate(all_actuals)
-        print(f"  [DEBUG] Predictions shape after concat: {predictions.shape}")
-        print(f"  [DEBUG] All predictions list length: {len(all_predictions)}")
-        print(f"  [DEBUG] First batch shape: {all_predictions[0].shape if all_predictions else 'empty'}")
-
-        # Compute diversity metrics
-        pred_std = np.std(predictions)
-        pred_range = np.ptp(predictions)
-        pred_mean = np.mean(predictions)
-        pct_pos = np.mean(predictions > 0) * 100
-        pct_neg = np.mean(predictions < 0) * 100
-        n_unique = len(np.unique(np.round(predictions, decimals=6)))
+        # Concatenate predictions and actuals for each horizon
+        predictions_by_horizon = {h: np.concatenate(preds) for h, preds in predictions_by_horizon.items()}
+        actuals_by_horizon = {h: np.concatenate(acts) for h, acts in actuals_by_horizon.items()}
         
-        self.history['epoch'].append(trainer.current_epoch)
-        self.history['prediction_std'].append(float(pred_std))
-        self.history['prediction_range'].append(float(pred_range))
-        self.history['prediction_mean'].append(float(pred_mean))
-        self.history['pct_positive'].append(float(pct_pos))
-        self.history['pct_negative'].append(float(pct_neg))
-        self.history['num_unique_predictions'].append(int(n_unique))
+        # Initialize per-horizon history keys if needed
+        if self.max_prediction_length > 1 and 'prediction_std_by_horizon' not in self.history:
+            self.history['prediction_std_by_horizon'] = {f'h{h}': [] for h in range(self.max_prediction_length)}
+            self.history['directional_accuracy_by_horizon'] = {f'h{h}': [] for h in range(self.max_prediction_length)}
+            self.history['num_unique_by_horizon'] = {f'h{h}': [] for h in range(self.max_prediction_length)}
         
-        # Compute anti-collapse penalty if model uses EnhancedQuantileLoss
-        collapse_penalty = None
-        if hasattr(pl_module.loss, 'collapse_weight') and hasattr(pl_module.loss, 'collapse_threshold'):
-            loss_fn = pl_module.loss
-            if pred_std < loss_fn.collapse_threshold:
-                collapse_penalty = loss_fn.collapse_weight * (loss_fn.collapse_threshold - pred_std) ** 2
+        # Compute metrics for each horizon
+        metrics_by_horizon = {}
+        for h in range(self.max_prediction_length):
+            predictions = predictions_by_horizon[h]
+            actuals = actuals_by_horizon[h]
+            
+            pred_std = np.std(predictions)
+            pred_range = np.ptp(predictions)
+            pred_mean = np.mean(predictions)
+            pct_pos = np.mean(predictions > 0) * 100
+            pct_neg = np.mean(predictions < 0) * 100
+            n_unique = len(np.unique(np.round(predictions, decimals=6)))
+            
+            # Directional accuracy
+            pred_signs = np.sign(predictions)
+            actual_signs = np.sign(actuals)
+            dir_acc = np.mean(pred_signs == actual_signs)
+            
+            # Prediction Sharpe
+            if pred_std > 1e-10:
+                pred_sharpe = (pred_mean / pred_std) * np.sqrt(252)
             else:
-                collapse_penalty = 0.0
-            self.history['collapse_penalty'] = self.history.get('collapse_penalty', [])
-            self.history['collapse_penalty'].append(float(collapse_penalty))
+                pred_sharpe = 0.0
+            
+            # Composite metric
+            actual_pct_positive = np.mean(actuals > 0)
+            pred_pct_positive = np.mean(predictions > 0)
+            distribution_match = 1.0 - abs(pred_pct_positive - actual_pct_positive)
+            composite = dir_acc * (0.5 + 0.5 * distribution_match)
+            
+            metrics_by_horizon[h] = {
+                'pred_std': pred_std,
+                'pred_range': pred_range,
+                'pred_mean': pred_mean,
+                'pct_pos': pct_pos,
+                'pct_neg': pct_neg,
+                'n_unique': n_unique,
+                'dir_acc': dir_acc,
+                'pred_sharpe': pred_sharpe,
+                'composite': composite,
+                'distribution_match': distribution_match,
+                'actual_pct_positive': actual_pct_positive,
+            }
+            
+            # Store per-horizon metrics if multi-horizon
+            if self.max_prediction_length > 1:
+                self.history['prediction_std_by_horizon'][f'h{h}'].append(float(pred_std))
+                self.history['directional_accuracy_by_horizon'][f'h{h}'].append(float(dir_acc))
+                self.history['num_unique_by_horizon'][f'h{h}'].append(int(n_unique))
         
-        print(f"  Pred std: {pred_std:.6f}, range: {pred_range:.6f}, "
-              f"mean: {pred_mean:.6f}")
-        print(f"  Pos: {pct_pos:.1f}%, Neg: {pct_neg:.1f}%, "
-              f"Unique: {n_unique}")
-       
-        # Log to pl_module so ModelCheckpoint can monitor these metrics
-        pl_module.log('val_pred_std', float(pred_std), on_step=False, on_epoch=True, prog_bar=False)
-        pl_module.log('val_pct_positive', float(pct_pos), on_step=False, on_epoch=True, prog_bar=False)
-        pl_module.log('val_num_unique', int(n_unique), on_step=False, on_epoch=True, prog_bar=False)
-
-        # Compute and log directional accuracy and prediction Sharpe
-        # Directional accuracy: % of times sign(pred) == sign(actual)
-        pred_signs = np.sign(predictions)
-        actual_signs = np.sign(actuals)
-        dir_acc = np.mean(pred_signs == actual_signs)
+        # Use horizon 0 (next-step) as primary metrics for checkpointing
+        h0 = metrics_by_horizon[0]
+        predictions = predictions_by_horizon[0]
+        actuals = actuals_by_horizon[0]
         
-        # Prediction Sharpe: mean(pred) / std(pred) * sqrt(252) for daily
-        # This measures how "confident" the predictions are, adjusted for variance
-        if pred_std > 1e-10:
-            pred_sharpe = (pred_mean / pred_std) * np.sqrt(252)
-        else:
-            pred_sharpe = 0.0
+        # Store primary metrics in history (horizon 0)
+        self.history['epoch'].append(trainer.current_epoch)
+        self.history['prediction_std'].append(float(h0['pred_std']))
+        self.history['prediction_range'].append(float(h0['pred_range']))
+        self.history['prediction_mean'].append(float(h0['pred_mean']))
+        self.history['pct_positive'].append(float(h0['pct_pos']))
+        self.history['pct_negative'].append(float(h0['pct_neg']))
+        self.history['num_unique_predictions'].append(int(h0['n_unique']))
         
-        # Log for ModelCheckpoint
-        pl_module.log('val_dir_acc', float(dir_acc), on_step=False, on_epoch=True, prog_bar=False)
-        pl_module.log('val_sharpe', float(pred_sharpe), on_step=False, on_epoch=True, prog_bar=False)
-        
-        # Store in history
         if 'directional_accuracy' not in self.history:
             self.history['directional_accuracy'] = []
         if 'prediction_sharpe' not in self.history:
             self.history['prediction_sharpe'] = []
-        self.history['directional_accuracy'].append(float(dir_acc))
-        self.history['prediction_sharpe'].append(float(pred_sharpe))
-        
-        print(f"  Dir Acc: {dir_acc*100:.2f}%, Pred Sharpe: {pred_sharpe:.4f}")
-
-        # Composite metric: directional accuracy penalized by distribution mismatch
-        # Penalizes deviation from actual target distribution, not arbitrary 50/50
-        actual_pct_positive = np.mean(actuals > 0)
-        pred_pct_positive = np.mean(predictions > 0)
-        distribution_match = 1.0 - abs(pred_pct_positive - actual_pct_positive)
-        composite = dir_acc * (0.5 + 0.5 * distribution_match)
-        
-        # Log for ModelCheckpoint
-        pl_module.log('val_composite', float(composite), on_step=False, on_epoch=True, prog_bar=False)
-        
-        # Store in history
         if 'composite' not in self.history:
             self.history['composite'] = []
         if 'distribution_match' not in self.history:
             self.history['distribution_match'] = []
         if 'actual_pct_positive' not in self.history:
             self.history['actual_pct_positive'] = []
-        self.history['composite'].append(float(composite))
-        self.history['distribution_match'].append(float(distribution_match))
-        self.history['actual_pct_positive'].append(float(actual_pct_positive * 100))
+            
+        self.history['directional_accuracy'].append(float(h0['dir_acc']))
+        self.history['prediction_sharpe'].append(float(h0['pred_sharpe']))
+        self.history['composite'].append(float(h0['composite']))
+        self.history['distribution_match'].append(float(h0['distribution_match']))
+        self.history['actual_pct_positive'].append(float(h0['actual_pct_positive'] * 100))
         
-        print(f"  Composite: {composite:.4f} (dist_match: {distribution_match:.4f}, "
-              f"actual_pos: {actual_pct_positive*100:.1f}%, pred_pos: {pred_pct_positive*100:.1f}%)")
-
-        # Print collapse penalty if computed
+        # Log primary metrics to pl_module for ModelCheckpoint
+        pl_module.log('val_pred_std', float(h0['pred_std']), on_step=False, on_epoch=True, prog_bar=False)
+        pl_module.log('val_pct_positive', float(h0['pct_pos']), on_step=False, on_epoch=True, prog_bar=False)
+        pl_module.log('val_num_unique', int(h0['n_unique']), on_step=False, on_epoch=True, prog_bar=False)
+        pl_module.log('val_dir_acc', float(h0['dir_acc']), on_step=False, on_epoch=True, prog_bar=False)
+        pl_module.log('val_sharpe', float(h0['pred_sharpe']), on_step=False, on_epoch=True, prog_bar=False)
+        pl_module.log('val_composite', float(h0['composite']), on_step=False, on_epoch=True, prog_bar=False)
+        
+        # Compute and log aggregate metrics if multi-horizon
+        if self.max_prediction_length > 1:
+            avg_pred_std = np.mean([m['pred_std'] for m in metrics_by_horizon.values()])
+            avg_dir_acc = np.mean([m['dir_acc'] for m in metrics_by_horizon.values()])
+            avg_composite = np.mean([m['composite'] for m in metrics_by_horizon.values()])
+            
+            pl_module.log('val_pred_std_avg', float(avg_pred_std), on_step=False, on_epoch=True, prog_bar=False)
+            pl_module.log('val_dir_acc_avg', float(avg_dir_acc), on_step=False, on_epoch=True, prog_bar=False)
+            pl_module.log('val_composite_avg', float(avg_composite), on_step=False, on_epoch=True, prog_bar=False)
+            
+            # Store aggregates in history
+            if 'prediction_std_avg' not in self.history:
+                self.history['prediction_std_avg'] = []
+                self.history['directional_accuracy_avg'] = []
+                self.history['composite_avg'] = []
+            self.history['prediction_std_avg'].append(float(avg_pred_std))
+            self.history['directional_accuracy_avg'].append(float(avg_dir_acc))
+            self.history['composite_avg'].append(float(avg_composite))
+        
+        # Compute anti-collapse penalty (using horizon 0)
+        collapse_penalty = None
+        if hasattr(pl_module.loss, 'collapse_weight') and hasattr(pl_module.loss, 'collapse_threshold'):
+            loss_fn = pl_module.loss
+            if h0['pred_std'] < loss_fn.collapse_threshold:
+                collapse_penalty = loss_fn.collapse_weight * (loss_fn.collapse_threshold - h0['pred_std']) ** 2
+            else:
+                collapse_penalty = 0.0
+            self.history['collapse_penalty'] = self.history.get('collapse_penalty', [])
+            self.history['collapse_penalty'].append(float(collapse_penalty))
+        
+        # Print summary
+        if self.max_prediction_length == 1:
+            # Original verbose output for single-horizon
+            print(f"  [DEBUG] Processed {batch_count} batches from val_dataloader")
+            print(f"  [DEBUG] Predictions shape after concat: {predictions.shape}")
+            print(f"  Pred std: {h0['pred_std']:.6f}, range: {h0['pred_range']:.6f}, mean: {h0['pred_mean']:.6f}")
+            print(f"  Pos: {h0['pct_pos']:.1f}%, Neg: {h0['pct_neg']:.1f}%, Unique: {h0['n_unique']}")
+            print(f"  Dir Acc: {h0['dir_acc']*100:.2f}%, Pred Sharpe: {h0['pred_sharpe']:.4f}")
+            print(f"  Composite: {h0['composite']:.4f} (dist_match: {h0['distribution_match']:.4f}, "
+                  f"actual_pos: {h0['actual_pct_positive']*100:.1f}%, pred_pos: {h0['pct_pos']:.1f}%)")
+        else:
+            # Multi-horizon output with key metrics per horizon
+            print(f"  [DEBUG] Processed {batch_count} batches, {self.max_prediction_length} horizon(s)")
+            print(f"  Multi-horizon metrics ({self.max_prediction_length} horizons):")
+            for h in range(min(self.max_prediction_length, 5)):  # Show first 5 horizons
+                m = metrics_by_horizon[h]
+                print(f"    h{h+1}: std={m['pred_std']:.4f}, dir_acc={m['dir_acc']*100:.1f}%, "
+                      f"pos={m['pct_pos']:.0f}%, unique={m['n_unique']}, sharpe={m['pred_sharpe']:.2f}")
+            if self.max_prediction_length > 5:
+                print(f"    ... ({self.max_prediction_length - 5} more horizons)")
+            print(f"  Aggregate: std_avg={avg_pred_std:.4f}, dir_acc_avg={avg_dir_acc*100:.1f}%, composite_avg={avg_composite:.4f}")
+            # Also print h1 details for direct comparison with single-horizon runs
+            print(f"  H1 detail: range={h0['pred_range']:.4f}, mean={h0['pred_mean']:.4f}, "
+                  f"dist_match={h0['distribution_match']:.4f}")
+        
         if collapse_penalty is not None:
-            print(f"  Collapse penalty: {collapse_penalty:.6f} "
-                  f"(threshold: {loss_fn.collapse_threshold:.6f})")
+            print(f"  Collapse penalty: {collapse_penalty:.6f} (threshold: {loss_fn.collapse_threshold:.6f})")
         
         # Print directional penalty if model uses it
         if hasattr(pl_module.loss, 'directional_weight') and hasattr(pl_module.loss, 'last_directional_penalty'):
@@ -288,13 +374,11 @@ class CollapseMonitor(Callback):
             dir_threshold = pl_module.loss.directional_threshold
             if dir_weight > 0:
                 if dir_penalty is not None:
-                    print(f"  Directional penalty: {dir_penalty:.6f} "
-                          f"(weight: {dir_weight:.2f}, threshold: {dir_threshold:.2f})")
+                    print(f"  Directional penalty: {dir_penalty:.6f} (weight: {dir_weight:.2f}, threshold: {dir_threshold:.2f})")
                 else:
-                    print(f"  Directional penalty: not computed yet "
-                          f"(weight: {dir_weight:.2f}, threshold: {dir_threshold:.2f})")
+                    print(f"  Directional penalty: not computed yet (weight: {dir_weight:.2f}, threshold: {dir_threshold:.2f})")
         
-        # regime attn
+        # Regime attention diagnostics
         if hasattr(pl_module, 'multihead_attn') and hasattr(pl_module.multihead_attn, 'get_regime_diagnostics'):
             from train.regime_attention_training import get_regime_diagnostics
             diag = get_regime_diagnostics(pl_module)
@@ -303,9 +387,14 @@ class CollapseMonitor(Callback):
             if diag.get('gate_statistics'):
                 print(f"  Regime gates: {diag['gate_statistics']}")
 
-        # Save actual predictions for debugging
+        # Save predictions for debugging (all horizons)
         pred_save_path = self.log_dir / f'val_predictions_epoch{trainer.current_epoch}.npy'
-        np.save(pred_save_path, predictions)
+        if self.max_prediction_length == 1:
+            np.save(pred_save_path, predictions)
+        else:
+            # Save as dict with horizon keys
+            np.savez(pred_save_path.with_suffix('.npz'), **{f'h{h}': predictions_by_horizon[h] for h in range(self.max_prediction_length)})
+            pred_save_path = pred_save_path.with_suffix('.npz')
         print(f"  Saved validation predictions to: {pred_save_path}")
 
     def _log_gradient_flow(self, pl_module):
@@ -625,12 +714,12 @@ class CollapseMonitor(Callback):
                     if cached_pred is None:
                         continue
                     
-                    # Extract median quantile (index 3) at first timestep
+                    # Extract median quantile at first timestep
                     # Shape: [batch, seq_len, output_size] -> [batch]
                     if cached_pred.ndim == 3:
-                        preds = cached_pred[:, 0, 3].numpy()
+                        preds = cached_pred[:, 0, self.median_idx].numpy()
                     elif cached_pred.ndim == 2:
-                        preds = cached_pred[:, 3].numpy()
+                        preds = cached_pred[:, self.median_idx].numpy()
                     else:
                         continue
                     

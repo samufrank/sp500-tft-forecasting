@@ -41,6 +41,14 @@ import matplotlib.pyplot as plt
 from scipy import stats
 from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix, roc_auc_score
 
+# Quantile configuration utilities
+try:
+    from src.quantile_config import get_median_index
+except ImportError:
+    # Fallback for standalone usage
+    def get_median_index(quantiles):
+        return quantiles.index(0.5)
+
 
 # ============================================================================
 # FREQUENCY-AWARE CONSTANTS
@@ -340,6 +348,9 @@ def prepare_test_dataset(train_df, test_df, config):
     # Get feature list from config
     features = config['features']['all']
     
+    # Get prediction length from config (default 1 for backward compatibility)
+    max_prediction_length = config.get('architecture', {}).get('max_prediction_length', 1)
+    
     # Create training dataset for normalization parameters (train only)
     train_df['time_idx'] = range(len(train_df))
     train_df['group'] = 'SP500'
@@ -350,7 +361,7 @@ def prepare_test_dataset(train_df, test_df, config):
         target="SP500_Returns",
         group_ids=["group"],
         max_encoder_length=config['architecture']['max_encoder_length'],
-        max_prediction_length=1,
+        max_prediction_length=max_prediction_length,
         time_varying_known_reals=[],
         time_varying_unknown_reals=features,
         target_normalizer=GroupNormalizer(groups=["group"]),
@@ -398,8 +409,8 @@ def load_model(checkpoint_path, config):
     checkpoint hyperparameters and loads from appropriate module.
     
     Detection logic:
-    - If 'num_encoder_features' in hparams → Custom TFT (models/tft_model.py)
-    - Otherwise → Baseline TFT (pytorch_forecasting)
+    - If 'num_encoder_features' in hparams â†’ Custom TFT (models/tft_model.py)
+    - Otherwise â†’ Baseline TFT (pytorch_forecasting)
     
     Both models have identical prediction interfaces, so downstream evaluation
     code works unchanged.
@@ -660,8 +671,27 @@ def load_model(checkpoint_path, config):
 # PREDICTION
 # ============================================================================
 
-def generate_predictions(model, test_dataset, batch_size=128):
-    """Generate predictions on test set."""
+def generate_predictions(model, test_dataset, batch_size=128, quantiles=None, max_prediction_length=1):
+    """Generate predictions on test set.
+    
+    Args:
+        model: Trained TFT model
+        test_dataset: TimeSeriesDataSet for test data
+        batch_size: Batch size for inference
+        quantiles: List of quantile values (default: 7q preset)
+        max_prediction_length: Number of forecast horizons (default: 1)
+    
+    Returns:
+        If max_prediction_length == 1:
+            predictions, actuals: 1D numpy arrays [N]
+        If max_prediction_length > 1:
+            predictions, actuals: 2D numpy arrays [N, H] where H = max_prediction_length
+    """
+    # Get median index from quantiles
+    if quantiles is None:
+        quantiles = [0.02, 0.1, 0.25, 0.5, 0.75, 0.9, 0.98]  # Default 7q
+    median_idx = get_median_index(quantiles)
+    
     # Create dataloader
     test_dataloader = test_dataset.to_dataloader(
         train=False,
@@ -670,29 +700,16 @@ def generate_predictions(model, test_dataset, batch_size=128):
         persistent_workers=True
     )
     
-    # DEBUG
-    #print(f"Test dataloader batches: {len(test_dataloader)}")
-    #print(f"Test dataset size: {len(test_dataset)}")
-    
     # Generate predictions
-    predictions = []
-    actuals = []
+    predictions_by_horizon = {h: [] for h in range(max_prediction_length)}
+    actuals_by_horizon = {h: [] for h in range(max_prediction_length)}
     
     with torch.no_grad():
         for i, batch in enumerate(test_dataloader):
-            # Unpack batch - dataloader returns (x_dict, y_tuple)
             x, y = batch
-            
-            # Get predictions
             pred = model(x)
             
-            # DEBUG check what pred actually is
-            #print(f"pred type: {type(pred)}")
-            #print(f"pred: {pred if not isinstance(pred, torch.Tensor) else pred.shape}")
-            
-            # Extract point prediction (median quantile)
-            # TFT returns a named tuple with 'prediction' attribute
-            # Shape: [batch_size, prediction_length, num_quantiles]
+            # Extract prediction tensor
             if hasattr(pred, 'prediction'):
                 pred_tensor = pred.prediction
             elif isinstance(pred, tuple):
@@ -702,26 +719,35 @@ def generate_predictions(model, test_dataset, batch_size=128):
             else:
                 pred_tensor = pred
             
-            # For prediction_length=1, quantiles=[0.02, 0.10, 0.25, 0.50, 0.75, 0.90, 0.98]
-            # Index 3 is the median (0.50 quantile)
-            point_pred = pred_tensor[:, 0, 3]
+            # Extract median predictions for each horizon
+            for h in range(max_prediction_length):
+                point_pred = pred_tensor[:, h, median_idx]
+                predictions_by_horizon[h].append(point_pred.cpu().numpy())
             
-            # Extract actual values - y is also a tuple (target, weight) or just target
-            if isinstance(y, tuple):
-                y_actual = y[0]
-            else:
-                y_actual = y
-            
-            # DEBUG
-            #print(f"Batch {i}: predictions shape={point_pred.shape}, actuals shape={y_actual.shape}")
-            
-            predictions.append(point_pred.cpu().numpy())
-            actuals.append(y_actual[:, 0].cpu().numpy())
+            # Extract actuals for each horizon
+            y_tensor = y[0] if isinstance(y, tuple) else y
+            for h in range(max_prediction_length):
+                if y_tensor.ndim == 2 and y_tensor.shape[1] > h:
+                    actuals_h = y_tensor[:, h].cpu().numpy()
+                else:
+                    actuals_h = y_tensor[:, 0].cpu().numpy()
+                actuals_by_horizon[h].append(actuals_h)
     
-    predictions = np.concatenate(predictions)
-    actuals = np.concatenate(actuals)
+    # Concatenate
+    for h in range(max_prediction_length):
+        predictions_by_horizon[h] = np.concatenate(predictions_by_horizon[h])
+        actuals_by_horizon[h] = np.concatenate(actuals_by_horizon[h])
     
-    print(f"Total predictions: {len(predictions)}, Total actuals: {len(actuals)}")
+    # Return format depends on prediction length
+    if max_prediction_length == 1:
+        predictions = predictions_by_horizon[0]
+        actuals = actuals_by_horizon[0]
+        print(f"Total predictions: {len(predictions)}, Total actuals: {len(actuals)}")
+    else:
+        # Stack into [N, H] arrays
+        predictions = np.stack([predictions_by_horizon[h] for h in range(max_prediction_length)], axis=1)
+        actuals = np.stack([actuals_by_horizon[h] for h in range(max_prediction_length)], axis=1)
+        print(f"Total predictions: {predictions.shape} (samples x horizons)")
     
     return predictions, actuals
 
@@ -1313,7 +1339,7 @@ def create_diagnostic_plots(predictions, actuals, dates, output_dir, frequency='
     axes[2].fill_between(dates_dt, 
                          rolling_mean_mag - rolling_std_mag, 
                          rolling_mean_mag + rolling_std_mag,
-                         alpha=0.2, color='blue', label='Ã‚Â±1 std')
+                         alpha=0.2, color='blue', label='Ãƒâ€šÃ‚Â±1 std')
     axes[2].axhline(y=0.01, color='orange', linestyle='--', alpha=0.5, label='1% threshold')
     axes[2].set_xlabel('Date')
     axes[2].set_ylabel('|Prediction| (%)')
@@ -1541,13 +1567,13 @@ def create_performance_plots(actuals, strategy_returns, dates, output_dir, colla
         # Plot markers (reverse order so most severe is on top)
         if first_degraded:
             axes[0].axvline(x=first_degraded, color='gold', linewidth=2, linestyle='--',
-                           label=f'Ã¢â€ â€™ Degraded: {first_degraded.strftime("%Y-%m")}', alpha=0.7)
+                           label=f'ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ Degraded: {first_degraded.strftime("%Y-%m")}', alpha=0.7)
         if first_weak:
             axes[0].axvline(x=first_weak, color='orange', linewidth=2, linestyle='--',
-                           label=f'Ã¢â€ â€™ Weak collapse: {first_weak.strftime("%Y-%m")}', alpha=0.7)
+                           label=f'ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ Weak collapse: {first_weak.strftime("%Y-%m")}', alpha=0.7)
         if first_strong:
             axes[0].axvline(x=first_strong, color='red', linewidth=2, linestyle='--',
-                           label=f'Ã¢â€ â€™ Strong collapse: {first_strong.strftime("%Y-%m")}', alpha=0.7)
+                           label=f'ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ Strong collapse: {first_strong.strftime("%Y-%m")}', alpha=0.7)
     
     axes[0].set_ylabel('Cumulative Return (Growth of $1)')
     axes[0].set_title('Strategy Performance (shaded by quality mode)')
@@ -1704,7 +1730,7 @@ def print_summary(metrics_stat, metrics_fin):
     print(f"  MSE:              {metrics_stat['mse']:.6f}")
     print(f"  RMSE:             {metrics_stat['rmse']:.6f}")
     print(f"  MAE:              {metrics_stat['mae']:.6f}")
-    print(f"  Out-of-sample RÂ²: {metrics_stat['r2']:.4f}")
+    print(f"  Out-of-sample RÃ‚Â²: {metrics_stat['r2']:.4f}")
     
     print("\nFINANCIAL METRICS:")
     print(f"  Directional Acc:  {metrics_fin['directional_accuracy']:.2%}")
@@ -1890,40 +1916,67 @@ def evaluate():
     print(f"Loading model from checkpoint...")
     model = load_model(checkpoint_path, config)
     
+    # Get quantiles and prediction length from config (defaults for backward compatibility)
+    loss_config = config.get('loss', {})
+    quantiles = loss_config.get('quantiles', [0.02, 0.1, 0.25, 0.5, 0.75, 0.9, 0.98])
+    arch_config = config.get('architecture', {})
+    max_prediction_length = arch_config.get('max_prediction_length', 1)
+    print(f"Using quantiles: {quantiles}")
+    print(f"Prediction horizons: {max_prediction_length}")
+    
     # Generate predictions
     print("Generating predictions...")
-    predictions, actuals = generate_predictions(model, test_dataset, args.batch_size)
+    predictions, actuals = generate_predictions(
+        model, test_dataset, args.batch_size, 
+        quantiles=quantiles, 
+        max_prediction_length=max_prediction_length
+    )
     
-    print(f"\nPrediction Generation Summary:")
-    print(f"  Total predictions: {len(predictions)}")
-    print(f"  Test dataset size: {len(test_dataset)}")
-    print(f"  Test dataloader batches: {len(test_dataset.to_dataloader(train=False, batch_size=args.batch_size))}")
-    print(f"  Prediction statistics:")
-    print(f"    Min: {predictions.min():.6f}")
-    print(f"    Max: {predictions.max():.6f}")
-    print(f"    Mean: {predictions.mean():.6f}")
-    print(f"    Std: {predictions.std():.6f}")
-    print(f"    Unique values: {len(np.unique(predictions))}")
+    # Handle multi-horizon predictions
+    is_multi_horizon = predictions.ndim == 2
+    if is_multi_horizon:
+        n_samples, n_horizons = predictions.shape
+        print(f"\nPrediction Generation Summary (Multi-horizon):")
+        print(f"  Samples: {n_samples}, Horizons: {n_horizons}")
+        print(f"  Test dataset size: {len(test_dataset)}")
+        print(f"  Per-horizon statistics:")
+        for h in range(n_horizons):
+            pred_h = predictions[:, h]
+            print(f"    h{h+1}: min={pred_h.min():.4f}, max={pred_h.max():.4f}, "
+                  f"mean={pred_h.mean():.4f}, std={pred_h.std():.4f}, unique={len(np.unique(pred_h))}")
+    else:
+        n_samples = len(predictions)
+        n_horizons = 1
+        print(f"\nPrediction Generation Summary:")
+        print(f"  Total predictions: {n_samples}")
+        print(f"  Test dataset size: {len(test_dataset)}")
+        print(f"  Test dataloader batches: {len(test_dataset.to_dataloader(train=False, batch_size=args.batch_size))}")
+        print(f"  Prediction statistics:")
+        print(f"    Min: {predictions.min():.6f}")
+        print(f"    Max: {predictions.max():.6f}")
+        print(f"    Mean: {predictions.mean():.6f}")
+        print(f"    Std: {predictions.std():.6f}")
+        print(f"    Unique values: {len(np.unique(predictions))}")
     
     # Get dates for plotting - need to align with actual predictions made
     # The test_dataset has been filtered to test period, but predictions may be shorter
     # due to encoder length requirements on the first samples
     # Use the test_dataset.index to get the correct time indices for predictions
-    if len(predictions) < len(test_df_indexed):
+    if n_samples < len(test_df_indexed):
         # Predictions are shorter than test_df - take the last N dates
         # This happens because first max_encoder_length samples can't be predicted
-        dates = test_df_indexed['Date'].values[-len(predictions):]
-        print(f"\nWARNING: Predictions ({len(predictions)}) < Test samples ({len(test_df_indexed)})")
+        dates = test_df_indexed['Date'].values[-n_samples:]
+        print(f"\nWARNING: Predictions ({n_samples}) < Test samples ({len(test_df_indexed)})")
         print(f"Date range: {dates[0]} to {dates[-1]}")
     else:
         # Full coverage
         dates = test_df_indexed['Date'].values
     
     # Verify alignment
-    assert len(dates) == len(predictions) == len(actuals), \
-        f"Length mismatch: dates={len(dates)}, predictions={len(predictions)}, actuals={len(actuals)}"
+    assert len(dates) == n_samples, \
+        f"Length mismatch: dates={len(dates)}, predictions={n_samples}"
     
-    print(f"\nPrediction period: {dates[0]} to {dates[-1]} ({len(predictions)} samples)")
+    print(f"\nPrediction period: {dates[0]} to {dates[-1]} ({n_samples} samples)")
     
     # Infer or confirm frequency
     if data_frequency is None:
@@ -1937,15 +1990,47 @@ def evaluate():
     freq_config = get_frequency_config(data_frequency)
     period_label = freq_config['period_label']
     
-    # Compute metrics
+    # Compute metrics (per-horizon for multi-horizon, then aggregate)
     print("Computing metrics...")
-    metrics_stat = compute_statistical_metrics(predictions, actuals)
-    metrics_fin, strategy_returns = compute_financial_metrics(predictions, actuals, frequency=data_frequency)
-    diagnostics = compute_residual_diagnostics(predictions, actuals)
     
-    # Detect model collapse
+    if is_multi_horizon:
+        # Per-horizon metrics
+        metrics_by_horizon = {}
+        for h in range(n_horizons):
+            pred_h = predictions[:, h]
+            act_h = actuals[:, h]
+            metrics_by_horizon[f'h{h+1}'] = {
+                'statistical': compute_statistical_metrics(pred_h, act_h),
+                'financial': compute_financial_metrics(pred_h, act_h, frequency=data_frequency)[0],
+            }
+        
+        # Use horizon 0 (next-step) as primary metrics
+        pred_h0 = predictions[:, 0]
+        act_h0 = actuals[:, 0]
+        metrics_stat = compute_statistical_metrics(pred_h0, act_h0)
+        metrics_fin, strategy_returns = compute_financial_metrics(pred_h0, act_h0, frequency=data_frequency)
+        diagnostics = compute_residual_diagnostics(pred_h0, act_h0)
+        
+        # Compute aggregate metrics (mean across horizons)
+        metrics_stat_avg = {}
+        for key in metrics_stat.keys():
+            values = [metrics_by_horizon[f'h{h+1}']['statistical'][key] for h in range(n_horizons)]
+            metrics_stat_avg[key] = float(np.mean(values))
+        
+        print(f"\nPer-horizon MAE: " + ", ".join([f"h{h+1}={metrics_by_horizon[f'h{h+1}']['statistical']['mae']:.4f}" for h in range(n_horizons)]))
+        print(f"Per-horizon Dir Acc: " + ", ".join([f"h{h+1}={metrics_by_horizon[f'h{h+1}']['financial']['directional_accuracy']*100:.1f}%" for h in range(n_horizons)]))
+    else:
+        metrics_stat = compute_statistical_metrics(predictions, actuals)
+        metrics_fin, strategy_returns = compute_financial_metrics(predictions, actuals, frequency=data_frequency)
+        diagnostics = compute_residual_diagnostics(predictions, actuals)
+        metrics_by_horizon = None
+        metrics_stat_avg = None
+        pred_h0 = predictions
+        act_h0 = actuals
+    
+    # Detect model collapse (use horizon 0 for multi-horizon)
     print("Analyzing prediction behavior for collapse...")
-    collapse_diagnostics = detect_model_collapse(predictions, actuals, dates, frequency=data_frequency)
+    collapse_diagnostics = detect_model_collapse(pred_h0, act_h0, dates, frequency=data_frequency)
     
     # Print collapse diagnostics
     print("\n" + "="*70)
@@ -2021,24 +2106,47 @@ def evaluate():
     
     # Create plots (pass collapse diagnostics for visual markers)
     print("Creating diagnostic plots...")
-    create_regression_diagnostic_plots(predictions, actuals, dates, output_dir)  # Classic 4-panel regression diagnostics
-    create_diagnostic_plots(predictions, actuals, dates, output_dir, frequency=data_frequency)  # Financial quality diagnostics
-    create_performance_plots(actuals, strategy_returns, dates, output_dir, 
+    # Use horizon 0 for plots (multi-horizon uses pred_h0/act_h0, single-horizon these are same as predictions/actuals)
+    create_regression_diagnostic_plots(pred_h0, act_h0, dates, output_dir)  # Classic 4-panel regression diagnostics
+    create_diagnostic_plots(pred_h0, act_h0, dates, output_dir, frequency=data_frequency)  # Financial quality diagnostics
+    create_performance_plots(act_h0, strategy_returns, dates, output_dir, 
                            collapse_diagnostics=collapse_diagnostics)
     
-    # Save results
+    # Save results (use horizon 0 for backward-compatible CSV/plots)
     print("Saving results...")
-    all_metrics = save_results(predictions, actuals, dates, metrics_stat, 
+    all_metrics = save_results(pred_h0, act_h0, dates, metrics_stat, 
                                 metrics_fin, diagnostics, collapse_diagnostics, output_dir)
+    
+    # Add multi-horizon metrics if applicable
+    if is_multi_horizon and metrics_by_horizon is not None:
+        all_metrics['multi_horizon'] = {
+            'n_horizons': n_horizons,
+            'metrics_by_horizon': metrics_by_horizon,
+            'aggregate': {
+                'statistical': metrics_stat_avg,
+            }
+        }
+        # Also save full prediction array as npz
+        np.savez(os.path.join(output_dir, 'predictions_all_horizons.npz'),
+                 predictions=predictions, actuals=actuals, dates=dates)
+        print(f"  - predictions_all_horizons.npz (all {n_horizons} horizons)")
     
     # Add checkpoint and frequency info to saved metrics
     all_metrics['checkpoint_used'] = checkpoint_path
     all_metrics['frequency'] = data_frequency
+    all_metrics['max_prediction_length'] = max_prediction_length
     with open(os.path.join(output_dir, 'evaluation_metrics.json'), 'w') as f:
         json.dump(all_metrics, f, indent=2)
     
     # Print summary
     print_summary(metrics_stat, metrics_fin)
+    
+    if is_multi_horizon:
+        print(f"\n  Multi-horizon performance (MAE by horizon):")
+        for h in range(n_horizons):
+            mae_h = metrics_by_horizon[f'h{h+1}']['statistical']['mae']
+            dir_acc_h = metrics_by_horizon[f'h{h+1}']['financial']['directional_accuracy']
+            print(f"    h{h+1}: MAE={mae_h:.4f}, DirAcc={dir_acc_h*100:.1f}%")
     
     print(f"\nResults saved to: {output_dir}")
     print(f"  - predictions.csv")

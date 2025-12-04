@@ -5,8 +5,6 @@ Implements EnhancedQuantileLoss that extends pytorch-forecasting's QuantileLoss
 with toggleable penalties for:
 - Anti-collapse penalty (prevent uniform predictions via minimum variance threshold)
 - Temporal consistency (penalize erratic prediction changes)
-- Directional diversity (prevent unidirectional predictions)
-- Gate separation (reward regime gate differentiation for regime-aware attention)
 
 All penalties are optional via weight parameters (weight=0.0 disables).
 """
@@ -22,8 +20,6 @@ class EnhancedQuantileLoss(QuantileLoss):
     Extends base QuantileLoss to prevent common failure modes in financial forecasting:
     1. Collapse: uniform/constant predictions (minimum variance enforcement)
     2. Temporal instability: erratic prediction changes between timesteps
-    3. Unidirectional bias: predicting same direction >90% of time
-    4. Gate collapse: regime gates not differentiating (for regime-aware attention)
     
     Each penalty is independently toggleable via weight parameters.
     
@@ -47,8 +43,6 @@ class EnhancedQuantileLoss(QuantileLoss):
         magnitude_weight_alpha=0.0,  # Linear magnitude weighting (0.0 = disabled)
         extreme_move_weight=1.0,     # Weight for extreme moves (1.0 = disabled, >1.0 = active)
         extreme_move_percentile=95,  # Percentile threshold for extreme moves
-        # Gate separation penalty (for regime-aware attention)
-        gate_separation_weight=0.0,  # Weight for gate separation reward (0.0 = disabled, typical: 0.1-0.5)
         **kwargs
     ):
         """
@@ -71,9 +65,6 @@ class EnhancedQuantileLoss(QuantileLoss):
             extreme_move_weight: Weight multiplier for extreme moves (1.0 = disabled, >1.0 = active)
                                 Applies to moves beyond extreme_move_percentile. Typical: 2.0-5.0
             extreme_move_percentile: Percentile threshold for extreme moves (default: 95 = top 5%)
-            gate_separation_weight: Weight for regime gate separation reward (0.0 = disabled)
-                                   Rewards gates learning different values for different regimes.
-                                   Only active when model has regime-aware attention. Typical: 0.1-0.5
         
         Note: magnitude_weight_alpha and extreme_move_weight are mutually exclusive.
         """
@@ -108,28 +99,12 @@ class EnhancedQuantileLoss(QuantileLoss):
         self.extreme_move_percentile = extreme_move_percentile
         self.extreme_threshold = None  # Will be computed on first batch if needed
         
-        # Gate separation parameters
-        self.gate_separation_weight = gate_separation_weight
-        self._model_ref = None  # Set via set_model() after model creation
-        
         # Logging attributes (for monitoring)
         self.last_pred_mean = None
         self.last_pred_std = None
         self.last_collapse_penalty = None
         self.last_directional_penalty = None
         self.last_temporal_penalty = None
-        self.last_gate_separation_penalty = None
-    
-    def set_model(self, model):
-        """
-        Set model reference for gate separation loss.
-        
-        Must be called after model creation if using gate_separation_weight > 0.
-        
-        Args:
-            model: TFT model with regime-aware attention (has multihead_attn.regime_gates)
-        """
-        self._model_ref = model
     
     def loss(self, y_pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         """
@@ -200,14 +175,6 @@ class EnhancedQuantileLoss(QuantileLoss):
                 temp_penalty_expanded = torch.zeros_like(base_losses)
                 temp_penalty_expanded[0, 0, :] = temp_penalty
                 total_losses = total_losses + temp_penalty_expanded
-        
-        # Add gate separation penalty (reward gates being different across regimes)
-        if self.gate_separation_weight > 0 and self._model_ref is not None:
-            gate_penalty = self._gate_separation_penalty(y_pred.device)
-            if gate_penalty is not None:
-                # Broadcast scalar penalty across all positions
-                gate_penalty_expanded = gate_penalty.expand_as(base_losses)
-                total_losses = total_losses + gate_penalty_expanded
         
         return total_losses
     
@@ -321,55 +288,6 @@ class EnhancedQuantileLoss(QuantileLoss):
         
         return penalty
     
-    def _gate_separation_penalty(self, device: torch.device) -> torch.Tensor:
-        """
-        Reward regime gates learning different values for different regimes.
-        
-        Computes negative reward (penalty) based on how similar gates are across regimes.
-        Maximizing separation = minimizing this penalty.
-        
-        This encourages the model to learn regime-specific attention patterns rather than
-        collapsing to uniform gates (~0.5 for all regimes).
-        
-        Args:
-            device: Device for tensor creation
-            
-        Returns:
-            Scalar penalty tensor (negative = reward for separation), or None if not applicable
-        """
-        if self._model_ref is None:
-            return None
-        
-        # Navigate to regime gates
-        if not hasattr(self._model_ref, 'multihead_attn'):
-            return None
-        
-        attn = self._model_ref.multihead_attn
-        if not hasattr(attn, 'regime_gates'):
-            return None
-        
-        # Get gate values: [num_regimes, n_heads]
-        gate_vals = torch.sigmoid(attn.regime_gates)
-        
-        # Compute mean absolute difference between regime 0 and regime 1 gates
-        # Higher difference = more separation = better
-        if gate_vals.shape[0] >= 2:
-            regime_diff = (gate_vals[1] - gate_vals[0]).abs().mean()
-        else:
-            # Single regime, no separation possible
-            return None
-        
-        # Negative because we want to MAXIMIZE separation (minimize negative diff)
-        # penalty = -weight * separation
-        # When separation is high (e.g., 0.2), penalty is negative (reward)
-        # When separation is low (e.g., 0.02), penalty is small negative (small reward)
-        penalty = -self.gate_separation_weight * regime_diff
-        
-        # Store for logging
-        self.last_gate_separation_penalty = penalty.detach().item()
-        
-        return penalty
-    
     def reset_temporal_state(self):
         """
         Reset temporal consistency state.
@@ -383,7 +301,7 @@ class EnhancedQuantileLoss(QuantileLoss):
 
 
 # Convenience function for backward compatibility with existing CLI flags
-def create_loss_from_args(args):
+def create_loss_from_args(args, quantiles=None):
     """
     Create EnhancedQuantileLoss from command-line arguments.
     
@@ -396,15 +314,16 @@ def create_loss_from_args(args):
     - magnitude_weight_alpha -> linear magnitude weighting coefficient
     - extreme_move_weight -> weight multiplier for extreme moves
     - extreme_move_percentile -> percentile threshold for extreme moves
-    - gate_separation_weight -> regime gate separation reward weight
     
     Args:
         args: argparse.Namespace with loss configuration
+        quantiles: List of quantile values (default: 7q preset)
     
     Returns:
         EnhancedQuantileLoss instance configured from args
     """
     return EnhancedQuantileLoss(
+        quantiles=quantiles,
         collapse_weight=args.dist_loss_std_weight,
         collapse_threshold=getattr(args, 'collapse_threshold', 0.005),  # Default 0.5%
         directional_weight=getattr(args, 'directional_weight', 0.0),  # Default disabled
@@ -413,5 +332,4 @@ def create_loss_from_args(args):
         magnitude_weight_alpha=getattr(args, 'magnitude_weight_alpha', 0.0),  # Default disabled
         extreme_move_weight=getattr(args, 'extreme_move_weight', 1.0),  # Default disabled
         extreme_move_percentile=getattr(args, 'extreme_move_percentile', 95),  # Default 95th percentile
-        gate_separation_weight=getattr(args, 'gate_separation_weight', 0.0),  # Default disabled
     )
