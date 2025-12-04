@@ -138,6 +138,12 @@ class RegimeAwareInterpretableMultiHeadAttention(nn.Module):
         VIX level above which regime=1 (high volatility)
     gate_init_std : float, default=0.01
         Std for regime gate initialization (small = near-identity start)
+    gate_grad_scale : float, default=100.0
+        Gradient scaling factor for regime gates (they're downstream, get weak signal)
+    gate_init : str, default='neutral'
+        Gate initialization strategy:
+        - 'neutral': All gates start near 0.5 (default behavior)
+        - 'separated': Low-vol starts dampened (~0.38), high-vol amplified (~0.62)
         
     Notes
     -----
@@ -156,12 +162,17 @@ class RegimeAwareInterpretableMultiHeadAttention(nn.Module):
         num_regimes: int = 2,
         regime_mode: str = 'vix_threshold',
         vix_threshold: float = 25.0,
-        gate_init_std: float = 0.01
+        gate_init_std: float = 0.01,
+        gate_grad_scale: float = 100.0,
+        gate_init: str = 'neutral'
     ):
         super().__init__()
         
         if regime_mode not in ['vix_threshold', 'disabled']:
             raise ValueError(f"regime_mode must be 'vix_threshold' or 'disabled', got '{regime_mode}'")
+        
+        if gate_init not in ['neutral', 'separated']:
+            raise ValueError(f"gate_init must be 'neutral' or 'separated', got '{gate_init}'")
         
         self.n_head = n_head
         self.d_model = d_model
@@ -195,13 +206,26 @@ class RegimeAwareInterpretableMultiHeadAttention(nn.Module):
         if regime_mode != 'disabled':
             # Learnable per-head gates for each regime
             # Shape: [num_regimes, n_head]
-            # Initialized near zero so sigmoid(gate) ≈ 0.5 (neutral scaling)
-            self.regime_gates = nn.Parameter(
-                torch.randn(num_regimes, n_head) * gate_init_std
-            )
+            if gate_init == 'separated':
+                # Pre-separated initialization:
+                # - Regime 0 (low-vol): sigmoid(-0.5) ≈ 0.38 (dampen)
+                # - Regime 1 (high-vol): sigmoid(0.5) ≈ 0.62 (amplify)
+                init_gates = torch.zeros(num_regimes, n_head)
+                init_gates[0, :] = -0.5  # Low-vol regime dampens
+                init_gates[1, :] = 0.5   # High-vol regime amplifies
+                self.regime_gates = nn.Parameter(init_gates)
+            else:
+                # Neutral: initialized near zero so sigmoid(gate) ≈ 0.5
+                self.regime_gates = nn.Parameter(
+                    torch.randn(num_regimes, n_head) * gate_init_std
+                )
+            
+            # Store for logging
+            self.gate_grad_scale = gate_grad_scale
+            self.gate_init = gate_init
 
             # Scale up gradients for gates (they're far downstream, get weak signal)
-            self.regime_gates.register_hook(lambda grad: grad * 100)
+            self.regime_gates.register_hook(lambda grad: grad * self.gate_grad_scale)
             
             # Optional: per-regime bias for attention logits (more expressive)
             # Disabled by default to keep minimal
@@ -224,152 +248,147 @@ class RegimeAwareInterpretableMultiHeadAttention(nn.Module):
     
     def init_weights(self):
         """Initialize weights using Xavier uniform (matches original TFT)."""
-        for name, p in self.named_parameters():
-            if "bias" not in name and "regime_gate" not in name:
-                torch.nn.init.xavier_uniform_(p)
-            elif "bias" in name:
-                torch.nn.init.zeros_(p)
+        for layer in self.q_layers:
+            nn.init.xavier_uniform_(layer.weight)
+            nn.init.zeros_(layer.bias)
+        for layer in self.k_layers:
+            nn.init.xavier_uniform_(layer.weight)
+            nn.init.zeros_(layer.bias)
+        nn.init.xavier_uniform_(self.v_layer.weight)
+        nn.init.zeros_(self.v_layer.bias)
+        nn.init.xavier_uniform_(self.w_h.weight)
     
-    def set_regime_signal(self, vix_values: torch.Tensor) -> None:
+    def set_regime_signal(self, vix_values: Optional[torch.Tensor]):
         """
-        Set the regime signal for current batch.
+        Set the VIX values for regime detection.
         
-        Must be called before forward() when regime_mode='vix_threshold'.
+        Must be called before forward() with the current batch's VIX values.
         
         Args:
-            vix_values: VIX values, shape [batch] or [batch, seq_len]
-                       If 2D, uses the last timestep (most recent VIX)
+            vix_values: Raw VIX values [batch_size] or None to disable
         """
         if vix_values is None:
             self._regime_signal = None
             self._current_regime = None
             return
-            
-        # Handle both [batch] and [batch, seq_len] inputs
-        if vix_values.dim() == 2:
-            # Use last timestep (most recent)
-            vix_values = vix_values[:, -1]
         
-        self._regime_signal = vix_values.detach()
+        self._regime_signal = vix_values
         
-        # Compute regime assignment
+        # Detect regime based on VIX threshold
         if self.regime_mode == 'vix_threshold':
-            # Binary: 0 = low vol (VIX < threshold), 1 = high vol (VIX >= threshold)
+            # Simple binary: above threshold = high vol regime (1), else low vol (0)
             self._current_regime = (vix_values >= self.vix_threshold).long()
         else:
-            self._current_regime = torch.zeros_like(vix_values, dtype=torch.long)
+            self._current_regime = None
     
-    def _get_regime_gate_weights(self, regime_indices: torch.Tensor) -> torch.Tensor:
+    def _get_regime_gates(self, batch_size: int, device: torch.device) -> Optional[torch.Tensor]:
         """
-        Get per-head gate weights for given regime indices.
+        Get per-sample regime gate values.
         
-        Args:
-            regime_indices: [batch] tensor of regime assignments (0 or 1)
-            
         Returns:
-            gate_weights: [batch, n_head] sigmoid-activated gate values
+            gate_weights: [batch_size, n_head] sigmoid-scaled gate values, or None
         """
-        # Index into regime gates: [batch, n_head]
-        gates = self.regime_gates[regime_indices]  # [batch, n_head]
+        if self.regime_mode == 'disabled' or self._current_regime is None:
+            return None
         
-        # Sigmoid activation to get [0, 1] scaling factors
-        # With small init, starts near 0.5 (neutral)
-        gate_weights = torch.sigmoid(gates)
+        # Get gate values for each sample's regime
+        # regime_gates: [num_regimes, n_head]
+        # current_regime: [batch_size]
+        regime_indices = self._current_regime.to(device)
+        
+        # Index into gates: [batch_size, n_head]
+        raw_gates = self.regime_gates[regime_indices]
+        
+        # Apply sigmoid to get scaling factors in (0, 1)
+        gate_weights = torch.sigmoid(raw_gates)
+        
+        # Cache for diagnostics
+        self._cached_regime_gates = gate_weights.detach()
         
         return gate_weights
     
     def forward(
         self,
         q: torch.Tensor,
-        k: torch.Tensor, 
+        k: torch.Tensor,
         v: torch.Tensor,
         mask: Optional[torch.Tensor] = None
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Forward pass with regime-conditional attention.
-        
-        Interface matches InterpretableMultiHeadAttention exactly.
+        Forward pass with regime-conditional attention gating.
         
         Args:
             q: Query tensor [batch, query_len, d_model]
             k: Key tensor [batch, key_len, d_model]
             v: Value tensor [batch, key_len, d_model]
-            mask: Optional attention mask [batch, query_len, key_len]
+            mask: Optional attention mask
             
         Returns:
-            outputs: Attended output [batch, query_len, d_model]
-            attn: Attention weights [batch, query_len, n_head, key_len]
+            output: Attended output [batch, query_len, d_model]
+            attn_weights: Attention weights [batch, n_head, query_len, key_len]
         """
         batch_size = q.size(0)
         
-        # Compute value projection (shared across heads for interpretability)
-        vs = self.v_layer(v)  # [batch, key_len, d_v]
+        # Shared value projection (interpretability constraint)
+        v_proj = self.v_layer(v)  # [batch, key_len, d_v]
         
-        heads = []
-        attns = []
+        # Get regime gates if enabled
+        regime_gates = self._get_regime_gates(batch_size, q.device)
         
-        for i in range(self.n_head):
-            # Per-head Q, K projections
-            qs = self.q_layers[i](q)  # [batch, query_len, d_q]
-            ks = self.k_layers[i](k)  # [batch, key_len, d_k]
+        # Per-head attention computation
+        head_outputs = []
+        head_attns = []
+        
+        for h in range(self.n_head):
+            # Project Q and K for this head
+            q_h = self.q_layers[h](q)  # [batch, query_len, d_q]
+            k_h = self.k_layers[h](k)  # [batch, key_len, d_k]
             
             # Compute attention
-            head, attn = self.attention(qs, ks, vs, mask)  # attn: [batch, q_len, k_len]
+            # Reshape for batch matrix multiply
+            q_h = q_h.view(batch_size, -1, self.d_q)
+            k_h = k_h.view(batch_size, -1, self.d_k)
+            v_h = v_proj.view(batch_size, -1, self.d_v)
             
-            head_dropout = self.dropout(head)
-            heads.append(head_dropout)
-            attns.append(attn)
+            # Attention scores
+            attn_scores = torch.bmm(q_h, k_h.transpose(1, 2))  # [batch, q_len, k_len]
+            attn_scores = attn_scores / math.sqrt(self.d_k)
+            
+            if mask is not None:
+                attn_scores = attn_scores.masked_fill(mask, self.mask_bias)
+            
+            attn_weights = F.softmax(attn_scores, dim=-1)
+            attn_weights = self.dropout(attn_weights)
+            
+            # Apply regime gating to attention weights
+            if regime_gates is not None:
+                # gate_h: [batch_size, 1, 1] for broadcasting
+                gate_h = regime_gates[:, h].unsqueeze(-1).unsqueeze(-1)
+                attn_weights = attn_weights * gate_h
+            
+            # Compute attended values
+            head_out = torch.bmm(attn_weights, v_h)  # [batch, q_len, d_v]
+            
+            head_outputs.append(head_out)
+            head_attns.append(attn_weights)
         
-        # Stack heads: [batch, query_len, n_head, d_v] and [batch, query_len, n_head, key_len]
-        head = torch.stack(heads, dim=2) if self.n_head > 1 else heads[0].unsqueeze(2)
-        attn = torch.stack(attns, dim=2)  # [batch, query_len, n_head, key_len]
+        # Average head outputs (interpretability constraint from TFT)
+        stacked = torch.stack(head_outputs, dim=0)  # [n_head, batch, q_len, d_v]
+        averaged = stacked.mean(dim=0)  # [batch, q_len, d_v]
         
-        # === REGIME-CONDITIONAL GATING ===
-        if self.regime_mode != 'disabled' and self._current_regime is not None:
-            # Get gate weights: [batch, n_head]
-            gate_weights = self._get_regime_gate_weights(self._current_regime)
-            
-            # Cache for diagnostics
-            self._cached_regime_gates = gate_weights.detach().cpu()
-            
-            # Apply gating to attention weights
-            # Expand gates: [batch, 1, n_head, 1] to broadcast over query_len and key_len
-            gate_weights_expanded = gate_weights.unsqueeze(1).unsqueeze(-1)
-            
-            # Scale attention weights by regime-specific head gates
-            # This modulates which heads contribute more based on regime
-            attn_gated = attn * gate_weights_expanded
-            
-            # Re-normalize attention to sum to 1 (optional, preserves attention semantics)
-            # Commented out: let the model learn whether to use normalized or scaled
-            # attn_gated = attn_gated / (attn_gated.sum(dim=-1, keepdim=True) + 1e-9)
-            
-            # Also gate the head outputs for consistent gradient flow
-            head_gated = head * gate_weights.unsqueeze(1).unsqueeze(-1)
-            
-            # Store gated attention for analysis
-            self._cached_attention_weights = attn_gated.detach()
-            
-            # Use gated versions
-            attn = attn_gated
-            head = head_gated
-        else:
-            self._cached_attention_weights = attn.detach()
+        # Cache head contributions for analysis
+        self._cached_head_contributions = stacked.detach()
         
-        # Combine heads (mean, not concat - matches original TFT)
-        outputs = torch.mean(head, dim=2) if self.n_head > 1 else head.squeeze(2)
+        # Final output projection
+        output = self.w_h(averaged)  # [batch, q_len, d_model]
         
-        # Output projection
-        outputs = self.w_h(outputs)
-        outputs = self.dropout(outputs)
+        # Stack attention weights for return
+        attn_weights_stacked = torch.stack(head_attns, dim=1)  # [batch, n_head, q_len, k_len]
+        self._cached_attention_weights = attn_weights_stacked.detach()
         
-        return outputs, attn
+        return output, attn_weights_stacked
     
-    def get_attention_weights(self) -> Optional[torch.Tensor]:
-        """Get cached attention weights from last forward pass."""
-        return self._cached_attention_weights
-    
-    def get_regime_diagnostics(self) -> Dict[str, torch.Tensor]:
+    def get_regime_diagnostics(self) -> Dict[str, Optional[torch.Tensor]]:
         """
         Get diagnostic information about regime gating.
         
@@ -478,7 +497,9 @@ def replace_attention_module(
     regime_mode: str = 'vix_threshold',
     vix_threshold: float = 25.0,
     num_regimes: int = 2,
-    gate_init_std: float = 0.01
+    gate_init_std: float = 0.01,
+    gate_grad_scale: float = 100.0,
+    gate_init: str = 'neutral'
 ) -> nn.Module:
     """
     Replace TFT's attention module with regime-aware version.
@@ -494,7 +515,11 @@ def replace_attention_module(
     num_regimes : int, default=2
         Number of regimes
     gate_init_std : float, default=0.01
-        Initialization std for regime gates
+        Initialization std for regime gates (only used if gate_init='neutral')
+    gate_grad_scale : float, default=100.0
+        Gradient scaling factor for regime gates
+    gate_init : str, default='neutral'
+        Gate initialization: 'neutral' (all ~0.5) or 'separated' (0.38/0.62)
         
     Returns
     -------
@@ -521,7 +546,9 @@ def replace_attention_module(
         num_regimes=num_regimes,
         regime_mode=regime_mode,
         vix_threshold=vix_threshold,
-        gate_init_std=gate_init_std
+        gate_init_std=gate_init_std,
+        gate_grad_scale=gate_grad_scale,
+        gate_init=gate_init
     )
     
     # Copy weights from original attention
@@ -543,6 +570,8 @@ def replace_attention_module(
     print(f"  Mode: {regime_mode}")
     print(f"  Regimes: {num_regimes}")
     print(f"  VIX threshold: {vix_threshold}")
+    print(f"  Gate grad scale: {gate_grad_scale}")
+    print(f"  Gate init: {gate_init}")
     print(f"  Heads: {n_head}")
     print(f"  New parameters: {regime_params} (regime gates only)")
     print(f"  Total attention parameters: {total_attn_params}")

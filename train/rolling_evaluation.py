@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Rolling Window Evaluation for TFT Experiments.
+Rolling Window / Walk-Forward Evaluation for TFT Experiments.
 
 Orchestrates multiple train/evaluate cycles across time folds to assess
 model robustness and out-of-sample performance stability.
@@ -9,8 +9,12 @@ Supports two modes:
 1. Rolling window: Fixed-size training window that slides forward
 2. Expanding window: Training window grows with each fold
 
+Supports two granularities:
+1. Year-based (original): --step-years, --val-years, --test-years
+2. Month-based (walk-forward): --step-months, --val-months, --test-months
+
 Usage:
-    # Rolling window (10-year train, 1-year val, 1-year test, 1-year step)
+    # Year-based rolling window (backward compatible)
     python rolling_evaluation.py \
         --mode rolling \
         --train-years 10 \
@@ -23,17 +27,17 @@ Usage:
         --frequency daily \
         --experiment-prefix rolling_baseline
 
-    # Expanding window (fixed start, growing train)
+    # Month-based walk-forward (new)
     python rolling_evaluation.py \
         --mode expanding \
-        --val-years 1 \
-        --test-years 1 \
-        --step-years 1 \
-        --start-test-year 2016 \
-        --end-test-year 2024 \
+        --val-months 3 \
+        --test-months 1 \
+        --step-months 1 \
+        --start-test-date 2020-01-01 \
+        --end-test-date 2023-12-01 \
         --feature-set core_proposal \
         --frequency daily \
-        --experiment-prefix expanding_baseline
+        --experiment-prefix wf_monthly
 
     # Dry run (show folds without executing)
     python rolling_evaluation.py --dry-run ...
@@ -46,6 +50,7 @@ import argparse
 import subprocess
 import logging
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
 from pathlib import Path
 import pandas as pd
 
@@ -84,13 +89,13 @@ def setup_logging(output_dir, experiment_prefix):
 
 
 # ============================================================================
-# FOLD GENERATION
+# FOLD GENERATION - YEAR-BASED (Original)
 # ============================================================================
 
-def generate_folds(mode, train_years, val_years, test_years, step_years,
-                   start_test_year, end_test_year, data_start_year=1990):
+def generate_folds_yearly(mode, train_years, val_years, test_years, step_years,
+                          start_test_year, end_test_year, data_start_year=1990):
     """
-    Generate train/val/test date boundaries for each fold.
+    Generate train/val/test date boundaries for each fold (year granularity).
     
     Parameters:
     -----------
@@ -162,23 +167,123 @@ def generate_folds(mode, train_years, val_years, test_years, step_years,
     return folds
 
 
-def print_fold_summary(folds, logger):
+# ============================================================================
+# FOLD GENERATION - MONTH-BASED (Walk-Forward)
+# ============================================================================
+
+def generate_folds_monthly(mode, train_months, val_months, test_months, step_months,
+                           start_test_date, end_test_date, data_start_date='1990-01-01'):
+    """
+    Generate train/val/test date boundaries for each fold (month granularity).
+    
+    Parameters:
+    -----------
+    mode : str
+        'rolling' (fixed train window) or 'expanding' (growing train window)
+    train_months : int
+        Training window size in months (for rolling mode). None for expanding.
+    val_months : int
+        Validation window size in months
+    test_months : int
+        Test window size in months
+    step_months : int
+        Step size between folds in months
+    start_test_date : str
+        First test period start date (YYYY-MM-DD)
+    end_test_date : str
+        Last test period start date (YYYY-MM-DD)
+    data_start_date : str
+        Earliest date available in data (for expanding mode)
+    
+    Returns:
+    --------
+    list of dict
+        Each dict contains fold boundaries and metadata
+    """
+    folds = []
+    
+    # Parse dates
+    current_test_start = datetime.strptime(start_test_date, '%Y-%m-%d')
+    end_test = datetime.strptime(end_test_date, '%Y-%m-%d')
+    data_start = datetime.strptime(data_start_date, '%Y-%m-%d')
+    
+    fold_idx = 0
+    while current_test_start <= end_test:
+        # Test period
+        test_start = current_test_start
+        test_end = test_start + relativedelta(months=test_months) - relativedelta(days=1)
+        
+        # Validation period (immediately before test)
+        val_end = test_start - relativedelta(days=1)
+        val_start = val_end - relativedelta(months=val_months) + relativedelta(days=1)
+        
+        # Training period
+        if mode == 'rolling':
+            train_end = val_start - relativedelta(days=1)
+            train_start = train_end - relativedelta(months=train_months) + relativedelta(days=1)
+        else:  # expanding
+            train_start = data_start
+            train_end = val_start - relativedelta(days=1)
+        
+        # Validate we have enough data
+        if train_start < data_start:
+            current_test_start += relativedelta(months=step_months)
+            continue
+        
+        # Calculate training period in months for logging
+        train_duration_months = (train_end.year - train_start.year) * 12 + (train_end.month - train_start.month) + 1
+        
+        # Create fold ID from test start date
+        fold_id = f"fold_{test_start.strftime('%Y%m')}"
+        
+        fold = {
+            'fold_id': fold_id,
+            'fold_idx': fold_idx,
+            'test_year': test_start.year,  # For compatibility with filtering
+            'test_month': test_start.month,
+            'train_start': train_start.strftime('%Y-%m-%d'),
+            'train_end': train_end.strftime('%Y-%m-%d'),
+            'val_start': val_start.strftime('%Y-%m-%d'),
+            'val_end': val_end.strftime('%Y-%m-%d'),
+            'test_start': test_start.strftime('%Y-%m-%d'),
+            'test_end': test_end.strftime('%Y-%m-%d'),
+            'train_months': train_duration_months,
+            'train_years': train_duration_months / 12,  # For compatibility
+        }
+        folds.append(fold)
+        fold_idx += 1
+        
+        # Step forward
+        current_test_start += relativedelta(months=step_months)
+    
+    return folds
+
+
+def print_fold_summary(folds, logger, monthly=False):
     """Print summary of all folds."""
-    logger.info("="*80)
+    logger.info("="*100)
     logger.info("FOLD SUMMARY")
-    logger.info("="*80)
-    logger.info(f"{'Fold':<12} {'Train':<25} {'Val':<25} {'Test':<25} {'Train Yrs':<10}")
-    logger.info("-"*80)
+    logger.info("="*100)
+    
+    if monthly:
+        logger.info(f"{'Fold':<15} {'Train':<25} {'Val':<25} {'Test':<25} {'Train Mo':<10}")
+    else:
+        logger.info(f"{'Fold':<12} {'Train':<25} {'Val':<25} {'Test':<25} {'Train Yrs':<10}")
+    logger.info("-"*100)
     
     for fold in folds:
         train_range = f"{fold['train_start']} to {fold['train_end']}"
         val_range = f"{fold['val_start']} to {fold['val_end']}"
         test_range = f"{fold['test_start']} to {fold['test_end']}"
-        logger.info(f"{fold['fold_id']:<12} {train_range:<25} {val_range:<25} {test_range:<25} {fold['train_years']:<10}")
+        
+        if monthly:
+            logger.info(f"{fold['fold_id']:<15} {train_range:<25} {val_range:<25} {test_range:<25} {fold['train_months']:<10}")
+        else:
+            logger.info(f"{fold['fold_id']:<12} {train_range:<25} {val_range:<25} {test_range:<25} {fold['train_years']:<10}")
     
-    logger.info("="*80)
+    logger.info("="*100)
     logger.info(f"Total folds: {len(folds)}")
-    logger.info("="*80 + "\n")
+    logger.info("="*100 + "\n")
 
 
 # ============================================================================
@@ -214,7 +319,7 @@ def run_command(cmd, logger, description, dry_run=False):
             logger.error(f"  STDERR: {result.stderr[:1000] if result.stderr else 'None'}")
             return False, result.returncode
         
-        logger.info(f"  âœ“ Completed successfully")
+        logger.info(f"  ✓ Completed successfully")
         return True, 0
         
     except subprocess.TimeoutExpired:
@@ -261,6 +366,8 @@ def create_fold_splits(fold, args, splits_base_dir, logger, dry_run=False):
     
     if args.enhanced:
         cmd.append('--enhanced')
+    
+    cmd.extend(['--lookback-buffer', str(args.max_encoder_length)])
     
     success, _ = run_command(cmd, logger, f"Creating splits for {fold['fold_id']}", dry_run)
     return success
@@ -338,7 +445,12 @@ def train_fold(fold, args, splits_base_dir, logger, dry_run=False):
     if args.regime_attention:
         cmd.append('--regime-attention')
         cmd.extend(['--regime-attention-vix-threshold', str(args.regime_attention_vix_threshold)])
-    
+        cmd.extend(['--regime-attention-grad-scale', str(args.regime_attention_grad_scale)])
+        cmd.extend(['--regime-gate-init', args.regime_gate_init])
+        
+    if args.gate_separation_weight > 0:
+        cmd.extend(['--gate-separation-weight', str(args.gate_separation_weight)])
+
     # Classification head
     if args.classification:
         cmd.append('--classification')
@@ -366,8 +478,8 @@ def evaluate_fold(fold, args, logger, dry_run=False):
         'python', 'train/evaluate_tft.py',
         '--experiment-name', experiment_name,
         '--batch-size', str(args.eval_batch_size),
+        '--checkpoint-type', args.checkpoint_type,
     ]
-    
     success, _ = run_command(cmd, logger, f"Evaluating {fold['fold_id']}", dry_run)
     return success
 
@@ -379,25 +491,28 @@ def run_fold(fold, args, splits_base_dir, logger, dry_run=False):
     logger.info("="*80)
     logger.info(f"PROCESSING {fold['fold_id'].upper()}")
     logger.info(f"  Test period: {fold['test_start']} to {fold['test_end']}")
-    logger.info(f"  Training samples: ~{fold['train_years']} years")
+    if 'train_months' in fold:
+        logger.info(f"  Training samples: ~{fold['train_months']} months ({fold['train_years']:.1f} years)")
+    else:
+        logger.info(f"  Training samples: ~{fold['train_years']} years")
     logger.info("="*80)
     
     # Step 1: Create splits
     if not create_fold_splits(fold, args, splits_base_dir, logger, dry_run):
-        logger.error(f"  âœ— Failed to create splits for {fold['fold_id']}")
+        logger.error(f"  ✗ Failed to create splits for {fold['fold_id']}")
         return {'fold_id': fold['fold_id'], 'status': 'split_failed'}
     
     # Step 2: Train
     if not train_fold(fold, args, splits_base_dir, logger, dry_run):
-        logger.error(f"  âœ— Failed to train {fold['fold_id']}")
+        logger.error(f"  ✗ Failed to train {fold['fold_id']}")
         return {'fold_id': fold['fold_id'], 'status': 'train_failed'}
     
     # Step 3: Evaluate
     if not evaluate_fold(fold, args, logger, dry_run):
-        logger.error(f"  âœ— Failed to evaluate {fold['fold_id']}")
+        logger.error(f"  ✗ Failed to evaluate {fold['fold_id']}")
         return {'fold_id': fold['fold_id'], 'status': 'eval_failed'}
     
-    logger.info(f"  âœ“ {fold['fold_id']} completed successfully")
+    logger.info(f"  ✓ {fold['fold_id']} completed successfully")
     return {'fold_id': fold['fold_id'], 'status': 'success', **fold}
 
 
@@ -429,9 +544,13 @@ def aggregate_results(folds, args, logger):
         # Add fold metadata
         metrics['fold_id'] = fold['fold_id']
         metrics['test_year'] = fold['test_year']
+        if 'test_month' in fold:
+            metrics['test_month'] = fold['test_month']
         metrics['test_start'] = fold['test_start']
         metrics['test_end'] = fold['test_end']
         metrics['train_years'] = fold['train_years']
+        if 'train_months' in fold:
+            metrics['train_months'] = fold['train_months']
         
         all_metrics.append(metrics)
         logger.info(f"  Loaded metrics for {fold['fold_id']}")
@@ -454,7 +573,8 @@ def aggregate_results(folds, args, logger):
     # Create summary statistics
     numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
     # Exclude fold metadata from summary
-    metric_cols = [c for c in numeric_cols if c not in ['test_year', 'train_years']]
+    exclude_cols = ['test_year', 'test_month', 'train_years', 'train_months', 'fold_idx']
+    metric_cols = [c for c in numeric_cols if c not in exclude_cols]
     
     if len(df) == 1:
         # Single fold - just transpose the metrics
@@ -486,7 +606,7 @@ def aggregate_results(folds, args, logger):
         if metric in df.columns:
             mean = df[metric].mean()
             std = df[metric].std()
-            logger.info(f"  {metric:<25}: {mean:>8.4f} Â± {std:.4f}")
+            logger.info(f"  {metric:<25}: {mean:>8.4f} ± {std:.4f}")
     
     logger.info("-"*60)
     
@@ -499,7 +619,7 @@ def aggregate_results(folds, args, logger):
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description='Rolling window evaluation for TFT experiments',
+        description='Rolling window / walk-forward evaluation for TFT experiments',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__
     )
@@ -508,6 +628,8 @@ def parse_args():
     parser.add_argument('--mode', type=str, default='rolling',
                         choices=['rolling', 'expanding'],
                         help='Evaluation mode: rolling (fixed window) or expanding (growing window)')
+    
+    # Year-based parameters (original)
     parser.add_argument('--train-years', type=int, default=10,
                         help='Training window size in years (rolling mode only)')
     parser.add_argument('--val-years', type=int, default=1,
@@ -516,12 +638,28 @@ def parse_args():
                         help='Test window size in years')
     parser.add_argument('--step-years', type=int, default=1,
                         help='Step size between folds in years')
-    parser.add_argument('--start-test-year', type=int, default=2016,
-                        help='First test period start year')
-    parser.add_argument('--end-test-year', type=int, default=2024,
-                        help='Last test period start year')
+    parser.add_argument('--start-test-year', type=int, default=None,
+                        help='First test period start year (for year-based mode)')
+    parser.add_argument('--end-test-year', type=int, default=None,
+                        help='Last test period start year (for year-based mode)')
     parser.add_argument('--data-start-year', type=int, default=1990,
                         help='Earliest year in dataset (for expanding mode)')
+    
+    # Month-based parameters (walk-forward)
+    parser.add_argument('--train-months', type=int, default=None,
+                        help='Training window size in months (rolling mode only, for month-based)')
+    parser.add_argument('--val-months', type=int, default=None,
+                        help='Validation window size in months (enables month-based mode)')
+    parser.add_argument('--test-months', type=int, default=None,
+                        help='Test window size in months')
+    parser.add_argument('--step-months', type=int, default=None,
+                        help='Step size between folds in months')
+    parser.add_argument('--start-test-date', type=str, default=None,
+                        help='First test period start date YYYY-MM-DD (for month-based mode)')
+    parser.add_argument('--end-test-date', type=str, default=None,
+                        help='Last test period start date YYYY-MM-DD (for month-based mode)')
+    parser.add_argument('--data-start-date', type=str, default='1990-01-01',
+                        help='Earliest date in dataset (for expanding mode, month-based)')
     
     # Experiment configuration
     parser.add_argument('--experiment-prefix', type=str, required=True,
@@ -615,7 +753,14 @@ def parse_args():
                         help='Enable regime-aware attention gating')
     parser.add_argument('--regime-attention-vix-threshold', type=float, default=25.0,
                         help='VIX threshold for regime switching')
-    
+    parser.add_argument('--regime-attention-grad-scale', type=float, default=100.0,
+                        help='Gradient scaling factor for regime gates')
+    parser.add_argument('--regime-gate-init', type=str, default='neutral',
+                        choices=['neutral', 'separated'],
+                        help='Gate initialization: neutral (0.5) or separated (0.38/0.62)')
+    parser.add_argument('--gate-separation-weight', type=float, default=0.0,
+                    help='Weight for regime gate separation reward')
+
     # Classification head (pass through to train_tft.py)
     parser.add_argument('--classification', action='store_true',
                         help='Enable parallel classification head')
@@ -638,10 +783,15 @@ def parse_args():
                         help='Overwrite existing experiment directories')
     parser.add_argument('--splits-dir', type=str, default='data/splits/rolling',
                         help='Base directory for fold splits')
-    parser.add_argument('--start-from-fold', type=int, default=None,
-                        help='Start from specific fold year (skip earlier folds)')
-    parser.add_argument('--only-fold', type=int, default=None,
-                        help='Run only a specific fold year')
+    parser.add_argument('--start-from-fold', type=str, default=None,
+                        help='Start from specific fold (fold_id or year/YYYYMM)')
+    parser.add_argument('--only-fold', type=str, default=None,
+                        help='Run only a specific fold (fold_id or year/YYYYMM)')
+                        
+    # ckpt selection
+    parser.add_argument('--checkpoint-type', type=str, default='best_pred_std_path',
+                    choices=['best_val_loss_path', 'best_pred_std_path', 'best_unique_path'],
+                    help='Checkpoint selection metric for evaluation')
     
     return parser.parse_args()
 
@@ -653,6 +803,33 @@ def parse_args():
 def main():
     args = parse_args()
     
+    # Determine if using month-based or year-based mode
+    use_monthly = (args.val_months is not None or 
+                   args.step_months is not None or
+                   args.start_test_date is not None)
+    
+    # Validate arguments based on mode
+    if use_monthly:
+        # Month-based mode - validate required args
+        if args.step_months is None:
+            args.step_months = 1  # Default to 1 month step
+        if args.val_months is None:
+            args.val_months = 3  # Default to 3 month validation
+        if args.test_months is None:
+            args.test_months = 1  # Default to 1 month test
+        if args.start_test_date is None or args.end_test_date is None:
+            print("ERROR: --start-test-date and --end-test-date required for month-based mode")
+            sys.exit(1)
+        if args.mode == 'rolling' and args.train_months is None:
+            print("ERROR: --train-months required for rolling mode with month-based folds")
+            sys.exit(1)
+    else:
+        # Year-based mode - use defaults if not specified
+        if args.start_test_year is None:
+            args.start_test_year = 2016
+        if args.end_test_year is None:
+            args.end_test_year = 2024
+    
     # Setup output directory and logging
     output_dir = Path('experiments') / args.experiment_prefix
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -660,18 +837,29 @@ def main():
     logger, log_file = setup_logging(output_dir, args.experiment_prefix.replace('/', '_'))
     
     logger.info("="*80)
-    logger.info("ROLLING WINDOW EVALUATION")
+    logger.info("ROLLING WINDOW / WALK-FORWARD EVALUATION")
     logger.info("="*80)
     logger.info(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     logger.info(f"Log file: {log_file}")
     logger.info("")
     logger.info("Configuration:")
     logger.info(f"  Mode: {args.mode}")
-    logger.info(f"  Train years: {args.train_years}")
-    logger.info(f"  Val years: {args.val_years}")
-    logger.info(f"  Test years: {args.test_years}")
-    logger.info(f"  Step years: {args.step_years}")
-    logger.info(f"  Test range: {args.start_test_year} - {args.end_test_year}")
+    logger.info(f"  Granularity: {'monthly' if use_monthly else 'yearly'}")
+    
+    if use_monthly:
+        if args.mode == 'rolling':
+            logger.info(f"  Train months: {args.train_months}")
+        logger.info(f"  Val months: {args.val_months}")
+        logger.info(f"  Test months: {args.test_months}")
+        logger.info(f"  Step months: {args.step_months}")
+        logger.info(f"  Test range: {args.start_test_date} - {args.end_test_date}")
+    else:
+        logger.info(f"  Train years: {args.train_years}")
+        logger.info(f"  Val years: {args.val_years}")
+        logger.info(f"  Test years: {args.test_years}")
+        logger.info(f"  Step years: {args.step_years}")
+        logger.info(f"  Test range: {args.start_test_year} - {args.end_test_year}")
+    
     logger.info(f"  Feature set: {args.feature_set}")
     logger.info(f"  Frequency: {args.frequency}")
     logger.info(f"  Alignment: {args.alignment}")
@@ -681,16 +869,28 @@ def main():
     logger.info("")
     
     # Generate folds
-    folds = generate_folds(
-        mode=args.mode,
-        train_years=args.train_years,
-        val_years=args.val_years,
-        test_years=args.test_years,
-        step_years=args.step_years,
-        start_test_year=args.start_test_year,
-        end_test_year=args.end_test_year,
-        data_start_year=args.data_start_year
-    )
+    if use_monthly:
+        folds = generate_folds_monthly(
+            mode=args.mode,
+            train_months=args.train_months,
+            val_months=args.val_months,
+            test_months=args.test_months,
+            step_months=args.step_months,
+            start_test_date=args.start_test_date,
+            end_test_date=args.end_test_date,
+            data_start_date=args.data_start_date
+        )
+    else:
+        folds = generate_folds_yearly(
+            mode=args.mode,
+            train_years=args.train_years,
+            val_years=args.val_years,
+            test_years=args.test_years,
+            step_years=args.step_years,
+            start_test_year=args.start_test_year,
+            end_test_year=args.end_test_year,
+            data_start_year=args.data_start_year
+        )
     
     if not folds:
         logger.error("No valid folds generated! Check date ranges and data availability.")
@@ -698,14 +898,39 @@ def main():
     
     # Filter folds if requested
     if args.only_fold:
-        folds = [f for f in folds if f['test_year'] == args.only_fold]
+        # Support both fold_id format (fold_2020 or fold_202001) and raw values
+        target = args.only_fold
+        folds = [f for f in folds if (f['fold_id'] == target or 
+                                       f['fold_id'] == f"fold_{target}" or
+                                       str(f.get('test_year')) == target)]
         if not folds:
-            logger.error(f"No fold found for year {args.only_fold}")
+            logger.error(f"No fold found matching '{args.only_fold}'")
             return
     elif args.start_from_fold:
-        folds = [f for f in folds if f['test_year'] >= args.start_from_fold]
+        target = args.start_from_fold
+        # Find index of starting fold
+        start_idx = None
+        for i, f in enumerate(folds):
+            if (f['fold_id'] == target or 
+                f['fold_id'] == f"fold_{target}" or
+                str(f.get('test_year')) == target):
+                start_idx = i
+                break
+        if start_idx is None:
+            logger.error(f"No fold found matching '{args.start_from_fold}'")
+            return
+        folds = folds[start_idx:]
     
-    print_fold_summary(folds, logger)
+    print_fold_summary(folds, logger, monthly=use_monthly)
+    
+    # Estimate runtime
+    if use_monthly:
+        est_time_per_fold = 8 if args.frequency == 'daily' else 4  # minutes
+    else:
+        est_time_per_fold = 10 if args.frequency == 'daily' else 5
+    est_total = len(folds) * est_time_per_fold
+    logger.info(f"Estimated runtime: ~{est_total} minutes ({est_total/60:.1f} hours)")
+    logger.info("")
     
     # Save fold configuration
     folds_config_path = output_dir / 'folds_config.json'
@@ -713,6 +938,7 @@ def main():
         json.dump({
             'args': vars(args),
             'folds': folds,
+            'granularity': 'monthly' if use_monthly else 'yearly',
             'created_at': datetime.now().isoformat()
         }, f, indent=2)
     logger.info(f"Saved folds configuration to: {folds_config_path}")

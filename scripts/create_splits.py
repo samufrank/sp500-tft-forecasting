@@ -118,6 +118,8 @@ def parse_args():
         choices=['fixed', 'vintage'],
         help='Data version to use: fixed (fixed-shift alignment) or vintage (ALFRED alignment)'
     )
+    parser.add_argument('--lookback-buffer', type=int, default=0,
+                    help='Number of rows from val/train to prepend to test for context')
     return parser.parse_args()
 
 def main():
@@ -192,6 +194,15 @@ def main():
     if args.timestamp:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         split_prefix = f"{split_prefix}_{timestamp}"
+    
+    if args.lookback_buffer and args.lookback_buffer > 0:
+        buffer_source = val if len(val) > 0 else train
+        if len(buffer_source) >= args.lookback_buffer:
+            buffer_rows = buffer_source.tail(args.lookback_buffer)
+            test = pd.concat([buffer_rows, test])
+            print(f"  Added {args.lookback_buffer} lookback rows to test (now {len(test)} total)")
+        else:
+            print(f"  WARNING: Not enough rows for lookback buffer")
     
     train_path = os.path.join(version_output_dir, f"{split_prefix}_train.csv")
     val_path = os.path.join(version_output_dir, f"{split_prefix}_val.csv")

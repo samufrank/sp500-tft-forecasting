@@ -194,7 +194,14 @@ def parse_args():
                         help='Enable regime-aware attention gating')
     parser.add_argument('--regime-attention-vix-threshold', type=float, default=25.0,
                         help='VIX threshold for regime switching (default: 25.0)')
-
+    parser.add_argument('--regime-attention-grad-scale', type=float, default=100.0,
+                        help='Gradient scaling factor for regime gates (default: 100.0)')
+    parser.add_argument('--regime-gate-init', type=str, default='neutral',
+                        choices=['neutral', 'separated'],
+                        help='Gate initialization: neutral (0.5) or separated (0.38/0.62)')
+    parser.add_argument('--gate-separation-weight', type=float, default=0.0,
+                    help='Weight for regime gate separation reward (0.0 = disabled)')
+    
     return parser.parse_args()
 
 
@@ -462,20 +469,7 @@ def create_model(training_dataset, args, raw_vix_train, raw_vix_val):
         print(f"\nActive loss penalties: {', '.join(active_penalties)}")
     else:
         print("\nUsing standard QuantileLoss (no penalties)")
-    """
-    tft = TemporalFusionTransformer.from_dataset(
-        training_dataset,
-        learning_rate=args.learning_rate,
-        hidden_size=args.hidden_size,
-        attention_head_size=args.attention_heads,
-        dropout=args.dropout,
-        hidden_continuous_size=args.hidden_continuous_size,
-        output_size=7,
-        loss=loss_fn,  # Use custom loss instead of QuantileLoss()
-        log_interval=10,
-        reduce_on_plateau_patience=4,
-    )
-    """
+
     # Common TFT kwargs
     tft_kwargs = dict(
         learning_rate=args.learning_rate,
@@ -606,7 +600,9 @@ def create_model(training_dataset, args, raw_vix_train, raw_vix_val):
             tft,
             regime_mode='vix_threshold',
             vix_threshold=args.regime_attention_vix_threshold,
-            num_regimes=2
+            num_regimes=2,
+            gate_grad_scale=args.regime_attention_grad_scale,
+            gate_init=args.regime_gate_init
         )
         tft = patch_forward_for_regime(
             tft, 
@@ -616,6 +612,11 @@ def create_model(training_dataset, args, raw_vix_train, raw_vix_val):
         )
         
         print(f"\n[REGIME ATTENTION] Enabled: vix_threshold={args.regime_attention_vix_threshold}")
+        
+        # Connect loss to model for gate separation penalty
+        if args.gate_separation_weight > 0 and hasattr(tft, 'loss') and hasattr(tft.loss, 'set_model'):
+            tft.loss.set_model(tft)
+            print(f"[GATE SEPARATION] Enabled: weight={args.gate_separation_weight}")
     
     # DEBUG: Show what the model actually received
     print("\n" + "="*80)
@@ -759,7 +760,7 @@ def save_config(args, features, output_dir):
             'enabled': args.regime_attention,
             'vix_threshold': args.regime_attention_vix_threshold,
             'num_regimes': 2,
-            'gate_grad_scale': 100,  # document the gradient scaling
+            'gate_grad_scale': args.regime_attention_grad_scale if args.regime_attention else None, 
         },
         'transfer_learning': {
             'freeze_backbone': getattr(args, 'freeze_backbone', False),
