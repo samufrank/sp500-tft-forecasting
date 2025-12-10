@@ -72,6 +72,25 @@ from pytorch_forecasting import TemporalFusionTransformer, TimeSeriesDataSet
 from pytorch_forecasting.data import GroupNormalizer
 
 
+def safe_to_device(model):
+    """
+    Move model to appropriate device, working around torchmetrics CUDA bug.
+    
+    torchmetrics stores the original training device and tries to create 
+    dummy tensors on it during .to() calls, even when moving to CPU.
+    This fails on machines without CUDA. Workaround: skip .to() when 
+    already on CPU from map_location='cpu'.
+    """
+    if torch.cuda.is_available():
+        model = model.to('cuda')
+        print(f"  Model loaded on device: cuda")
+    else:
+        # Model already on CPU from map_location='cpu', skip .to() 
+        # to avoid torchmetrics bug
+        print(f"  Model loaded on device: cpu")
+    return model
+
+
 # ============================================================================
 # LOGGING SETUP
 # ============================================================================
@@ -396,13 +415,12 @@ def load_model(checkpoint_path, config):
             print(f"  Successfully loaded regime attention state_dict")
         else:
             # Standard baseline loading
-            model = TemporalFusionTransformer.load_from_checkpoint(checkpoint_path)
+            model = TemporalFusionTransformer.load_from_checkpoint(
+                checkpoint_path, map_location='cpu'
+            )
         
         model.eval()
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        model = model.to(device)
-        print(f"  Model loaded on device: {device}")
-        return model
+        return safe_to_device(model)
     
     # Case 2: Regime output without dist loss
     if use_regime_output and not uses_dist_loss:
@@ -451,10 +469,7 @@ def load_model(checkpoint_path, config):
         print(f"  Successfully loaded regime output state_dict")
         
         model.eval()
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        model = model.to(device)
-        print(f"  Model loaded on device: {device}")
-        return model
+        return safe_to_device(model)
     
     # Case 3: Distribution loss (with or without regime output/attention)
     print(f"  Loading distribution loss checkpoint (bypassing corrupted loss)...")
@@ -567,11 +582,7 @@ def load_model(checkpoint_path, config):
     )
     print(f"  Re-applied distribution penalties: mean_weight={mean_weight}, std_weight={std_weight}")
     
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = model.to(device)
-    print(f"  Model loaded on device: {device}")
-    
-    return model
+    return safe_to_device(model)
 
 
 # ============================================================================

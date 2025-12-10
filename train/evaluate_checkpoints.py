@@ -3,23 +3,30 @@
 Batch Checkpoint Evaluation
 
 Evaluates all (or selected) checkpoints in an experiment and produces a comparison CSV.
+Now supports both single experiments and phase directories.
 
 Usage:
-    # Evaluate all checkpoints
-    python evaluate_checkpoints.py experiments/test_weekly/baseline_h16_daily
+    # Evaluate single experiment
+    python evaluate_checkpoints.py experiments/04_custom_losses/exp001
+    
+    # Evaluate all unevaluated experiments in a phase (skips existing)
+    python evaluate_checkpoints.py experiments/04_custom_losses
+    
+    # Force re-evaluation of all experiments in phase
+    python evaluate_checkpoints.py experiments/04_custom_losses --overwrite
     
     # Evaluate specific checkpoints by pattern
-    python evaluate_checkpoints.py experiments/test_weekly/baseline_h16_daily --pattern "diracc|sharpe"
+    python evaluate_checkpoints.py experiments/04_custom_losses/exp001 --pattern "diracc|sharpe"
     
     # Evaluate only top N by each metric type
-    python evaluate_checkpoints.py experiments/test_weekly/baseline_h16_daily --top-per-metric 2
+    python evaluate_checkpoints.py experiments/04_custom_losses/exp001 --top-per-metric 2
     
     # Quick mode (skip plots, faster)
-    python evaluate_checkpoints.py experiments/test_weekly/baseline_h16_daily --quick
+    python evaluate_checkpoints.py experiments/04_custom_losses --quick
 
 Output:
-    {experiment}/checkpoint_comparison.csv - Summary table of all evaluated checkpoints
-    {experiment}/eval_{checkpoint_name}/ - Individual evaluation outputs (unless --quick)
+    {experiment}/evaluation/checkpoint_comparison.csv - Summary table of all evaluated checkpoints
+    {experiment}/evaluation/{checkpoint_name}/ - Individual evaluation outputs (unless --quick)
 """
 
 import os
@@ -48,7 +55,6 @@ def find_checkpoints(exp_path: Path, pattern: str = None) -> list[Path]:
     """
     ckpt_dir = exp_path / 'checkpoints'
     if not ckpt_dir.exists():
-        print(f"No checkpoints directory found at {ckpt_dir}")
         return []
     
     checkpoints = list(ckpt_dir.glob('*.ckpt'))
@@ -245,36 +251,65 @@ def deduplicate_by_epoch(checkpoints: list[Path]) -> list[Path]:
     return unique
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description='Batch evaluate checkpoints and compare results')
-    parser.add_argument('exp_path', type=str,
-                       help='Path to experiment directory')
-    parser.add_argument('--pattern', type=str, default=None,
-                       help='Regex pattern to filter checkpoint names')
-    parser.add_argument('--top-per-metric', type=int, default=None,
-                       help='Only evaluate top N checkpoints per metric type')
-    parser.add_argument('--quick', action='store_true',
-                       help='Quick mode (skip individual output dirs)')
-    parser.add_argument('--output', type=str, default=None,
-                       help='Output CSV path (default: {exp}/checkpoint_comparison.csv)')
+def is_phase_directory(path: Path) -> bool:
+    """
+    Determine if path is a phase directory (contains experiment subdirs)
+    vs a single experiment (has checkpoints/ directly).
+    """
+    # If it has checkpoints/ directly, it's a single experiment
+    if (path / 'checkpoints').exists():
+        return False
     
-    args = parser.parse_args()
+    # Check if any subdirectory has checkpoints/
+    for subdir in path.iterdir():
+        if subdir.is_dir() and (subdir / 'checkpoints').exists():
+            return True
     
-    exp_path = Path(args.exp_path)
-    if not exp_path.exists():
-        print(f"Error: {exp_path} does not exist")
-        return
-    
-    # Determine experiment name for evaluate_tft.py
-    # Handle both "experiments/phase/exp" and "phase/exp" formats
+    return False
+
+
+def find_experiments_in_phase(phase_path: Path) -> list[Path]:
+    """
+    Find all experiment directories in a phase that have checkpoints.
+    """
+    experiments = []
+    for subdir in sorted(phase_path.iterdir()):
+        if subdir.is_dir() and (subdir / 'checkpoints').exists():
+            # Verify there are actual checkpoint files
+            if list((subdir / 'checkpoints').glob('*.ckpt')):
+                experiments.append(subdir)
+    return experiments
+
+
+def experiment_already_evaluated(exp_path: Path) -> bool:
+    """
+    Check if experiment already has evaluation results.
+    """
+    comparison_csv = exp_path / 'evaluation' / 'checkpoint_comparison.csv'
+    return comparison_csv.exists()
+
+
+def get_experiment_name(exp_path: Path) -> str:
+    """
+    Get experiment name for evaluate_tft.py from path.
+    Handles both "experiments/phase/exp" and "phase/exp" formats.
+    """
     if 'experiments' in exp_path.parts:
         exp_idx = exp_path.parts.index('experiments')
-        exp_name = '/'.join(exp_path.parts[exp_idx + 1:])
+        return '/'.join(exp_path.parts[exp_idx + 1:])
     else:
-        exp_name = str(exp_path)
+        return str(exp_path)
+
+
+def evaluate_single_experiment(exp_path: Path, args) -> pd.DataFrame:
+    """
+    Evaluate all checkpoints for a single experiment.
     
-    print(f"Experiment: {exp_name}")
+    Returns DataFrame of results (empty if no checkpoints found).
+    """
+    exp_name = get_experiment_name(exp_path)
+    
+    print(f"\nExperiment: {exp_name}")
     print(f"Path: {exp_path}")
     
     # Find checkpoints
@@ -282,7 +317,7 @@ def main():
     
     if not checkpoints:
         print("No checkpoints found")
-        return
+        return pd.DataFrame()
     
     print(f"Found {len(checkpoints)} checkpoints")
     
@@ -336,16 +371,22 @@ def main():
     df = pd.DataFrame(results)
     
     # Sort by epoch
-    if 'epoch' in df.columns:
+    if 'epoch' in df.columns and not df.empty:
         df = df.sort_values('epoch')
     
     # Save results
-    output_path = Path(args.output) if args.output else eval_base_dir / 'checkpoint_comparison.csv'
+    output_path = eval_base_dir / 'checkpoint_comparison.csv'
     df.to_csv(output_path, index=False)
-    print(f"\n{'='*70}")
-    print(f"Saved comparison to: {output_path}")
+    print(f"\nSaved comparison to: {output_path}")
     
-    # Print summary table
+    return df
+
+
+def print_summary(df: pd.DataFrame):
+    """Print summary table and best checkpoints."""
+    if df.empty:
+        return
+    
     print(f"\n{'='*70}")
     print("CHECKPOINT COMPARISON SUMMARY")
     print(f"{'='*70}")
@@ -382,6 +423,108 @@ def main():
     if 'total_return' in df.columns and df['total_return'].notna().any():
         best_return = df.loc[df['total_return'].idxmax()]
         print(f"Best Return:     epoch {best_return['epoch']:.0f} ({best_return['total_return']:.4f})")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='Batch evaluate checkpoints and compare results',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=__doc__
+    )
+    parser.add_argument('path', type=str,
+                       help='Path to experiment or phase directory')
+    parser.add_argument('--pattern', type=str, default=None,
+                       help='Regex pattern to filter checkpoint names')
+    parser.add_argument('--top-per-metric', type=int, default=None,
+                       help='Only evaluate top N checkpoints per metric type')
+    parser.add_argument('--quick', action='store_true',
+                       help='Quick mode (skip individual output dirs)')
+    parser.add_argument('--overwrite', action='store_true',
+                       help='Re-evaluate experiments that already have results')
+    parser.add_argument('--output', type=str, default=None,
+                       help='Output CSV path (only for single experiment mode)')
+    
+    args = parser.parse_args()
+    
+    path = Path(args.path)
+    if not path.exists():
+        print(f"Error: {path} does not exist")
+        return
+    
+    # Determine if this is a phase directory or single experiment
+    if is_phase_directory(path):
+        # Phase directory mode
+        experiments = find_experiments_in_phase(path)
+        print(f"Phase directory: {path}")
+        print(f"Found {len(experiments)} experiments with checkpoints")
+        
+        if not experiments:
+            print("No experiments found")
+            return
+        
+        # Categorize experiments
+        to_evaluate = []
+        already_done = []
+        for exp_path in experiments:
+            if experiment_already_evaluated(exp_path):
+                already_done.append(exp_path)
+            else:
+                to_evaluate.append(exp_path)
+        
+        print(f"  Already evaluated: {len(already_done)}")
+        print(f"  To evaluate: {len(to_evaluate)}")
+        
+        if args.overwrite:
+            to_evaluate = experiments
+            print(f"  --overwrite: will re-evaluate all {len(to_evaluate)} experiments")
+        
+        if not to_evaluate:
+            print("\nNo experiments to evaluate. Use --overwrite to re-run existing.")
+            return
+        
+        # Evaluate each experiment
+        all_results = {}
+        for i, exp_path in enumerate(to_evaluate):
+            print(f"\n{'='*70}")
+            print(f"[{i+1}/{len(to_evaluate)}] {exp_path.name}")
+            print('='*70)
+            
+            df = evaluate_single_experiment(exp_path, args)
+            if not df.empty:
+                all_results[exp_path.name] = df
+                print_summary(df)
+        
+        # Final summary
+        print(f"\n{'='*70}")
+        print("PHASE EVALUATION COMPLETE")
+        print(f"{'='*70}")
+        print(f"Evaluated: {len(all_results)} experiments")
+        print(f"Skipped (already done): {len(already_done)}")
+        
+        if all_results:
+            print("\nBest per experiment (by dir_acc):")
+            for exp_name, df in all_results.items():
+                if 'dir_acc' in df.columns and df['dir_acc'].notna().any():
+                    best = df.loc[df['dir_acc'].idxmax()]
+                    print(f"  {exp_name}: epoch {best['epoch']:.0f}, "
+                          f"dir_acc={best['dir_acc']:.4f}, sharpe={best['sharpe']:.4f}")
+    
+    else:
+        # Single experiment mode
+        if not args.overwrite and experiment_already_evaluated(path):
+            print(f"Experiment already evaluated: {path}")
+            print("Use --overwrite to re-run")
+            return
+        
+        df = evaluate_single_experiment(path, args)
+        
+        # Handle custom output path
+        if args.output and not df.empty:
+            output_path = Path(args.output)
+            df.to_csv(output_path, index=False)
+            print(f"Saved to custom path: {output_path}")
+        
+        print_summary(df)
 
 
 if __name__ == '__main__':
