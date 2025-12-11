@@ -335,9 +335,11 @@ def load_model(checkpoint_path, config):
         regime_attn_config = config.get('regime_attention', {})
         use_regime_attention = regime_attn_config.get('enabled', False)
         
-        if use_regime_attention:
-            print(f"  Detected regime attention checkpoint, applying architecture modification...")
-            
+        # Check if staleness attention is used
+        staleness_attn_config = config.get('staleness_attention', {})
+        use_staleness_attention = staleness_attn_config.get('enabled', False)
+        
+        if use_regime_attention or use_staleness_attention:
             # Load checkpoint dict first
             checkpoint = torch.load(checkpoint_path, map_location='cpu')
             hparams = checkpoint['hyper_parameters']
@@ -345,19 +347,55 @@ def load_model(checkpoint_path, config):
             # Create baseline model
             model = TemporalFusionTransformer(**hparams)
             
-            # Apply regime attention modification
-            from src.regime_attention import replace_attention_module
+            # Apply regime attention if enabled (and staleness not enabled)
+            # When staleness is enabled, it handles regime gating internally
+            if use_regime_attention and not use_staleness_attention:
+                print(f"  Detected regime attention checkpoint, applying architecture modification...")
+                from src.regime_attention import replace_attention_module
+                
+                model = replace_attention_module(
+                    model,
+                    regime_mode=regime_attn_config.get('regime_mode', 'vix_threshold'),
+                    vix_threshold=regime_attn_config.get('vix_threshold', 25.0),
+                    num_regimes=regime_attn_config.get('num_regimes', 2)
+                )
             
-            model = replace_attention_module(
-                model,
-                regime_mode=regime_attn_config.get('regime_mode', 'vix_threshold'),
-                vix_threshold=regime_attn_config.get('vix_threshold', 25.0),
-                num_regimes=regime_attn_config.get('num_regimes', 2)
-            )
+            # Apply staleness attention if enabled
+            if use_staleness_attention:
+                print(f"  Detected staleness attention checkpoint, applying architecture modification...")
+                from src.staleness_attention import replace_attention_with_staleness
+                from train.staleness_attention_training import patch_forward_for_staleness_training
+                
+                # Determine regime mode - enable if combine_with_regime or regime_attention enabled
+                staleness_regime_mode = 'disabled'
+                if staleness_attn_config.get('combine_with_regime', False) or use_regime_attention:
+                    staleness_regime_mode = 'vix_threshold'
+                
+                model = replace_attention_with_staleness(
+                    model,
+                    staleness_mode='penalty',
+                    staleness_decay=staleness_attn_config.get('decay', 'prenormalized'),
+                    staleness_weight=staleness_attn_config.get('weight_initial', 0.5),
+                    staleness_learnable=staleness_attn_config.get('learnable', True),
+                    staleness_max_days=staleness_attn_config.get('max_days', 45.0),
+                    staleness_grad_scale=staleness_attn_config.get('staleness_grad_scale', 100.0),
+                    regime_mode=staleness_regime_mode,
+                    vix_threshold=regime_attn_config.get('vix_threshold', 25.0)
+                )
+                
+                model = patch_forward_for_staleness_training(
+                    model,
+                    staleness_feature_name='days_since_CPI_update',
+                    vix_feature_name='VIX',
+                    verbose=False
+                )
+                
+                print(f"    decay={staleness_attn_config.get('decay', 'prenormalized')}, "
+                      f"regime_mode={staleness_regime_mode}")
             
             # Load weights
             model.load_state_dict(checkpoint['state_dict'])
-            print(f"  Successfully loaded regime attention state_dict")
+            print(f"  Successfully loaded modified attention state_dict")
         else:
             # Standard baseline loading
             model = TemporalFusionTransformer.load_from_checkpoint(checkpoint_path)
@@ -401,15 +439,49 @@ def load_model(checkpoint_path, config):
         regime_attn_config = config.get('regime_attention', {})
         use_regime_attention = regime_attn_config.get('enabled', False)
         
-        if use_regime_attention:
+        # Check if staleness attention is also used
+        staleness_attn_config = config.get('staleness_attention', {})
+        use_staleness_attention = staleness_attn_config.get('enabled', False)
+        
+        # Apply regime attention if enabled (and staleness not enabled)
+        if use_regime_attention and not use_staleness_attention:
             print(f"  Detected regime attention, applying attention modification...")
-            from regime_attention import replace_attention_module
+            from src.regime_attention import replace_attention_module
             
             model = replace_attention_module(
                 model,
                 regime_mode=regime_attn_config.get('regime_mode', 'vix_threshold'),
                 vix_threshold=regime_attn_config.get('vix_threshold', 25.0),
                 num_regimes=regime_attn_config.get('num_regimes', 2)
+            )
+        
+        # Apply staleness attention if enabled
+        if use_staleness_attention:
+            print(f"  Detected staleness attention, applying attention modification...")
+            from src.staleness_attention import replace_attention_with_staleness
+            from train.staleness_attention_training import patch_forward_for_staleness_training
+            
+            staleness_regime_mode = 'disabled'
+            if staleness_attn_config.get('combine_with_regime', False) or use_regime_attention:
+                staleness_regime_mode = 'vix_threshold'
+            
+            model = replace_attention_with_staleness(
+                model,
+                staleness_mode='penalty',
+                staleness_decay=staleness_attn_config.get('decay', 'prenormalized'),
+                staleness_weight=staleness_attn_config.get('weight_initial', 0.5),
+                staleness_learnable=staleness_attn_config.get('learnable', True),
+                staleness_max_days=staleness_attn_config.get('max_days', 45.0),
+                staleness_grad_scale=staleness_attn_config.get('staleness_grad_scale', 100.0),
+                regime_mode=staleness_regime_mode,
+                vix_threshold=regime_attn_config.get('vix_threshold', 25.0)
+            )
+            
+            model = patch_forward_for_staleness_training(
+                model,
+                staleness_feature_name='days_since_CPI_update',
+                vix_feature_name='VIX',
+                verbose=False
             )
         
         # NOW load the MoE weights
@@ -483,15 +555,49 @@ def load_model(checkpoint_path, config):
             regime_attn_config = config.get('regime_attention', {})
             use_regime_attention = regime_attn_config.get('enabled', False)
             
-            if use_regime_attention:
+            # Check if staleness attention is also used
+            staleness_attn_config = config.get('staleness_attention', {})
+            use_staleness_attention = staleness_attn_config.get('enabled', False)
+            
+            # Apply regime attention if enabled (and staleness not enabled)
+            if use_regime_attention and not use_staleness_attention:
                 print(f"  Detected regime attention, applying attention modification...")
-                from regime_attention import replace_attention_module
+                from src.regime_attention import replace_attention_module
                 
                 model = replace_attention_module(
                     model,
                     regime_mode=regime_attn_config.get('regime_mode', 'vix_threshold'),
                     vix_threshold=regime_attn_config.get('vix_threshold', 25.0),
                     num_regimes=regime_attn_config.get('num_regimes', 2)
+                )
+            
+            # Apply staleness attention if enabled
+            if use_staleness_attention:
+                print(f"  Detected staleness attention, applying attention modification...")
+                from src.staleness_attention import replace_attention_with_staleness
+                from train.staleness_attention_training import patch_forward_for_staleness_training
+                
+                staleness_regime_mode = 'disabled'
+                if staleness_attn_config.get('combine_with_regime', False) or use_regime_attention:
+                    staleness_regime_mode = 'vix_threshold'
+                
+                model = replace_attention_with_staleness(
+                    model,
+                    staleness_mode='penalty',
+                    staleness_decay=staleness_attn_config.get('decay', 'prenormalized'),
+                    staleness_weight=staleness_attn_config.get('weight_initial', 0.5),
+                    staleness_learnable=staleness_attn_config.get('learnable', True),
+                    staleness_max_days=staleness_attn_config.get('max_days', 45.0),
+                    staleness_grad_scale=staleness_attn_config.get('staleness_grad_scale', 100.0),
+                    regime_mode=staleness_regime_mode,
+                    vix_threshold=regime_attn_config.get('vix_threshold', 25.0)
+                )
+                
+                model = patch_forward_for_staleness_training(
+                    model,
+                    staleness_feature_name='days_since_CPI_update',
+                    vix_feature_name='VIX',
+                    verbose=False
                 )
             
             # Now load the state dict with MoE architecture
@@ -502,22 +608,57 @@ def load_model(checkpoint_path, config):
             regime_attn_config = config.get('regime_attention', {})
             use_regime_attention = regime_attn_config.get('enabled', False)
             
-            if use_regime_attention:
-                print(f"  Detected regime attention, applying attention modification...")
+            # Check if staleness attention is used
+            staleness_attn_config = config.get('staleness_attention', {})
+            use_staleness_attention = staleness_attn_config.get('enabled', False)
+            
+            if use_regime_attention or use_staleness_attention:
                 hparams = checkpoint['hyper_parameters']
                 model = TemporalFusionTransformer(**hparams)
                 
-                from regime_attention import replace_attention_module
+                # Apply regime attention if enabled (and staleness not enabled)
+                if use_regime_attention and not use_staleness_attention:
+                    print(f"  Detected regime attention, applying attention modification...")
+                    from src.regime_attention import replace_attention_module
+                    
+                    model = replace_attention_module(
+                        model,
+                        regime_mode=regime_attn_config.get('regime_mode', 'vix_threshold'),
+                        vix_threshold=regime_attn_config.get('vix_threshold', 25.0),
+                        num_regimes=regime_attn_config.get('num_regimes', 2)
+                    )
                 
-                model = replace_attention_module(
-                    model,
-                    regime_mode=regime_attn_config.get('regime_mode', 'vix_threshold'),
-                    vix_threshold=regime_attn_config.get('vix_threshold', 25.0),
-                    num_regimes=regime_attn_config.get('num_regimes', 2)
-                )
+                # Apply staleness attention if enabled
+                if use_staleness_attention:
+                    print(f"  Detected staleness attention, applying attention modification...")
+                    from src.staleness_attention import replace_attention_with_staleness
+                    from train.staleness_attention_training import patch_forward_for_staleness_training
+                    
+                    staleness_regime_mode = 'disabled'
+                    if staleness_attn_config.get('combine_with_regime', False) or use_regime_attention:
+                        staleness_regime_mode = 'vix_threshold'
+                    
+                    model = replace_attention_with_staleness(
+                        model,
+                        staleness_mode='penalty',
+                        staleness_decay=staleness_attn_config.get('decay', 'prenormalized'),
+                        staleness_weight=staleness_attn_config.get('weight_initial', 0.5),
+                        staleness_learnable=staleness_attn_config.get('learnable', True),
+                        staleness_max_days=staleness_attn_config.get('max_days', 45.0),
+                        staleness_grad_scale=staleness_attn_config.get('staleness_grad_scale', 100.0),
+                        regime_mode=staleness_regime_mode,
+                        vix_threshold=regime_attn_config.get('vix_threshold', 25.0)
+                    )
+                    
+                    model = patch_forward_for_staleness_training(
+                        model,
+                        staleness_feature_name='days_since_CPI_update',
+                        vix_feature_name='VIX',
+                        verbose=False
+                    )
                 
                 model.load_state_dict(checkpoint['state_dict'])
-                print(f"  Successfully loaded regime attention state_dict")
+                print(f"  Successfully loaded modified attention state_dict")
             else:
                 # Standard loading
                 torch.save(checkpoint, tmp_path)

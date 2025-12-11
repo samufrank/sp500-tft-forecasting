@@ -3,7 +3,10 @@ Utilities for loading and preparing datasets for modeling.
 """
 
 import pandas as pd
-from src.feature_configs import FEATURE_SETS, FEATURE_METADATA, TARGET
+from src.feature_configs import (
+    FEATURE_SETS, FEATURE_METADATA, TARGET, 
+    DEFAULT_CHANGE_THRESHOLD, get_change_threshold
+)
 
 def load_feature_set(config_name='core_proposal', 
                      frequency='daily',
@@ -225,7 +228,7 @@ def create_split_by_dates(df, train_start=None, train_end=None, val_end=None,
     return train, val, test
 
 
-def add_staleness_features(df, use_vintage=False, verbose=True):
+def add_staleness_features(df, use_vintage=False, staleness_mode='all', verbose=True):
     """
     Add staleness indicators for low-frequency features.
     
@@ -236,6 +239,11 @@ def add_staleness_features(df, use_vintage=False, verbose=True):
     use_vintage : bool
         If True, compute staleness from actual release dates (vintage)
         If False, use typical lag patterns (fixed)
+    staleness_mode : str
+        Which staleness features to add:
+        - 'all': both days_since_* and *_is_fresh (default)
+        - 'days_only': only days_since_* (continuous counter)
+        - 'fresh_only': only *_is_fresh (sparse binary flag)
     verbose : bool
         Print information about staleness computation
         
@@ -244,6 +252,9 @@ def add_staleness_features(df, use_vintage=False, verbose=True):
     pd.DataFrame
         Original dataframe with additional staleness features
     """
+    valid_modes = ['all', 'days_only', 'fresh_only']
+    if staleness_mode not in valid_modes:
+        raise ValueError(f"Invalid staleness_mode: {staleness_mode}. Must be one of {valid_modes}")
     
     df = df.copy()
     
@@ -251,10 +262,11 @@ def add_staleness_features(df, use_vintage=False, verbose=True):
         print(f"\n{'='*70}")
         print("Adding Staleness Features")
         print(f"{'='*70}")
-        print(f"Mode: {'Vintage (ALFRED)' if use_vintage else 'Fixed lag'}")
+        print(f"Vintage mode: {'Vintage (ALFRED)' if use_vintage else 'Fixed lag'}")
+        print(f"Staleness mode: {staleness_mode}")
     
     for feature, metadata in FEATURE_METADATA.items():
-        if not metadata['needs_staleness']:
+        if not metadata.get('needs_staleness', False):
             continue
             
         if feature not in df.columns:
@@ -268,21 +280,20 @@ def add_staleness_features(df, use_vintage=False, verbose=True):
                 print(f"\nSkipping {feature}: source column {source_col} not found")
             continue
         
+        # Get feature-specific threshold
+        threshold = get_change_threshold(feature)
+        
         if verbose:
-            print(f"\nProcessing: {feature} (detecting from {source_col})")
+            print(f"\nProcessing: {feature} (detecting from {source_col}, threshold={threshold})")
         
         # Detect updates from source column
         feature_values = df[source_col]
         
-        # Detect updates: value changed from previous day
-        # updates = (feature_values != feature_values.shift(1))
-        # updates = (feature_values.diff().abs() > 1e-6)  # Only count changes > threshold
-
-        # For CPI/inflation, changes should be substantial (at least 0.01%)
-        updates = (feature_values.diff().abs() > 0.01)
+        # Detect updates: value changed from previous day by more than threshold
+        updates = (feature_values.diff().abs() > threshold)
 
         # For first observation, assume it's an update
-        updates.at[updates.index[0]] = True
+        updates.iloc[0] = True
         
         # Days since last update
         days_since_update = pd.Series(0, index=df.index)
@@ -298,36 +309,167 @@ def add_staleness_features(df, use_vintage=False, verbose=True):
         # Binary freshness indicator
         is_fresh = updates.astype(int)
         
-        # Add to dataframe with appropriate names
+        # Add to dataframe based on staleness_mode
         staleness_col_name = metadata['staleness_features'][0]  # e.g., 'days_since_CPI_update'
         freshness_col_name = metadata['staleness_features'][1]  # e.g., 'CPI_is_fresh'
         
-        df[staleness_col_name] = days_since_update
-        df[freshness_col_name] = is_fresh
+        if staleness_mode in ['all', 'days_only']:
+            df[staleness_col_name] = days_since_update
+        if staleness_mode in ['all', 'fresh_only']:
+            df[freshness_col_name] = is_fresh
         
         if verbose:
             num_updates = is_fresh.sum()
             avg_staleness = days_since_update.mean()
             max_staleness = days_since_update.max()
-            print(f"  Updates detected: {num_updates}")
-            print(f"  Avg days stale: {avg_staleness:.1f}")
-            print(f"  Max days stale: {max_staleness}")
+            # Sanity check: expected updates for monthly data
+            years = (df.index[-1] - df.index[0]).days / 365.25
+            expected_monthly = years * 12
+            expected_irregular = years * 10  # Fed Funds effective rate, empirically ~10/year
+            freq = metadata.get('update_frequency', 'monthly')
+            expected = expected_irregular if freq == 'irregular' else expected_monthly
+            
+            print(f"  Updates detected: {num_updates} (expected ~{expected:.0f} for {freq})")
+            print(f"  Ratio actual/expected: {num_updates/expected:.2f}x")
+            if staleness_mode in ['all', 'days_only']:
+                print(f"  Avg days stale: {avg_staleness:.1f}")
+                print(f"  Max days stale: {max_staleness}")
     
     if verbose:
+        added_features = [c for c in df.columns if 'days_since' in c or 'is_fresh' in c]
         print(f"\n{'='*70}")
-        print(f"Total staleness features added: {len([c for c in df.columns if 'days_since' in c or 'is_fresh' in c])}")
+        print(f"Total staleness features added: {len(added_features)}")
+        print(f"Features: {added_features}")
         print(f"{'='*70}\n")
     
     return df
 
 
+def validate_staleness_detection(df, feature_name, verbose=True):
+    """
+    Validate that staleness detection is working correctly for a feature.
+    
+    Checks:
+    1. Number of updates is reasonable for the update frequency
+    2. Max staleness doesn't exceed expected bounds
+    3. Updates align with known release patterns (if applicable)
+    
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        DataFrame with staleness features already added
+    feature_name : str
+        Base feature name (e.g., 'Unemployment')
+    verbose : bool
+        Print validation results
+        
+    Returns:
+    --------
+    dict
+        Validation results with 'passed', 'warnings', and 'stats' keys
+    """
+    if feature_name not in FEATURE_METADATA:
+        return {'passed': False, 'warnings': [f'{feature_name} not in FEATURE_METADATA']}
+    
+    metadata = FEATURE_METADATA[feature_name]
+    if not metadata.get('needs_staleness', False):
+        return {'passed': True, 'warnings': ['Feature does not need staleness']}
+    
+    staleness_col = metadata['staleness_features'][0]
+    freshness_col = metadata['staleness_features'][1]
+    
+    warnings = []
+    stats = {}
+    
+    # Check columns exist
+    for col in [staleness_col, freshness_col]:
+        if col not in df.columns:
+            warnings.append(f"Missing column: {col}")
+    
+    if warnings:
+        return {'passed': False, 'warnings': warnings, 'stats': stats}
+    
+    # Compute stats
+    days_stale = df[staleness_col]
+    is_fresh = df[freshness_col]
+    
+    num_updates = is_fresh.sum()
+    years = (df.index[-1] - df.index[0]).days / 365.25
+    
+    freq = metadata.get('update_frequency', 'monthly')
+    if freq == 'monthly':
+        expected_updates = years * 12
+        # Max staleness can spike during govt shutdowns, unchanged values, holidays
+        # Unemployment can stay flat for 4+ months; CPI delayed during shutdowns
+        max_expected_staleness = 130  # ~4 months covers edge cases
+    elif freq == 'irregular':  # Fed Funds - can be unchanged for years during ZIRP
+        expected_updates = years * 10  # ~10 meaningful moves per year empirically
+        max_expected_staleness = 300  # ZIRP periods: 2008-2015, 2020-2022
+    else:
+        expected_updates = years * 12
+        max_expected_staleness = 130
+    
+    stats = {
+        'num_updates': int(num_updates),
+        'expected_updates': int(expected_updates),
+        'ratio': num_updates / expected_updates if expected_updates > 0 else 0,
+        'avg_staleness': float(days_stale.mean()),
+        'max_staleness': int(days_stale.max()),
+        'max_expected_staleness': max_expected_staleness,
+    }
+    
+    # Validate
+    # Note: Unemployment can stay unchanged for months (ratio ~0.76 is normal)
+    if stats['ratio'] < 0.4:
+        warnings.append(f"Too few updates: {num_updates} vs expected {expected_updates:.0f} (ratio={stats['ratio']:.2f})")
+    elif stats['ratio'] > 2.0:
+        warnings.append(f"Too many updates: {num_updates} vs expected {expected_updates:.0f} (ratio={stats['ratio']:.2f}) - threshold may be too low")
+    
+    if stats['max_staleness'] > max_expected_staleness:
+        warnings.append(f"Max staleness {stats['max_staleness']} exceeds expected {max_expected_staleness}")
+    
+    passed = len(warnings) == 0
+    
+    if verbose:
+        status = "PASSED" if passed else "✗ FAILED"
+        print(f"\nValidation for {feature_name}: {status}")
+        print(f"  Updates: {stats['num_updates']} (expected ~{stats['expected_updates']}, ratio={stats['ratio']:.2f})")
+        print(f"  Staleness: avg={stats['avg_staleness']:.1f}, max={stats['max_staleness']}")
+        if warnings:
+            for w in warnings:
+                print(f"  WARNING: {w}")
+    
+    return {'passed': passed, 'warnings': warnings, 'stats': stats}
+
+
 
 if __name__ == "__main__":
-    print("Testing feature set loading...\n")
+    print("Testing feature set loading and staleness detection...\n")
     
-    # Test each config
-    for config_name in FEATURE_SETS.keys():
-        data = load_feature_set(config_name, frequency='monthly')
-        train, val, test = create_train_val_test_split(data, verbose=False)
-        print(f"\n{config_name}: {len(data)} total samples "
-              f"(train={len(train)}, val={len(val)}, test={len(test)})")
+    # Test macro_heavy which has multiple low-frequency features
+    print("=" * 70)
+    print("Test 1: Load macro_heavy feature set")
+    print("=" * 70)
+    
+    try:
+        data = load_feature_set('macro_heavy', frequency='daily', version='vintage')
+        print(f"\nLoaded {len(data)} observations")
+        print(f"Columns: {list(data.columns)}")
+    except Exception as e:
+        print(f"Failed to load: {e}")
+        data = None
+    
+    if data is not None:
+        print("\n" + "=" * 70)
+        print("Test 2: Add staleness features")
+        print("=" * 70)
+        
+        data_with_staleness = add_staleness_features(data, staleness_mode='all', verbose=True)
+        
+        print("\n" + "=" * 70)
+        print("Test 3: Validate staleness detection")
+        print("=" * 70)
+        
+        for feature in ['Inflation_YoY', 'Unemployment', 'Fed_Rate', 'Consumer_Sentiment', 'Industrial_Production']:
+            if feature in data.columns:
+                validate_staleness_detection(data_with_staleness, feature, verbose=True)

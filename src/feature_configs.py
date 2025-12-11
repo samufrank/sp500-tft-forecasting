@@ -35,7 +35,15 @@ FEATURE_SETS = {
         'description': 'Core + credit risk indicators',
         'min_date': '1997-01-01',  # Credit spreads start 1997
     },
-    
+    'core_dynamics': {
+        'features': [
+            'SP500_Returns', 'VIX', 'Treasury_10Y', 'Yield_Spread', 'Inflation_YoY',
+            'VIX_relative', 'VIX_spike', 'Treasury_10Y_change', 'CPI',
+        ],
+        'enhanced': True,
+        'description': 'Core features + regime dynamics (VIX spikes, rate changes)',
+        'min_date': '2000-11-27',
+    },
     'macro_heavy': {
         'features': [
             'SP500_Returns',
@@ -203,9 +211,14 @@ def get_all_targets(config_name: str) -> dict:
     }
 
 
+# Default threshold for change detection (used if not specified per-feature)
+DEFAULT_CHANGE_THRESHOLD = 1e-6
+
 # To create staleness features
 FEATURE_METADATA = {
+    # =========================================================================
     # High-frequency features (daily updates, no staleness needed)
+    # =========================================================================
     'VIX': {
         'update_frequency': 'daily',
         'needs_staleness': False,
@@ -227,42 +240,66 @@ FEATURE_METADATA = {
         'needs_staleness': False,
     },
     
+    # =========================================================================
     # Low-frequency features (monthly updates with lag, need staleness)
+    # =========================================================================
+    # 
+    # change_threshold: minimum absolute change to count as a "new release"
+    #   - Set to ~50% of smallest expected real change to filter float noise
+    #   - Run diagnose_staleness_thresholds.py to calibrate empirically
+    #
+    # typical_lag_days: days between reference period end and release date
+    #   - CPI: ~14 days (mid-month release for prior month)
+    #   - Unemployment: ~7 days (first Friday for prior month)
+    #   - Fed_Rate: 0 days (immediate after FOMC)
+    #   - Consumer_Sentiment: 0 days (preliminary mid-month, final end-month)
+    #   - Industrial_Production: ~14 days (mid-month for prior month)
+    # =========================================================================
+    
     'Inflation_YoY': {
         'update_frequency': 'monthly',
         'needs_staleness': True,
-        'typical_lag_days': 14,  # CPI released ~2 weeks after month end
+        'typical_lag_days': 14,
         'staleness_features': ['days_since_CPI_update', 'CPI_is_fresh'],
-        'source_column': 'CPI',  # use CPI for staleness since Inflation_YoY updates daily from rolling window
+        'source_column': 'CPI',  # Detect from CPI since Inflation_YoY is derived
+        'change_threshold': 0.002,  # Empirical: min_change=0.004, catches all 431 updates
     },
     'Unemployment': {
         'update_frequency': 'monthly',
         'needs_staleness': True,
-        'typical_lag_days': 7,  # Jobs report released ~1 week after month end
+        'typical_lag_days': 7,
         'staleness_features': ['days_since_unemployment_update', 'unemployment_is_fresh'],
+        'source_column': 'Unemployment',
+        'change_threshold': 0.05,  # Empirical: min_change=0.1, catches all 325 updates (rate sometimes unchanged)
     },
     'Fed_Rate': {
-        'update_frequency': 'irregular',  # FOMC meetings ~8x per year
+        'update_frequency': 'irregular',  # FOMC meetings ~8x per year, but effective rate fluctuates daily
         'needs_staleness': True,
-        'typical_lag_days': 0,  # Immediate release
+        'typical_lag_days': 0,
         'staleness_features': ['days_since_fed_update', 'fed_is_fresh'],
+        'source_column': 'Fed_Rate',
+        'change_threshold': 0.005,  # Empirical: min_change=0.01, catches 312 updates (effective rate moves)
     },
     'Consumer_Sentiment': {
         'update_frequency': 'monthly',
         'needs_staleness': True,
-        'typical_lag_days': 0,  # Michigan survey, immediate release
+        'typical_lag_days': 0,
         'staleness_features': ['days_since_sentiment_update', 'sentiment_is_fresh'],
+        'source_column': 'Consumer_Sentiment',
+        'change_threshold': 0.05,  # Empirical: min_change=0.1, catches all 423 updates
     },
     'Industrial_Production': {
         'update_frequency': 'monthly',
         'needs_staleness': True,
         'typical_lag_days': 14,
         'staleness_features': ['days_since_indprod_update', 'indprod_is_fresh'],
+        'source_column': 'Industrial_Production',
+        'change_threshold': 0.002,  # Empirical: min_change=0.0045, catches all 451 updates (incl. revisions)
     },
 }
 
 
-def get_staleness_features(feature_list):
+def get_staleness_features(feature_list, staleness_mode='all'):
     """
     Given a list of features, return staleness features that should be added.
 
@@ -270,6 +307,11 @@ def get_staleness_features(feature_list):
     -----------
     feature_list : list
         List of feature names (e.g., ['VIX', 'Inflation_YoY', ...])
+    staleness_mode : str
+        Which staleness features to include:
+        - 'all': both days_since_* and *_is_fresh (default)
+        - 'days_only': only days_since_* (continuous counter)
+        - 'fresh_only': only *_is_fresh (sparse binary flag)
 
     Returns:
     --------
@@ -277,6 +319,10 @@ def get_staleness_features(feature_list):
         'staleness_features': list of staleness feature names to add
         'needs_staleness': dict mapping original features to bool
     """
+    valid_modes = ['all', 'days_only', 'fresh_only']
+    if staleness_mode not in valid_modes:
+        raise ValueError(f"Invalid staleness_mode: {staleness_mode}. Must be one of {valid_modes}")
+    
     staleness_features = []
     needs_staleness = {}
 
@@ -286,9 +332,37 @@ def get_staleness_features(feature_list):
             needs_staleness[feature] = metadata['needs_staleness']
 
             if metadata['needs_staleness']:
-                staleness_features.extend(metadata['staleness_features'])
+                # staleness_features is [days_since_*, *_is_fresh] by convention
+                feature_staleness = metadata['staleness_features']
+                if staleness_mode == 'all':
+                    staleness_features.extend(feature_staleness)
+                elif staleness_mode == 'days_only':
+                    # First element is days_since_*
+                    staleness_features.append(feature_staleness[0])
+                elif staleness_mode == 'fresh_only':
+                    # Second element is *_is_fresh
+                    staleness_features.append(feature_staleness[1])
 
     return {
         'staleness_features': staleness_features,
         'needs_staleness': needs_staleness,
     }
+
+
+def get_change_threshold(feature_name: str) -> float:
+    """
+    Get the change detection threshold for a feature.
+    
+    Parameters:
+    -----------
+    feature_name : str
+        Feature name to look up
+        
+    Returns:
+    --------
+    float
+        Threshold for detecting meaningful changes (absolute value)
+    """
+    if feature_name in FEATURE_METADATA:
+        return FEATURE_METADATA[feature_name].get('change_threshold', DEFAULT_CHANGE_THRESHOLD)
+    return DEFAULT_CHANGE_THRESHOLD
