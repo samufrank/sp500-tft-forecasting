@@ -54,11 +54,19 @@ def load_sweep_results(sweep_dir: Path, min_epoch: int = 20) -> pd.DataFrame:
         # Get best by dir_acc
         best = df_filtered.loc[df_filtered['dir_acc'].idxmax()]
         
+        # Base rates for each frequency
+        BASE_RATES = {
+            'weekly': 0.568,
+            'daily': 0.539,
+        }
+        
         results.append({
             'experiment': exp_path.name,
             **factors,
             'epoch': int(best['epoch']),
             'dir_acc': best['dir_acc'],
+            'base_rate': BASE_RATES.get(factors['frequency'], 0.5),
+            'excess_dir_acc': best['dir_acc'] - BASE_RATES.get(factors['frequency'], 0.5),
             'sharpe': best['sharpe'],
             'healthy_pct': best['healthy_pct'],
             'unidirectional_pct': best['unidirectional_pct'],
@@ -77,19 +85,30 @@ def print_factor_analysis(df: pd.DataFrame):
     
     df['collapse_pct'] = df['weak_collapse_pct'] + df['strong_collapse_pct']
     
-    metrics = ['dir_acc', 'sharpe', 'healthy_pct', 'unidirectional_pct', 'collapse_pct', 'pred_std']
+    # Base rates already added in load_sweep_results
+    # Just ensure they exist for safety
+    if 'excess_dir_acc' not in df.columns:
+        BASE_RATES = {
+            'weekly': 0.568,
+            'daily': 0.539,
+        }
+        df['base_rate'] = df['frequency'].map(BASE_RATES)
+        df['excess_dir_acc'] = df['dir_acc'] - df['base_rate']
+    
+    metrics = ['dir_acc', 'excess_dir_acc', 'sharpe', 'healthy_pct', 'unidirectional_pct', 'collapse_pct', 'pred_std']
     
     print("\n" + "="*90)
     print("FACTOR ANALYSIS (mean ± std across seeds)")
     print("="*90)
     
     # By Frequency
-    print("\n>>> BY FREQUENCY")
+    print("\n>>> BY FREQUENCY (base rate: weekly=56.8%, daily=53.9%)")
     freq_agg = df.groupby('frequency')[metrics].agg(['mean', 'std'])
     for freq in ['weekly', 'daily']:
         if freq in freq_agg.index:
             row = freq_agg.loc[freq]
             print(f"  {freq:8s}: DirAcc={row['dir_acc']['mean']*100:.1f}±{row['dir_acc']['std']*100:.1f}%  "
+                  f"Excess={row['excess_dir_acc']['mean']*100:+.1f}%  "
                   f"Sharpe={row['sharpe']['mean']:.2f}±{row['sharpe']['std']:.2f}  "
                   f"Healthy={row['healthy_pct']['mean']:.1f}%  "
                   f"Collapse={row['collapse_pct']['mean']:.1f}%")
@@ -97,31 +116,30 @@ def print_factor_analysis(df: pd.DataFrame):
     # By Quantiles
     print("\n>>> BY QUANTILES")
     quant_agg = df.groupby('quantiles')[metrics].agg(['mean', 'std'])
-    for quant in ['3q', '7q']:
-        if quant in quant_agg.index:
-            row = quant_agg.loc[quant]
-            print(f"  {quant:8s}: DirAcc={row['dir_acc']['mean']*100:.1f}±{row['dir_acc']['std']*100:.1f}%  "
-                  f"Sharpe={row['sharpe']['mean']:.2f}±{row['sharpe']['std']:.2f}  "
-                  f"Healthy={row['healthy_pct']['mean']:.1f}%  "
-                  f"Collapse={row['collapse_pct']['mean']:.1f}%")
+    for quant in sorted(quant_agg.index, key=lambda x: int(x.replace('q', ''))):
+        row = quant_agg.loc[quant]
+        print(f"  {quant:8s}: DirAcc={row['dir_acc']['mean']*100:.1f}±{row['dir_acc']['std']*100:.1f}%  "
+              f"Sharpe={row['sharpe']['mean']:.2f}±{row['sharpe']['std']:.2f}  "
+              f"Healthy={row['healthy_pct']['mean']:.1f}%  "
+              f"Collapse={row['collapse_pct']['mean']:.1f}%")
     
     # By Horizon
     print("\n>>> BY HORIZON")
     horizon_agg = df.groupby('horizon')[metrics].agg(['mean', 'std'])
-    for h in [1, 3, 5]:
-        if h in horizon_agg.index:
-            row = horizon_agg.loc[h]
-            print(f"  h{h:7d}: DirAcc={row['dir_acc']['mean']*100:.1f}±{row['dir_acc']['std']*100:.1f}%  "
-                  f"Sharpe={row['sharpe']['mean']:.2f}±{row['sharpe']['std']:.2f}  "
-                  f"Healthy={row['healthy_pct']['mean']:.1f}%  "
-                  f"Collapse={row['collapse_pct']['mean']:.1f}%")
+    for h in sorted(horizon_agg.index):
+        row = horizon_agg.loc[h]
+        print(f"  h{h:<7d}: DirAcc={row['dir_acc']['mean']*100:.1f}±{row['dir_acc']['std']*100:.1f}%  "
+              f"Sharpe={row['sharpe']['mean']:.2f}±{row['sharpe']['std']:.2f}  "
+              f"Healthy={row['healthy_pct']['mean']:.1f}%  "
+              f"Collapse={row['collapse_pct']['mean']:.1f}%")
     
     # By Frequency × Quantiles (most important interaction)
     print("\n>>> BY FREQUENCY × QUANTILES")
     fq_agg = df.groupby(['frequency', 'quantiles'])[metrics].agg(['mean', 'std'])
     for (freq, quant), row in fq_agg.iterrows():
         print(f"  {freq}_{quant}: DirAcc={row['dir_acc']['mean']*100:.1f}±{row['dir_acc']['std']*100:.1f}%  "
-              f"Sharpe={row['sharpe']['mean']:.2f}±{row['sharpe']['std']:.2f}  "
+              f"Excess={row['excess_dir_acc']['mean']*100:+.1f}%  "
+              f"Sharpe={row['sharpe']['mean']:.2f}  "
               f"Healthy={row['healthy_pct']['mean']:.1f}%  "
               f"Collapse={row['collapse_pct']['mean']:.1f}%")
     
@@ -130,7 +148,8 @@ def print_factor_analysis(df: pd.DataFrame):
     fh_agg = df.groupby(['frequency', 'horizon'])[metrics].agg(['mean', 'std'])
     for (freq, h), row in fh_agg.iterrows():
         print(f"  {freq}_h{h}: DirAcc={row['dir_acc']['mean']*100:.1f}±{row['dir_acc']['std']*100:.1f}%  "
-              f"Sharpe={row['sharpe']['mean']:.2f}±{row['sharpe']['std']:.2f}  "
+              f"Excess={row['excess_dir_acc']['mean']*100:+.1f}%  "
+              f"Sharpe={row['sharpe']['mean']:.2f}  "
               f"Healthy={row['healthy_pct']['mean']:.1f}%  "
               f"Collapse={row['collapse_pct']['mean']:.1f}%")
 
@@ -140,15 +159,30 @@ def print_top_experiments(df: pd.DataFrame, n: int = 5):
     
     df['collapse_pct'] = df['weak_collapse_pct'] + df['strong_collapse_pct']
     
+    # Base rates already added in load_sweep_results
+    if 'excess_dir_acc' not in df.columns:
+        BASE_RATES = {
+            'weekly': 0.568,
+            'daily': 0.539,
+        }
+        df['base_rate'] = df['frequency'].map(BASE_RATES)
+        df['excess_dir_acc'] = df['dir_acc'] - df['base_rate']
+    
     print("\n" + "="*90)
     print(f"TOP {n} EXPERIMENTS")
     print("="*90)
     
     # Top by dir_acc
-    print(f"\n>>> By Directional Accuracy")
-    top_dir = df.nlargest(n, 'dir_acc')[['experiment', 'dir_acc', 'sharpe', 'healthy_pct', 'collapse_pct']]
+    print(f"\n>>> By Directional Accuracy (raw)")
+    top_dir = df.nlargest(n, 'dir_acc')[['experiment', 'dir_acc', 'excess_dir_acc', 'sharpe', 'healthy_pct', 'collapse_pct']]
     for _, row in top_dir.iterrows():
-        print(f"  {row['experiment']:30s} DirAcc={row['dir_acc']*100:.1f}%  Sharpe={row['sharpe']:.2f}  Healthy={row['healthy_pct']:.1f}%")
+        print(f"  {row['experiment']:30s} DirAcc={row['dir_acc']*100:.1f}%  Excess={row['excess_dir_acc']*100:+.1f}%  Sharpe={row['sharpe']:.2f}  Healthy={row['healthy_pct']:.1f}%")
+    
+    # Top by excess_dir_acc (above base rate)
+    print(f"\n>>> By Excess DirAcc (above base rate)")
+    top_excess = df.nlargest(n, 'excess_dir_acc')[['experiment', 'dir_acc', 'excess_dir_acc', 'sharpe', 'healthy_pct', 'pct_positive']]
+    for _, row in top_excess.iterrows():
+        print(f"  {row['experiment']:30s} Excess={row['excess_dir_acc']*100:+.1f}%  DirAcc={row['dir_acc']*100:.1f}%  Pct+={row['pct_positive']:.0f}%  Healthy={row['healthy_pct']:.1f}%")
     
     # Top by Sharpe
     print(f"\n>>> By Sharpe Ratio")

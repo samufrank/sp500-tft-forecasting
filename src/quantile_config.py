@@ -7,6 +7,7 @@ with helper functions to find median index dynamically.
 Presets:
 - median (1q): [0.5] - Single point prediction
 - 3q: [0.1, 0.5, 0.9] - Minimal uncertainty quantification  
+- 5q: [0.1, 0.25, 0.5, 0.75, 0.9] - Quartiles + median
 - 7q: [0.02, 0.1, 0.25, 0.5, 0.75, 0.9, 0.98] - Full distribution (default)
 
 Reference: Original TFT paper (Lim et al., 2021) uses 3 quantiles for 
@@ -19,6 +20,7 @@ from typing import List, Tuple
 QUANTILE_PRESETS = {
     'median': [0.5],
     '3q': [0.1, 0.5, 0.9],
+    '5q': [0.1, 0.25, 0.5, 0.75, 0.9],
     '7q': [0.02, 0.1, 0.25, 0.5, 0.75, 0.9, 0.98],
 }
 
@@ -27,6 +29,7 @@ QUANTILE_ALIASES = {
     '1q': 'median',
     '1': 'median',
     '3': '3q',
+    '5': '5q',
     '7': '7q',
 }
 
@@ -119,7 +122,7 @@ def add_quantile_args(parser):
         '--quantiles', 
         type=str, 
         default='7q',
-        choices=['median', '1q', '3q', '7q'],
-        help='Quantile preset: median/1q (single), 3q (standard), 7q (full distribution)'
+        choices=['median', '1q', '3q', '5q', '7q'],
+        help='Quantile preset: median/1q (single), 3q (standard), 5q (quartiles), 7q (full distribution)'
     )
     return parser

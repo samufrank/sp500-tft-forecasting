@@ -86,9 +86,11 @@ def parse_checkpoint_name(ckpt_path: Path) -> dict:
     
     # Extract metric type and value
     # Patterns: diracc, sharpe, valloss, predstd, unique
+    # Note: sharpe can be negative, so allow optional leading minus
+    # Use word boundary or end-of-string to avoid capturing -v1 suffix
     metric_patterns = [
         (r'diracc=val_dir_acc=([0-9.]+)', 'val_dir_acc'),
-        (r'sharpe=val_sharpe=([0-9.-]+)', 'val_sharpe'),
+        (r'sharpe=val_sharpe=(-?[0-9.]+)(?:-v\d+)?(?:\.ckpt)?$', 'val_sharpe'),
         (r'valloss=val_loss=([0-9.]+)', 'val_loss'),
         (r'predstd=val_pred_std=([0-9.]+)', 'val_pred_std'),
         (r'unique=val_num_unique=(\d+)', 'val_num_unique'),

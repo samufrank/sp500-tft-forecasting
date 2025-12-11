@@ -351,6 +351,30 @@ def prepare_test_dataset(train_df, test_df, config):
     # Get prediction length from config (default 1 for backward compatibility)
     max_prediction_length = config.get('architecture', {}).get('max_prediction_length', 1)
     
+    # Get target from config (default SP500_Returns for backward compatibility)
+    target_col = config.get('target', config.get('data', {}).get('target', 'SP500_Returns'))
+    
+    # Validate target exists
+    if target_col not in train_df.columns:
+        print(f"WARNING: Target '{target_col}' not in data. Available: {list(train_df.columns)}")
+        print(f"Falling back to 'SP500_Returns'")
+        target_col = 'SP500_Returns'
+    
+    print(f"\nTarget variable: {target_col}")
+    if target_col.startswith('cumret_'):
+        horizon = int(target_col.split('_')[1])
+        print(f"  Mode: Cumulative return prediction ({horizon}-period horizon)")
+    else:
+        print(f"  Mode: Point return prediction")
+    
+    # Drop unused target columns to prevent accidental leakage
+    unused_targets = [c for c in train_df.columns 
+                      if c.startswith('cumret_') and c != target_col]
+    if unused_targets:
+        print(f"  Dropping unused cumret columns: {unused_targets}")
+        train_df = train_df.drop(columns=unused_targets)
+        test_df = test_df.drop(columns=unused_targets)
+    
     # Create training dataset for normalization parameters (train only)
     train_df['time_idx'] = range(len(train_df))
     train_df['group'] = 'SP500'
@@ -358,7 +382,7 @@ def prepare_test_dataset(train_df, test_df, config):
     training = TimeSeriesDataSet(
         train_df,
         time_idx="time_idx",
-        target="SP500_Returns",
+        target=target_col,
         group_ids=["group"],
         max_encoder_length=config['architecture']['max_encoder_length'],
         max_prediction_length=max_prediction_length,
@@ -394,7 +418,7 @@ def prepare_test_dataset(train_df, test_df, config):
     # DEBUG
     #print(f"Filtered test_dataset size: {len(test_dataset.index)}")
     
-    return test_dataset, test_df, test_start_idx
+    return test_dataset, test_df, test_start_idx, target_col
 
 
 # ============================================================================
@@ -1904,7 +1928,7 @@ def evaluate():
     
     # Prepare test dataset
     print("Preparing test dataset...")
-    test_dataset, test_df_indexed, test_start_idx = prepare_test_dataset(train_df, test_df, config)
+    test_dataset, test_df_indexed, test_start_idx, target_col = prepare_test_dataset(train_df, test_df, config)
     
     # Count actual test predictions
     # Need to account for encoder length requirement

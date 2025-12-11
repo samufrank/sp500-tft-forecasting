@@ -3,7 +3,146 @@ Utilities for loading and preparing datasets for modeling.
 """
 
 import pandas as pd
+import numpy as np
 from src.feature_configs import FEATURE_SETS, FEATURE_METADATA, TARGET
+
+# Cumulative return horizons (in periods, not days)
+# For daily data: 5/10/20/30 days
+# For weekly data: 5/10/20/30 weeks
+CUMRET_HORIZONS = [5, 10, 20, 30]
+
+
+def add_cumulative_returns(df, return_col='SP500_Returns', horizons=None, verbose=True):
+    """
+    Add forward-looking cumulative return columns.
+    
+    Computes the return you'd get if you bought at close on day t and sold at 
+    close on day t+h:
+        cumret_h = (1+r[t+1]) × (1+r[t+2]) × ... × (1+r[t+h]) - 1
+    
+    IMPORTANT: Assumes returns are in PERCENTAGE form (1.0 = 1%, not 0.01).
+    Output is also in percentage form for consistency with SP500_Returns.
+    
+    Note: This creates NaN values for the last h rows of each horizon since
+    we can't compute future returns beyond the data. These should be dropped
+    before model training.
+    
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        DataFrame with DatetimeIndex and return column
+    return_col : str
+        Name of the return column (default: 'SP500_Returns')
+        Must be in percentage form (1.0 = 1%)
+    horizons : list of int or None
+        Horizons to compute (default: CUMRET_HORIZONS = [5, 10, 20, 30])
+    verbose : bool
+        Print computation information
+        
+    Returns:
+    --------
+    pd.DataFrame
+        Original dataframe with additional cumret_N columns (in percentage form)
+    dict
+        Statistics about NaN rows created per horizon
+    """
+    if horizons is None:
+        horizons = CUMRET_HORIZONS
+    
+    df = df.copy()
+    
+    if return_col not in df.columns:
+        raise ValueError(f"Return column '{return_col}' not found. "
+                        f"Available: {list(df.columns)}")
+    
+    if verbose:
+        print(f"\n{'='*70}")
+        print("Adding Cumulative Return Targets")
+        print(f"{'='*70}")
+        print(f"Source column: {return_col}")
+        print(f"Horizons: {horizons}")
+    
+    stats = {}
+    returns = df[return_col].values
+    n = len(returns)
+    
+    for h in horizons:
+        col_name = f'cumret_{h}'
+        cumret = np.full(n, np.nan)
+        
+        # For each position t, compute product of (1+r) for t+1 to t+h
+        # Returns are in PERCENTAGE form (1.0 = 1%), so divide by 100 first
+        # Output is also in percentage form for consistency
+        for t in range(n - h):
+            # Forward returns from t+1 to t+h (inclusive)
+            forward_returns = returns[t+1:t+h+1]
+            # Convert to decimal, compound, convert back to percentage
+            cumret[t] = (np.prod(1 + forward_returns / 100) - 1) * 100
+        
+        df[col_name] = cumret
+        
+        # Stats
+        nan_count = np.sum(np.isnan(cumret))
+        valid_count = n - nan_count
+        
+        if valid_count > 0:
+            valid_vals = cumret[~np.isnan(cumret)]
+            stats[col_name] = {
+                'horizon': h,
+                'valid_rows': valid_count,
+                'nan_rows': nan_count,
+                'mean': np.mean(valid_vals),
+                'std': np.std(valid_vals),
+                'min': np.min(valid_vals),
+                'max': np.max(valid_vals),
+            }
+        
+        if verbose:
+            print(f"\n  {col_name}:")
+            print(f"    Valid rows: {valid_count} (last {nan_count} are NaN)")
+            if valid_count > 0:
+                print(f"    Mean: {stats[col_name]['mean']:.4f}")
+                print(f"    Std:  {stats[col_name]['std']:.4f}")
+                print(f"    Range: [{stats[col_name]['min']:.4f}, {stats[col_name]['max']:.4f}]")
+    
+    if verbose:
+        print(f"\n{'='*70}\n")
+    
+    return df, stats
+
+
+def get_valid_targets():
+    """
+    Return list of valid target column names.
+    
+    Returns:
+    --------
+    list
+        Valid target names: ['SP500_Returns', 'cumret_5', 'cumret_10', ...]
+    """
+    return ['SP500_Returns'] + [f'cumret_{h}' for h in CUMRET_HORIZONS]
+
+
+def get_cumret_horizon(target):
+    """
+    Extract horizon from cumret target name.
+    
+    Parameters:
+    -----------
+    target : str
+        Target column name (e.g., 'cumret_10')
+        
+    Returns:
+    --------
+    int or None
+        Horizon if cumret target, None if SP500_Returns
+    """
+    if target == 'SP500_Returns':
+        return None
+    elif target.startswith('cumret_'):
+        return int(target.split('_')[1])
+    else:
+        raise ValueError(f"Unknown target: {target}. Valid: {get_valid_targets()}")
 
 def load_feature_set(config_name='core_proposal', 
                      frequency='daily',

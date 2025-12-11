@@ -19,7 +19,13 @@ import json
 import argparse
 import pandas as pd
 from datetime import datetime
-from src.data_utils import load_feature_set, create_train_val_test_split, create_split_by_dates
+from src.data_utils import (
+    load_feature_set, 
+    create_train_val_test_split, 
+    create_split_by_dates,
+    add_cumulative_returns,
+    CUMRET_HORIZONS
+)
 
 def parse_args():
     """Parse command line arguments."""
@@ -120,6 +126,11 @@ def parse_args():
     )
     parser.add_argument('--lookback-buffer', type=int, default=0,
                     help='Number of rows from val/train to prepend to test for context')
+    parser.add_argument('--cumret', action='store_true', default=True,
+                    help='Add cumulative return targets (cumret_5, cumret_10, cumret_20, cumret_30). '
+                         'Enabled by default. Use --no-cumret to disable.')
+    parser.add_argument('--no-cumret', dest='cumret', action='store_false',
+                    help='Disable cumulative return target computation')
     return parser.parse_args()
 
 def main():
@@ -147,6 +158,21 @@ def main():
         verbose=True
     )
     
+    # Add cumulative return targets (computed on full dataset before splitting)
+    cumret_stats = None
+    max_horizon = 0
+    if args.cumret:
+        print(f"\nComputing cumulative return targets...")
+        print(f"  Horizons: {CUMRET_HORIZONS} periods")
+        print(f"  Note: For {args.frequency} data, cumret_N means N-{args.frequency[:-2] if args.frequency.endswith('ly') else args.frequency} forward return")
+        df, cumret_stats = add_cumulative_returns(
+            df, 
+            return_col='SP500_Returns',
+            horizons=CUMRET_HORIZONS,
+            verbose=True
+        )
+        max_horizon = max(CUMRET_HORIZONS)
+    
     # Create temporal splits - use date-based if dates provided, else percentage-based
     use_date_split = args.train_end is not None
     
@@ -173,6 +199,41 @@ def main():
             val_pct=args.val_pct,
             verbose=True
         )
+    
+    # Drop trailing NaN rows from cumret computation
+    # Each split loses its last max_horizon rows where cumret_30 would be NaN
+    if args.cumret and max_horizon > 0:
+        print(f"\nDropping trailing NaN rows from cumret computation...")
+        cumret_cols = [f'cumret_{h}' for h in CUMRET_HORIZONS]
+        
+        # For train: drop last max_horizon rows
+        train_before = len(train)
+        train = train.iloc[:-max_horizon] if len(train) > max_horizon else train.iloc[0:0]
+        print(f"  Train: {train_before} -> {len(train)} (dropped {train_before - len(train)} rows)")
+        
+        # For val: drop last max_horizon rows
+        val_before = len(val)
+        if len(val) > max_horizon:
+            val = val.iloc[:-max_horizon]
+        elif len(val) > 0:
+            # Val set too small - this is a warning condition
+            print(f"  WARNING: Validation set ({val_before} rows) smaller than max horizon ({max_horizon})")
+            val = val.iloc[0:0]  # Empty
+        print(f"  Val:   {val_before} -> {len(val)} (dropped {val_before - len(val)} rows)")
+        
+        # For test: drop last max_horizon rows
+        test_before = len(test)
+        test = test.iloc[:-max_horizon] if len(test) > max_horizon else test.iloc[0:0]
+        print(f"  Test:  {test_before} -> {len(test)} (dropped {test_before - len(test)} rows)")
+        
+        # Verify no NaNs remain in cumret columns
+        for split_name, split_df in [('train', train), ('val', val), ('test', test)]:
+            if len(split_df) > 0:
+                for col in cumret_cols:
+                    if col in split_df.columns:
+                        nan_count = split_df[col].isna().sum()
+                        if nan_count > 0:
+                            print(f"  WARNING: {split_name} still has {nan_count} NaN in {col}")
     
     # Save splits with data version in filename and subdirectory
     # Create subdirectory for data version (unless already specified in output-dir)
@@ -229,7 +290,29 @@ def main():
         'val_size': len(val),
         'test_size': len(test),
         'features': list(df.columns),
+        'cumret_enabled': args.cumret,
     }
+    
+    # Add cumret-specific metadata
+    if args.cumret:
+        metadata['cumret'] = {
+            'horizons': [int(h) for h in CUMRET_HORIZONS],
+            'columns': [f'cumret_{h}' for h in CUMRET_HORIZONS],
+            'max_horizon': int(max_horizon),
+            'rows_dropped_per_split': int(max_horizon),
+            'valid_targets': ['SP500_Returns'] + [f'cumret_{h}' for h in CUMRET_HORIZONS],
+        }
+        if cumret_stats:
+            # Convert numpy types to native Python for JSON serialization
+            def to_native(v):
+                if hasattr(v, 'item'):  # numpy scalar
+                    return v.item()
+                return v
+            
+            metadata['cumret']['statistics'] = {
+                col: {k: to_native(v) for k, v in stats.items()}
+                for col, stats in cumret_stats.items()
+            }
     
     # Add split parameters based on method
     if use_date_split:

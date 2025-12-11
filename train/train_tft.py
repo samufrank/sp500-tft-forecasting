@@ -68,6 +68,9 @@ def parse_args():
     parser.add_argument('--alignment', type=str, default='vintage',
                         choices=['fixed', 'vintage'],
                         help='Release date alignment mode (vintage uses actual release dates)')
+    parser.add_argument('--target', type=str, default='SP500_Returns',
+                        choices=['SP500_Returns', 'cumret_5', 'cumret_10', 'cumret_20', 'cumret_30'],
+                        help='Target variable: SP500_Returns (daily return) or cumret_N (N-period cumulative return)')
     
     # Reproducibility
     parser.add_argument('--seed', type=int, default=42,
@@ -96,16 +99,19 @@ def parse_args():
                         help='Maximum training epochs')
     parser.add_argument('--gradient-clip', type=float, default=0.1,
                         help='Gradient clipping value')
-    parser.add_argument('--early-stop-patience', type=int, default=10,
+    parser.add_argument('--early-stop-patience', type=int, default=100,
                         help='Early stopping patience')
 
     # Include staleness features
     parser.add_argument('--staleness', action='store_true',
-                        help='Enable staleness features (experimental)')    
+                        help='Enable staleness features (experimental)')
+    parser.add_argument('--staleness-mode', type=str, default='all',
+                        choices=['all', 'days_only', 'fresh_only'],
+                        help='Which staleness features to add: all (both), days_only (continuous counter), fresh_only (sparse binary flag)')    
     
     # Quantile configuration
     parser.add_argument('--quantiles', type=str, default='7q',
-                        choices=['median', '1q', '3q', '7q'],
+                        choices=['median', '1q', '3q', '5q', '7q'],
                         help='Quantile preset: median/1q (single), 3q (standard), 7q (full distribution)')
     
     # Paths
@@ -202,6 +208,31 @@ def parse_args():
                         help='Enable regime-aware attention gating')
     parser.add_argument('--regime-attention-vix-threshold', type=float, default=25.0,
                         help='VIX threshold for regime switching (default: 25.0)')
+    parser.add_argument('--regime-attention-grad-scale', type=float, default=100.0,
+                        help='Gradient scaling factor for regime gates (default: 100.0)')
+    parser.add_argument('--regime-gate-init', type=str, default='neutral',
+                        choices=['neutral', 'separated'],
+                        help='Gate initialization: neutral (0.5) or separated (0.38/0.62)')
+    parser.add_argument('--gate-separation-weight', type=float, default=0.0,
+                    help='Weight for regime gate separation reward (0.0 = disabled)')
+
+
+    # Staleness attention args
+    parser.add_argument('--staleness-attention', action='store_true',
+                        help='Enable staleness-aware attention penalty')
+    parser.add_argument('--staleness-decay', type=str, default='prenormalized',
+                        choices=['prenormalized', 'linear', 'exponential', 'log', 'step'],
+                        help='Decay function for staleness penalty. "prenormalized" recommended (uses log-normalized values directly)')
+    parser.add_argument('--staleness-weight', type=float, default=0.5,
+                        help='Initial staleness penalty magnitude (0.1-1.0 recommended)')
+    parser.add_argument('--staleness-learnable', action='store_true', default=True,
+                        help='Make staleness weight learnable (recommended)')
+    parser.add_argument('--staleness-max-days', type=float, default=45.0,
+                        help='Max staleness for normalization (only used if decay != prenormalized)')
+    parser.add_argument('--staleness-combine-regime', action='store_true',
+                        help='Combine staleness attention with regime gating')
+    parser.add_argument('--staleness-grad-scale', type=float, default=100.0,
+                    help='Gradient scaling for staleness weight (default: 100.0)') 
 
     return parser.parse_args()
 
@@ -210,7 +241,7 @@ def parse_args():
 # FEATURE DEFINITIONS (based on frequency and feature set)
 # ============================================================================
 
-def get_features(feature_set, frequency, include_staleness=True):
+def get_features(feature_set, frequency, include_staleness=True, staleness_mode='all'):
     """
     Get feature lists based on configuration.
     Must match feature_configs.py exactly.
@@ -223,6 +254,8 @@ def get_features(feature_set, frequency, include_staleness=True):
         'daily' or 'monthly'
     include_staleness : bool
         If True, add staleness features for low-frequency variables
+    staleness_mode : str
+        Which staleness features to include: 'all', 'days_only', 'fresh_only'
         
     Returns:
     --------
@@ -253,7 +286,7 @@ def get_features(feature_set, frequency, include_staleness=True):
                      "Consumer_Sentiment", "Industrial_Production"]]
     
     # Add staleness features if requested
-    staleness_info = get_staleness_features(all_features)
+    staleness_info = get_staleness_features(all_features, staleness_mode=staleness_mode)
     staleness_features = staleness_info['staleness_features'] if include_staleness else []
     
     return {
@@ -316,6 +349,9 @@ def load_splits(splits_dir, feature_set, frequency, alignment):
 def prepare_tft_data(train_df, val_df, args, features, add_staleness=True):
     """Prepare data in TimeSeriesDataSet format for TFT."""
     
+    # init max days for staleness
+    staleness_normalization_max = None
+    
     # add staleness
     if add_staleness and len(features['staleness']) > 0:
         print("\nAdding staleness features to data...")
@@ -323,8 +359,11 @@ def prepare_tft_data(train_df, val_df, args, features, add_staleness=True):
         
         # Use vintage=True if alignment is vintage, False if fixed
         use_vintage = (args.alignment == 'vintage')
-        train_df = add_staleness_features(train_df, use_vintage=use_vintage, verbose=True)
-        val_df = add_staleness_features(val_df, use_vintage=use_vintage, verbose=True)
+        staleness_mode = getattr(args, 'staleness_mode', 'all')
+        train_df = add_staleness_features(train_df, use_vintage=use_vintage, 
+                                          staleness_mode=staleness_mode, verbose=True)
+        val_df = add_staleness_features(val_df, use_vintage=use_vintage, 
+                                        staleness_mode=staleness_mode, verbose=True)
     
     # DROP SOURCE COLUMNS (used for staleness detection only, not model features)
     source_cols_to_drop = []
@@ -370,6 +409,7 @@ def prepare_tft_data(train_df, val_df, args, features, add_staleness=True):
         max_train = train_df[staleness_cols].max().max()
         max_val = val_df[staleness_cols].max().max()
         MAX_DAYS_STALE = np.ceil(max(max_train, max_val)) + 5  # Add 5-day buffer
+        staleness_normalization_max = MAX_DAYS_STALE
         
         print(f"Max staleness observed: train={max_train:.0f}, val={max_val:.0f}")
         print(f"Using normalization max: {MAX_DAYS_STALE:.0f} days")
@@ -396,11 +436,43 @@ def prepare_tft_data(train_df, val_df, args, features, add_staleness=True):
     train_df['group'] = 'SP500'
     val_df['group'] = 'SP500'
     
+    # Validate target column exists
+    target_col = args.target
+    if target_col not in train_df.columns:
+        available_targets = [c for c in train_df.columns if 'Returns' in c or 'cumret' in c]
+        raise ValueError(
+            f"Target column '{target_col}' not found in data.\n"
+            f"Available target-like columns: {available_targets}\n"
+            f"If using cumret targets, regenerate splits with: python create_splits.py --cumret"
+        )
+    
+    print(f"\n{'='*70}")
+    print(f"TARGET CONFIGURATION")
+    print(f"{'='*70}")
+    print(f"Target variable: {target_col}")
+    if target_col.startswith('cumret_'):
+        horizon = int(target_col.split('_')[1])
+        print(f"  Mode: Cumulative return prediction")
+        print(f"  Horizon: {horizon} periods forward")
+    else:
+        print(f"  Mode: Point return prediction (single-step)")
+    print(f"  Target stats: mean={train_df[target_col].mean():.4f}, std={train_df[target_col].std():.4f}")
+    
+    # Drop unused target columns to prevent accidental leakage
+    # cumret_* columns that aren't the active target should not be in the dataframe
+    unused_targets = [c for c in train_df.columns 
+                      if c.startswith('cumret_') and c != target_col]
+    if unused_targets:
+        print(f"  Dropping unused cumret columns: {unused_targets}")
+        train_df = train_df.drop(columns=unused_targets)
+        val_df = val_df.drop(columns=unused_targets)
+    print(f"{'='*70}")
+    
     # Create training dataset
     training = TimeSeriesDataSet(
         train_df,
         time_idx="time_idx",
-        target="SP500_Returns",
+        target=target_col,
         group_ids=["group"],
         max_encoder_length=args.max_encoder_length,
         max_prediction_length=args.max_prediction_length,
@@ -439,7 +511,7 @@ def prepare_tft_data(train_df, val_df, args, features, add_staleness=True):
     raw_vix_train = train_df['VIX'].values
     raw_vix_val = val_df['VIX'].values
     
-    return training, validation, raw_vix_train, raw_vix_val
+    return training, validation, raw_vix_train, raw_vix_val, staleness_normalization_max
 
 # ============================================================================
 # MODEL SETUP
@@ -480,20 +552,7 @@ def create_model(training_dataset, args, raw_vix_train, raw_vix_val):
         print(f"\nActive loss penalties: {', '.join(active_penalties)}")
     else:
         print("\nUsing standard QuantileLoss (no penalties)")
-    """
-    tft = TemporalFusionTransformer.from_dataset(
-        training_dataset,
-        learning_rate=args.learning_rate,
-        hidden_size=args.hidden_size,
-        attention_head_size=args.attention_heads,
-        dropout=args.dropout,
-        hidden_continuous_size=args.hidden_continuous_size,
-        output_size=7,
-        loss=loss_fn,  # Use custom loss instead of QuantileLoss()
-        log_interval=10,
-        reduce_on_plateau_patience=4,
-    )
-    """
+
     # Common TFT kwargs
     tft_kwargs = dict(
         learning_rate=args.learning_rate,
@@ -634,7 +693,52 @@ def create_model(training_dataset, args, raw_vix_train, raw_vix_val):
         )
         
         print(f"\n[REGIME ATTENTION] Enabled: vix_threshold={args.regime_attention_vix_threshold}")
-    
+   
+    # STALENESS ATTENTION
+    if args.staleness_attention:
+        # Validate: staleness features must be enabled
+        if not args.staleness:
+            raise ValueError(
+                "--staleness-attention requires --staleness flag to include staleness features in data. "
+                "Use: --staleness --staleness-attention"
+            )
+        
+        # Import staleness attention modules
+        from src.staleness_attention import replace_attention_with_staleness
+        from train.staleness_attention_training import patch_forward_for_staleness_training
+        
+        # Determine regime mode (can combine staleness + regime)
+        regime_mode = 'disabled'
+        if args.staleness_combine_regime or args.regime_attention:
+            regime_mode = 'vix_threshold'
+        
+        # Replace attention module
+        tft = replace_attention_with_staleness(
+            tft,
+            staleness_mode='penalty',
+            staleness_decay=args.staleness_decay,
+            staleness_weight=args.staleness_weight,
+            staleness_learnable=args.staleness_learnable,
+            staleness_max_days=args.staleness_max_days,
+            staleness_grad_scale=args.staleness_grad_scale,
+            regime_mode=regime_mode,
+            vix_threshold=args.regime_attention_vix_threshold if regime_mode != 'disabled' else 25.0
+        )
+        
+        # Patch forward for signal threading
+        tft = patch_forward_for_staleness_training(
+            tft,
+            staleness_feature_name='days_since_CPI_update',
+            vix_feature_name='VIX'
+        )
+        
+        # Log configuration
+        regime_str = f", regime_mode={regime_mode}" if regime_mode != 'disabled' else ""
+        print(f"\n[STALENESS ATTENTION] Enabled: decay={args.staleness_decay}, "
+              f"weight={args.staleness_weight}, learnable={args.staleness_learnable}{regime_str}")
+    else:
+        print(f"\n[STALENESS ATTENTION] Disabled")
+
     # DEBUG: Show what the model actually received
     print("\n" + "="*80)
     print("BASELINE MODEL FEATURE CONFIGURATION (after from_dataset)")
@@ -710,7 +814,7 @@ def freeze_backbone(model, verbose=True):
 # EXPERIMENT TRACKING SETUP
 # ============================================================================
 
-def save_config(args, features, output_dir):
+def save_config(args, features, output_dir, staleness_norm_max):
     """Save all hyperparameters and configuration."""
     os.makedirs(output_dir, exist_ok=True)
     
@@ -721,10 +825,12 @@ def save_config(args, features, output_dir):
         'feature_set': args.feature_set,
         'frequency': args.frequency,
         'alignment': args.alignment,
+        'target': args.target,  # Target variable (SP500_Returns or cumret_N)
         'data': {
             'splits_dir': args.splits_dir,
             'release_date_mode': args.alignment,  # For compatibility with evaluate_tft.py
             'split_prefix': f"{args.feature_set}_{args.frequency}_{args.alignment}",
+            'target': args.target,  # Also in data section for evaluate_tft.py
             'train_size': len(pd.read_csv(os.path.join(
                 args.splits_dir, 
                 args.alignment,
@@ -784,7 +890,7 @@ def save_config(args, features, output_dir):
             'enabled': args.regime_attention,
             'vix_threshold': args.regime_attention_vix_threshold,
             'num_regimes': 2,
-            'gate_grad_scale': 100,  # document the gradient scaling
+            'gate_grad_scale': args.regime_attention_grad_scale if args.regime_attention else None,
         },
         'transfer_learning': {
             'freeze_backbone': getattr(args, 'freeze_backbone', False),
@@ -797,6 +903,18 @@ def save_config(args, features, output_dir):
             'regression_weight': getattr(args, 'regression_weight', 1.0),
             'num_classes': getattr(args, 'num_classes', 2),
             'thresholds': getattr(args, 'classification_thresholds', None),
+        },
+        'staleness_attention': {
+            'enabled': getattr(args, 'staleness_attention', False),
+            'staleness_features_in_data': getattr(args, 'staleness', False),
+            'staleness_mode': getattr(args, 'staleness_mode', 'all'),
+            'decay': getattr(args, 'staleness_decay', 'prenormalized'),
+            'weight_initial': getattr(args, 'staleness_weight', 0.5),
+            'learnable': getattr(args, 'staleness_learnable', True),
+            'staleness_grad_scale': args.staleness_grad_scale,
+            'max_days': getattr(args, 'staleness_max_days', 45.0),
+            'combine_with_regime': getattr(args, 'staleness_combine_regime', False),
+            'data_normalization_max_days': staleness_norm_max,
         },
         'features': features,
         'pytorch_version': torch.__version__,
@@ -818,6 +936,18 @@ def train():
     """Main training loop."""
     # Parse arguments
     args = parse_args()
+    
+    # Validate target vs max_prediction_length
+    # When using cumret targets, must use max_prediction_length=1
+    if args.target.startswith('cumret_') and args.max_prediction_length != 1:
+        print(f"\nERROR: --target {args.target} requires --max-prediction-length 1")
+        print(f"  Cumulative return targets already encode the forward horizon.")
+        print(f"  Using multi-step prediction would create overlapping horizons.")
+        print(f"\n  Current settings:")
+        print(f"    --target: {args.target}")
+        print(f"    --max-prediction-length: {args.max_prediction_length}")
+        print(f"\n  Fix: Use --max-prediction-length 1 with cumret targets")
+        return None, None
     
     # Set seeds for reproducibility
     set_all_seeds(args.seed)
@@ -889,7 +1019,9 @@ def train():
         print(f"\n[WARN] Could not patch matplotlib errorbar: {e}")
     
     # Get features for this configuration
-    features = get_features(args.feature_set, args.frequency, include_staleness=args.staleness)
+    features = get_features(args.feature_set, args.frequency, 
+                           include_staleness=args.staleness, 
+                           staleness_mode=args.staleness_mode)
     
     print("="*70)
     print(f"Training TFT: {args.experiment_name}")
@@ -897,9 +1029,6 @@ def train():
     print(f"Logging to: {log_file}")
     print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("="*70)
-    
-    # Save configuration
-    config = save_config(args, features, output_dir)
     
     # Load data
     print("\nLoading data splits...")
@@ -915,7 +1044,10 @@ def train():
     
     # Prepare TFT datasets
     print("\nPreparing TimeSeriesDataSet...")
-    training, validation, raw_vix_train, raw_vix_val = prepare_tft_data(train_df, val_df, args, features)
+    training, validation, raw_vix_train, raw_vix_val, staleness_norm_max = prepare_tft_data(train_df, val_df, args, features)
+
+    # Save configuration
+    config = save_config(args, features, output_dir, staleness_norm_max=staleness_norm_max)
 
     print(f"[DEBUG] VIX train values: {raw_vix_train[0:5]}")
     print(f"[DEBUG] VIX val values: {raw_vix_val[0:5]}")
