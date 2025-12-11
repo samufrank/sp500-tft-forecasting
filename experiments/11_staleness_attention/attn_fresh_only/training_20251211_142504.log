@@ -1,0 +1,2552 @@
+
+[INFO] MPS detected but upsample ops unsupported, using CPU for stability.
+
+[INFO] Patched matplotlib.Axes.errorbar to abs() negative yerr for robustness.
+======================================================================
+Training TFT: 11_staleness_attention/attn_fresh_only
+======================================================================
+Logging to: experiments/11_staleness_attention/attn_fresh_only/training_20251211_142504.log
+Started at: 2025-12-11 14:25:04
+======================================================================
+
+Loading data splits...
+Train: 6074 samples
+Val: 1302 samples
+Test: 1302 samples
+
+Preparing TimeSeriesDataSet...
+
+Adding staleness features to data...
+
+======================================================================
+Adding Staleness Features
+======================================================================
+Vintage mode: Vintage (ALFRED)
+Staleness mode: fresh_only
+
+Processing: Inflation_YoY (detecting from CPI, threshold=0.002)
+  Updates detected: 288 (expected ~292 for monthly)
+  Ratio actual/expected: 0.99x
+
+======================================================================
+Total staleness features added: 1
+Features: ['CPI_is_fresh']
+======================================================================
+
+
+======================================================================
+Adding Staleness Features
+======================================================================
+Vintage mode: Vintage (ALFRED)
+Staleness mode: fresh_only
+
+Processing: Inflation_YoY (detecting from CPI, threshold=0.002)
+  Updates detected: 67 (expected ~62 for monthly)
+  Ratio actual/expected: 1.07x
+
+======================================================================
+Total staleness features added: 1
+Features: ['CPI_is_fresh']
+======================================================================
+
+
+Dropping source columns (used for staleness only): ['CPI']
+
+Final features for TFT: ['SP500_Returns', 'VIX', 'Treasury_10Y', 'Yield_Spread', 'Inflation_YoY', 'CPI_is_fresh']
+
+======================================================================
+FEATURE STATISTICS - BEFORE NORMALIZATION
+======================================================================
+VIX                             mean= 19.7438  std=  8.0295  min=  9.3100  max= 80.8600
+Treasury_10Y                    mean=  4.7672  std=  1.6903  min=  1.4300  max=  8.3600
+Yield_Spread                    mean=  1.2778  std=  0.9179  min= -0.5200  max=  2.9100
+Inflation_YoY                   mean=  2.5322  std=  1.1865  min= -2.1498  max=  6.7300
+CPI_is_fresh                    mean=  0.0474  std=  0.2125  min=  0.0000  max=  1.0000
+
+======================================================================
+FEATURES AFTER GROUPNORMALIZER (first batch, last timestep)
+======================================================================
+VIX                             normalized_value=  1.0000
+Treasury_10Y                    normalized_value= -0.0500
+Yield_Spread                    normalized_value=  0.0817
+Inflation_YoY                   normalized_value=  0.8774
+CPI_is_fresh                    normalized_value= -1.0109
+======================================================================
+
+Configuration saved to: experiments/11_staleness_attention/attn_fresh_only/config.json
+[DEBUG] VIX train values: [28.95 30.38 33.3  31.33 32.63]
+[DEBUG] VIX val values: [14.31 15.15 15.13 12.86 13.85]
+Batches per epoch: 94
+[DEBUG] Validation batches: 21
+[DEBUG] Validation dataset size: 1282
+[DEBUG] Batch size: 64
+
+Initializing model...
+
+Quantile configuration: 7q
+  Quantiles: [0.02, 0.1, 0.25, 0.5, 0.75, 0.9, 0.98]
+  Output size: 7
+  Median index: 3
+
+Using standard QuantileLoss (no penalties)
+
+[REGIME OUTPUT] Disabled (using baseline output layer)
+
+[STALENESS ATTENTION] Replaced attention module:
+  Staleness mode: penalty
+  Staleness decay: prenormalized
+  Staleness weight: 0.5 (learnable)
+  Max days: 45.0
+  Regime mode: disabled
+[STALENESS TRAINING] WARNING: 'days_since_CPI_update' not found in model features
+[STALENESS TRAINING] Available features: ['encoder_length', 'relative_time_idx', 'VIX', 'Treasury_10Y', 'Yield_Spread', 'Inflation_YoY', 'CPI_is_fresh']
+[STALENESS TRAINING] Found 'VIX' at index 2
+
+[STALENESS ATTENTION] Enabled: decay=prenormalized, weight=0.5, learnable=True
+
+================================================================================
+BASELINE MODEL FEATURE CONFIGURATION (after from_dataset)
+================================================================================
+tft.hparams.time_varying_reals_encoder: ['relative_time_idx', 'VIX', 'Treasury_10Y', 'Yield_Spread', 'Inflation_YoY', 'CPI_is_fresh']
+  Count: 6
+
+tft.hparams.time_varying_reals_decoder: ['relative_time_idx']
+  Count: 1
+
+tft.hparams.x_reals (all reals passed to model): ['encoder_length', 'relative_time_idx', 'VIX', 'Treasury_10Y', 'Yield_Spread', 'Inflation_YoY', 'CPI_is_fresh']
+  Count: 7
+
+Encoder VSN configuration:
+  num_inputs: 6
+  input_sizes: {'relative_time_idx': 16, 'VIX': 16, 'Treasury_10Y': 16, 'Yield_Spread': 16, 'Inflation_YoY': 16, 'CPI_is_fresh': 16}
+  flattened_grn.fc1: in_features=96, out_features=6
+  -> Params in fc1: 576 (should be 5*16*5=400 if 5 features)
+================================================================================
+
+Model parameters: 24,002
+
+Starting training...
+Checkpoints will be saved to: experiments/11_staleness_attention/attn_fresh_only/checkpoints/
+Logs will be saved to: experiments/11_staleness_attention/attn_fresh_only/logs/
+
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 0
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 0: val_loss=N/A
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 0
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 0: val_loss=0.7060564756393433
+Epoch 0: train_loss=0.8994390368461609
+
+[CollapseMonitor] Epoch 0
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.004888, range: 0.035677, mean: 0.222118
+  Pos: 100.0%, Neg: 0.0%, Unique: 1227
+  Dir Acc: 54.76%, Pred Sharpe: 721.3181
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch0.npy
+  Gradient norms:
+    lstm_encoder: 0.023936
+    lstm_decoder: 0.022683
+    output_layer: 0.897225
+  VSN output std:
+    encoder: 0.116854
+  Attention entropy: 2.946360
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 1
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 1: val_loss=0.557705283164978
+Epoch 1: train_loss=0.6824787259101868
+
+[CollapseMonitor] Epoch 1
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.003585, range: 0.024977, mean: 0.168831
+  Pos: 100.0%, Neg: 0.0%, Unique: 1196
+  Dir Acc: 54.76%, Pred Sharpe: 747.5019
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch1.npy
+  Gradient norms:
+    lstm_encoder: 0.008958
+    lstm_decoder: 0.011035
+    output_layer: 0.627767
+  VSN output std:
+    encoder: 0.130070
+  Attention entropy: 2.951398
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 2
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 2: val_loss=0.4929192066192627
+Epoch 2: train_loss=0.5662664175033569
+
+[CollapseMonitor] Epoch 2
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.003949, range: 0.025132, mean: 0.080534
+  Pos: 100.0%, Neg: 0.0%, Unique: 1206
+  Dir Acc: 54.76%, Pred Sharpe: 323.7251
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch2.npy
+  Gradient norms:
+    lstm_encoder: 0.005051
+    lstm_decoder: 0.006797
+    output_layer: 0.375086
+  VSN output std:
+    encoder: 0.136809
+  Attention entropy: 2.971212
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 3
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 3: val_loss=0.4651658833026886
+Epoch 3: train_loss=0.49801766872406006
+
+[CollapseMonitor] Epoch 3
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.003497, range: 0.023524, mean: 0.055942
+  Pos: 100.0%, Neg: 0.0%, Unique: 1184
+  Dir Acc: 54.76%, Pred Sharpe: 253.9837
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch3.npy
+  Gradient norms:
+    lstm_encoder: 0.003796
+    lstm_decoder: 0.004812
+    output_layer: 0.198233
+  VSN output std:
+    encoder: 0.133145
+  Attention entropy: 2.989748
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 4
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 4: val_loss=0.4565682113170624
+Epoch 4: train_loss=0.4705524444580078
+
+[CollapseMonitor] Epoch 4
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.003263, range: 0.018402, mean: 0.073365
+  Pos: 100.0%, Neg: 0.0%, Unique: 1172
+  Dir Acc: 54.76%, Pred Sharpe: 356.9092
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch4.npy
+  Gradient norms:
+    lstm_encoder: 0.003082
+    lstm_decoder: 0.003953
+    output_layer: 0.126485
+  VSN output std:
+    encoder: 0.126122
+  Attention entropy: 2.992195
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 5
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 5: val_loss=0.4526897668838501
+Epoch 5: train_loss=0.4614793360233307
+
+[CollapseMonitor] Epoch 5
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.003089, range: 0.017752, mean: 0.024774
+  Pos: 100.0%, Neg: 0.0%, Unique: 1198
+  Dir Acc: 54.76%, Pred Sharpe: 127.3176
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch5.npy
+  Gradient norms:
+    lstm_encoder: 0.002865
+    lstm_decoder: 0.003628
+    output_layer: 0.106520
+  VSN output std:
+    encoder: 0.121068
+  Attention entropy: 2.988734
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 6
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 6: val_loss=0.4521775245666504
+Epoch 6: train_loss=0.45860615372657776
+
+[CollapseMonitor] Epoch 6
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.002877, range: 0.017072, mean: 0.014333
+  Pos: 100.0%, Neg: 0.0%, Unique: 1179
+  Dir Acc: 54.76%, Pred Sharpe: 79.0764
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch6.npy
+  Gradient norms:
+    lstm_encoder: 0.002700
+    lstm_decoder: 0.003522
+    output_layer: 0.100850
+  VSN output std:
+    encoder: 0.120798
+  Attention entropy: 2.986773
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 7
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 7: val_loss=0.45106205344200134
+Epoch 7: train_loss=0.4564485251903534
+
+[CollapseMonitor] Epoch 7
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.002816, range: 0.017898, mean: 0.061700
+  Pos: 100.0%, Neg: 0.0%, Unique: 1171
+  Dir Acc: 54.76%, Pred Sharpe: 347.8336
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch7.npy
+  Gradient norms:
+    lstm_encoder: 0.002956
+    lstm_decoder: 0.003827
+    output_layer: 0.107576
+  VSN output std:
+    encoder: 0.123071
+  Attention entropy: 2.982553
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 8
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 8: val_loss=0.4496753215789795
+Epoch 8: train_loss=0.4548395872116089
+
+[CollapseMonitor] Epoch 8
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.003063, range: 0.021798, mean: 0.030240
+  Pos: 100.0%, Neg: 0.0%, Unique: 1189
+  Dir Acc: 54.76%, Pred Sharpe: 156.7183
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch8.npy
+  Gradient norms:
+    lstm_encoder: 0.002791
+    lstm_decoder: 0.003501
+    output_layer: 0.097458
+  VSN output std:
+    encoder: 0.126393
+  Attention entropy: 2.975443
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 9
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 9: val_loss=0.44822800159454346
+Epoch 9: train_loss=0.4534394145011902
+
+[CollapseMonitor] Epoch 9
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.004950, range: 0.032289, mean: 0.056601
+  Pos: 100.0%, Neg: 0.0%, Unique: 1216
+  Dir Acc: 54.76%, Pred Sharpe: 181.5325
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch9.npy
+  Gradient norms:
+    lstm_encoder: 0.002738
+    lstm_decoder: 0.003353
+    output_layer: 0.093210
+  VSN output std:
+    encoder: 0.124091
+  Attention entropy: 2.965194
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 10
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 10: val_loss=0.43938541412353516
+Epoch 10: train_loss=0.45014581084251404
+
+[CollapseMonitor] Epoch 10
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.025254, range: 0.090398, mean: 0.048167
+  Pos: 100.0%, Neg: 0.0%, Unique: 1274
+  Dir Acc: 54.76%, Pred Sharpe: 30.2780
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch10.npy
+  Gradient norms:
+    lstm_encoder: 0.003152
+    lstm_decoder: 0.003369
+    output_layer: 0.094065
+  VSN output std:
+    encoder: 0.129211
+  Attention entropy: 2.973450
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 11
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 11: val_loss=0.4333878755569458
+Epoch 11: train_loss=0.44594594836235046
+
+[CollapseMonitor] Epoch 11
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.041122, range: 0.137025, mean: 0.104763
+  Pos: 100.0%, Neg: 0.0%, Unique: 1276
+  Dir Acc: 54.76%, Pred Sharpe: 40.4418
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch11.npy
+  Gradient norms:
+    lstm_encoder: 0.003654
+    lstm_decoder: 0.003916
+    output_layer: 0.103258
+  VSN output std:
+    encoder: 0.121492
+  Attention entropy: 2.964625
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 12
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 12: val_loss=0.42948687076568604
+Epoch 12: train_loss=0.44225454330444336
+
+[CollapseMonitor] Epoch 12
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.023998, range: 0.094276, mean: 0.073318
+  Pos: 100.0%, Neg: 0.0%, Unique: 1262
+  Dir Acc: 54.76%, Pred Sharpe: 48.4993
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch12.npy
+  Gradient norms:
+    lstm_encoder: 0.003833
+    lstm_decoder: 0.003942
+    output_layer: 0.102732
+  VSN output std:
+    encoder: 0.113581
+  Attention entropy: 2.958751
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 13
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 13: val_loss=0.4280405640602112
+Epoch 13: train_loss=0.4411263167858124
+
+[CollapseMonitor] Epoch 13
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.025980, range: 0.107841, mean: 0.072866
+  Pos: 99.7%, Neg: 0.3%, Unique: 1274
+  Dir Acc: 54.60%, Pred Sharpe: 44.5229
+  Composite: 0.4234 (dist_match: 0.5507, actual_pos: 54.8%, pred_pos: 99.7%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch13.npy
+  Gradient norms:
+    lstm_encoder: 0.003835
+    lstm_decoder: 0.003867
+    output_layer: 0.097055
+  VSN output std:
+    encoder: 0.112815
+  Attention entropy: 2.962283
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 14
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 14: val_loss=0.4261249899864197
+Epoch 14: train_loss=0.43673449754714966
+
+[CollapseMonitor] Epoch 14
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.020071, range: 0.106557, mean: 0.057093
+  Pos: 98.7%, Neg: 1.3%, Unique: 1260
+  Dir Acc: 54.37%, Pred Sharpe: 45.1566
+  Composite: 0.4243 (dist_match: 0.5608, actual_pos: 54.8%, pred_pos: 98.7%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch14.npy
+  Gradient norms:
+    lstm_encoder: 0.004055
+    lstm_decoder: 0.003915
+    output_layer: 0.098009
+  VSN output std:
+    encoder: 0.111201
+  Attention entropy: 2.954704
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 15
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 15: val_loss=0.4237940013408661
+Epoch 15: train_loss=0.43600723147392273
+
+[CollapseMonitor] Epoch 15
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.019494, range: 0.121871, mean: 0.075921
+  Pos: 100.0%, Neg: 0.0%, Unique: 1272
+  Dir Acc: 54.76%, Pred Sharpe: 61.8245
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch15.npy
+  Gradient norms:
+    lstm_encoder: 0.004253
+    lstm_decoder: 0.004079
+    output_layer: 0.097524
+  VSN output std:
+    encoder: 0.111320
+  Attention entropy: 2.952864
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 16
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 16: val_loss=0.42233091592788696
+Epoch 16: train_loss=0.434073269367218
+
+[CollapseMonitor] Epoch 16
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.022206, range: 0.129622, mean: 0.058589
+  Pos: 99.0%, Neg: 1.0%, Unique: 1265
+  Dir Acc: 54.37%, Pred Sharpe: 41.8829
+  Composite: 0.4235 (dist_match: 0.5577, actual_pos: 54.8%, pred_pos: 99.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch16.npy
+  Gradient norms:
+    lstm_encoder: 0.004475
+    lstm_decoder: 0.004003
+    output_layer: 0.097392
+  VSN output std:
+    encoder: 0.113983
+  Attention entropy: 2.954717
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 17
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 17: val_loss=0.4228101372718811
+Epoch 17: train_loss=0.4345373511314392
+
+[CollapseMonitor] Epoch 17
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.017679, range: 0.123528, mean: 0.076692
+  Pos: 100.0%, Neg: 0.0%, Unique: 1259
+  Dir Acc: 54.76%, Pred Sharpe: 68.8639
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch17.npy
+  Gradient norms:
+    lstm_encoder: 0.004917
+    lstm_decoder: 0.004512
+    output_layer: 0.099983
+  VSN output std:
+    encoder: 0.115850
+  Attention entropy: 2.960884
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 18
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 18: val_loss=0.4190595746040344
+Epoch 18: train_loss=0.4321954548358917
+
+[CollapseMonitor] Epoch 18
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.020568, range: 0.138475, mean: 0.062349
+  Pos: 99.9%, Neg: 0.1%, Unique: 1251
+  Dir Acc: 54.84%, Pred Sharpe: 48.1211
+  Composite: 0.4245 (dist_match: 0.5484, actual_pos: 54.8%, pred_pos: 99.9%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch18.npy
+  Gradient norms:
+    lstm_encoder: 0.005122
+    lstm_decoder: 0.004435
+    output_layer: 0.097775
+  VSN output std:
+    encoder: 0.125504
+  Attention entropy: 2.942018
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 19
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 19: val_loss=0.41912370920181274
+Epoch 19: train_loss=0.43235519528388977
+
+[CollapseMonitor] Epoch 19
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.016293, range: 0.125385, mean: 0.086377
+  Pos: 100.0%, Neg: 0.0%, Unique: 1247
+  Dir Acc: 54.76%, Pred Sharpe: 84.1580
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch19.npy
+  Gradient norms:
+    lstm_encoder: 0.005621
+    lstm_decoder: 0.004646
+    output_layer: 0.094758
+  VSN output std:
+    encoder: 0.127427
+  Attention entropy: 2.947514
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 20
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 20: val_loss=0.41831234097480774
+Epoch 20: train_loss=0.4304600954055786
+
+[CollapseMonitor] Epoch 20
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.017846, range: 0.130076, mean: 0.062863
+  Pos: 100.0%, Neg: 0.0%, Unique: 1258
+  Dir Acc: 54.76%, Pred Sharpe: 55.9178
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch20.npy
+  Gradient norms:
+    lstm_encoder: 0.006095
+    lstm_decoder: 0.005023
+    output_layer: 0.093850
+  VSN output std:
+    encoder: 0.146322
+  Attention entropy: 2.951857
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 21
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 21: val_loss=0.4163455069065094
+Epoch 21: train_loss=0.429149329662323
+
+[CollapseMonitor] Epoch 21
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.014471, range: 0.118714, mean: 0.093467
+  Pos: 100.0%, Neg: 0.0%, Unique: 1252
+  Dir Acc: 54.76%, Pred Sharpe: 102.5317
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch21.npy
+  Gradient norms:
+    lstm_encoder: 0.006838
+    lstm_decoder: 0.005689
+    output_layer: 0.099946
+  VSN output std:
+    encoder: 0.153815
+  Attention entropy: 2.946804
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 22
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 22: val_loss=0.41511133313179016
+Epoch 22: train_loss=0.4286563992500305
+
+[CollapseMonitor] Epoch 22
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.021507, range: 0.133076, mean: 0.051845
+  Pos: 100.0%, Neg: 0.0%, Unique: 1246
+  Dir Acc: 54.76%, Pred Sharpe: 38.2667
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch22.npy
+  Gradient norms:
+    lstm_encoder: 0.006459
+    lstm_decoder: 0.005097
+    output_layer: 0.092916
+  VSN output std:
+    encoder: 0.163157
+  Attention entropy: 2.944479
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 23
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 23: val_loss=0.41408491134643555
+Epoch 23: train_loss=0.4267154037952423
+
+[CollapseMonitor] Epoch 23
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.020497, range: 0.142874, mean: 0.076891
+  Pos: 100.0%, Neg: 0.0%, Unique: 1241
+  Dir Acc: 54.76%, Pred Sharpe: 59.5521
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch23.npy
+  Gradient norms:
+    lstm_encoder: 0.007637
+    lstm_decoder: 0.005882
+    output_layer: 0.098964
+  VSN output std:
+    encoder: 0.165951
+  Attention entropy: 2.924594
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 24
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 24: val_loss=0.413290798664093
+Epoch 24: train_loss=0.4264514148235321
+
+[CollapseMonitor] Epoch 24
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.020782, range: 0.142552, mean: 0.070109
+  Pos: 100.0%, Neg: 0.0%, Unique: 1242
+  Dir Acc: 54.76%, Pred Sharpe: 53.5527
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch24.npy
+  Gradient norms:
+    lstm_encoder: 0.008040
+    lstm_decoder: 0.005934
+    output_layer: 0.099922
+  VSN output std:
+    encoder: 0.173886
+  Attention entropy: 2.930021
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 25
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 25: val_loss=0.41329628229141235
+Epoch 25: train_loss=0.42563480138778687
+
+[CollapseMonitor] Epoch 25
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.019931, range: 0.140880, mean: 0.038014
+  Pos: 99.2%, Neg: 0.8%, Unique: 1238
+  Dir Acc: 54.91%, Pred Sharpe: 30.2777
+  Composite: 0.4271 (dist_match: 0.5554, actual_pos: 54.8%, pred_pos: 99.2%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch25.npy
+  Gradient norms:
+    lstm_encoder: 0.008306
+    lstm_decoder: 0.006140
+    output_layer: 0.103046
+  VSN output std:
+    encoder: 0.174682
+  Attention entropy: 2.937215
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 26
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 26: val_loss=0.4119197428226471
+Epoch 26: train_loss=0.4266936480998993
+
+[CollapseMonitor] Epoch 26
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.016949, range: 0.136748, mean: 0.051212
+  Pos: 99.3%, Neg: 0.7%, Unique: 1247
+  Dir Acc: 54.84%, Pred Sharpe: 47.9656
+  Composite: 0.4262 (dist_match: 0.5546, actual_pos: 54.8%, pred_pos: 99.3%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch26.npy
+  Gradient norms:
+    lstm_encoder: 0.008699
+    lstm_decoder: 0.006635
+    output_layer: 0.105054
+  VSN output std:
+    encoder: 0.179594
+  Attention entropy: 2.931189
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 27
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 27: val_loss=0.4104803204536438
+Epoch 27: train_loss=0.42521119117736816
+
+[CollapseMonitor] Epoch 27
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.022281, range: 0.159016, mean: 0.025802
+  Pos: 98.0%, Neg: 2.0%, Unique: 1234
+  Dir Acc: 54.52%, Pred Sharpe: 18.3834
+  Composite: 0.4272 (dist_match: 0.5671, actual_pos: 54.8%, pred_pos: 98.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch27.npy
+  Gradient norms:
+    lstm_encoder: 0.008227
+    lstm_decoder: 0.006174
+    output_layer: 0.095689
+  VSN output std:
+    encoder: 0.180855
+  Attention entropy: 2.921587
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 28
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 28: val_loss=0.4091356098651886
+Epoch 28: train_loss=0.42626234889030457
+
+[CollapseMonitor] Epoch 28
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.021989, range: 0.155533, mean: 0.059296
+  Pos: 100.0%, Neg: 0.0%, Unique: 1245
+  Dir Acc: 54.76%, Pred Sharpe: 42.8065
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch28.npy
+  Gradient norms:
+    lstm_encoder: 0.008652
+    lstm_decoder: 0.006319
+    output_layer: 0.097108
+  VSN output std:
+    encoder: 0.184591
+  Attention entropy: 2.915614
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 29
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 29: val_loss=0.40877628326416016
+Epoch 29: train_loss=0.4242270588874817
+
+[CollapseMonitor] Epoch 29
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.019478, range: 0.139638, mean: 0.086211
+  Pos: 100.0%, Neg: 0.0%, Unique: 1243
+  Dir Acc: 54.76%, Pred Sharpe: 70.2609
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch29.npy
+  Gradient norms:
+    lstm_encoder: 0.008819
+    lstm_decoder: 0.006579
+    output_layer: 0.096553
+  VSN output std:
+    encoder: 0.191874
+  Attention entropy: 2.923469
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 30
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 30: val_loss=0.40763670206069946
+Epoch 30: train_loss=0.425345242023468
+
+[CollapseMonitor] Epoch 30
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.032223, range: 0.192335, mean: 0.074510
+  Pos: 100.0%, Neg: 0.0%, Unique: 1245
+  Dir Acc: 54.76%, Pred Sharpe: 36.7068
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch30.npy
+  Gradient norms:
+    lstm_encoder: 0.009401
+    lstm_decoder: 0.006955
+    output_layer: 0.094966
+  VSN output std:
+    encoder: 0.189861
+  Attention entropy: 2.915622
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 31
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 31: val_loss=0.4069896936416626
+Epoch 31: train_loss=0.42443838715553284
+
+[CollapseMonitor] Epoch 31
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.029801, range: 0.189173, mean: 0.083578
+  Pos: 100.0%, Neg: 0.0%, Unique: 1249
+  Dir Acc: 54.76%, Pred Sharpe: 44.5205
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch31.npy
+  Gradient norms:
+    lstm_encoder: 0.009574
+    lstm_decoder: 0.006872
+    output_layer: 0.095777
+  VSN output std:
+    encoder: 0.189397
+  Attention entropy: 2.919363
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 32
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 32: val_loss=0.4071815311908722
+Epoch 32: train_loss=0.42398568987846375
+
+[CollapseMonitor] Epoch 32
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.029430, range: 0.200739, mean: 0.040170
+  Pos: 100.0%, Neg: 0.0%, Unique: 1225
+  Dir Acc: 54.76%, Pred Sharpe: 21.6680
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch32.npy
+  Gradient norms:
+    lstm_encoder: 0.010692
+    lstm_decoder: 0.007918
+    output_layer: 0.103334
+  VSN output std:
+    encoder: 0.195161
+  Attention entropy: 2.919808
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 33
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 33: val_loss=0.4069143533706665
+Epoch 33: train_loss=0.4244230091571808
+
+[CollapseMonitor] Epoch 33
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.031074, range: 0.199186, mean: 0.061119
+  Pos: 100.0%, Neg: 0.0%, Unique: 1228
+  Dir Acc: 54.76%, Pred Sharpe: 31.2226
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch33.npy
+  Gradient norms:
+    lstm_encoder: 0.009246
+    lstm_decoder: 0.006633
+    output_layer: 0.099612
+  VSN output std:
+    encoder: 0.196655
+  Attention entropy: 2.919207
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 34
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 34: val_loss=0.40651094913482666
+Epoch 34: train_loss=0.42274945974349976
+
+[CollapseMonitor] Epoch 34
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.030659, range: 0.205749, mean: 0.067693
+  Pos: 100.0%, Neg: 0.0%, Unique: 1249
+  Dir Acc: 54.76%, Pred Sharpe: 35.0497
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch34.npy
+  Gradient norms:
+    lstm_encoder: 0.010770
+    lstm_decoder: 0.007783
+    output_layer: 0.102549
+  VSN output std:
+    encoder: 0.192087
+  Attention entropy: 2.907030
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 35
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 35: val_loss=0.4053359031677246
+Epoch 35: train_loss=0.42345181107521057
+
+[CollapseMonitor] Epoch 35
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.039017, range: 0.248831, mean: 0.069075
+  Pos: 100.0%, Neg: 0.0%, Unique: 1248
+  Dir Acc: 54.76%, Pred Sharpe: 28.1041
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch35.npy
+  Gradient norms:
+    lstm_encoder: 0.010619
+    lstm_decoder: 0.007689
+    output_layer: 0.088384
+  VSN output std:
+    encoder: 0.193562
+  Attention entropy: 2.880826
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 36
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 36: val_loss=0.4054679572582245
+Epoch 36: train_loss=0.4232422709465027
+
+[CollapseMonitor] Epoch 36
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.028199, range: 0.201302, mean: 0.062714
+  Pos: 100.0%, Neg: 0.0%, Unique: 1230
+  Dir Acc: 54.76%, Pred Sharpe: 35.3052
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch36.npy
+  Gradient norms:
+    lstm_encoder: 0.010089
+    lstm_decoder: 0.007592
+    output_layer: 0.102979
+  VSN output std:
+    encoder: 0.208897
+  Attention entropy: 2.897598
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 37
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 37: val_loss=0.4048154354095459
+Epoch 37: train_loss=0.42379748821258545
+
+[CollapseMonitor] Epoch 37
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.036327, range: 0.220949, mean: 0.051898
+  Pos: 100.0%, Neg: 0.0%, Unique: 1240
+  Dir Acc: 54.76%, Pred Sharpe: 22.6793
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch37.npy
+  Gradient norms:
+    lstm_encoder: 0.010214
+    lstm_decoder: 0.007632
+    output_layer: 0.094253
+  VSN output std:
+    encoder: 0.204178
+  Attention entropy: 2.884336
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 38
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 38: val_loss=0.4060875475406647
+Epoch 38: train_loss=0.4225645959377289
+
+[CollapseMonitor] Epoch 38
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.036020, range: 0.220705, mean: 0.056064
+  Pos: 100.0%, Neg: 0.0%, Unique: 1248
+  Dir Acc: 54.76%, Pred Sharpe: 24.7084
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch38.npy
+  Gradient norms:
+    lstm_encoder: 0.011507
+    lstm_decoder: 0.008383
+    output_layer: 0.098895
+  VSN output std:
+    encoder: 0.202062
+  Attention entropy: 2.890410
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 39
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 39: val_loss=0.4046165347099304
+Epoch 39: train_loss=0.4219651222229004
+
+[CollapseMonitor] Epoch 39
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.039388, range: 0.245313, mean: 0.077335
+  Pos: 100.0%, Neg: 0.0%, Unique: 1247
+  Dir Acc: 54.76%, Pred Sharpe: 31.1680
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch39.npy
+  Gradient norms:
+    lstm_encoder: 0.010930
+    lstm_decoder: 0.007713
+    output_layer: 0.094292
+  VSN output std:
+    encoder: 0.206465
+  Attention entropy: 2.894540
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 40
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 40: val_loss=0.4036831855773926
+Epoch 40: train_loss=0.42250382900238037
+
+[CollapseMonitor] Epoch 40
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.033330, range: 0.227249, mean: 0.066793
+  Pos: 100.0%, Neg: 0.0%, Unique: 1246
+  Dir Acc: 54.76%, Pred Sharpe: 31.8126
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch40.npy
+  Gradient norms:
+    lstm_encoder: 0.012763
+    lstm_decoder: 0.009008
+    output_layer: 0.100100
+  VSN output std:
+    encoder: 0.205585
+  Attention entropy: 2.877857
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 41
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 41: val_loss=0.40412238240242004
+Epoch 41: train_loss=0.4225796163082123
+
+[CollapseMonitor] Epoch 41
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.026256, range: 0.198484, mean: 0.065716
+  Pos: 100.0%, Neg: 0.0%, Unique: 1233
+  Dir Acc: 54.76%, Pred Sharpe: 39.7325
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch41.npy
+  Gradient norms:
+    lstm_encoder: 0.012020
+    lstm_decoder: 0.008528
+    output_layer: 0.091946
+  VSN output std:
+    encoder: 0.207833
+  Attention entropy: 2.876057
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 42
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 42: val_loss=0.40473198890686035
+Epoch 42: train_loss=0.4217384159564972
+
+[CollapseMonitor] Epoch 42
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.027658, range: 0.205401, mean: 0.054487
+  Pos: 100.0%, Neg: 0.0%, Unique: 1246
+  Dir Acc: 54.76%, Pred Sharpe: 31.2729
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch42.npy
+  Gradient norms:
+    lstm_encoder: 0.011902
+    lstm_decoder: 0.008461
+    output_layer: 0.104544
+  VSN output std:
+    encoder: 0.209802
+  Attention entropy: 2.867599
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 43
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 43: val_loss=0.4035618007183075
+Epoch 43: train_loss=0.4214807450771332
+
+[CollapseMonitor] Epoch 43
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.027084, range: 0.205080, mean: 0.093745
+  Pos: 100.0%, Neg: 0.0%, Unique: 1241
+  Dir Acc: 54.76%, Pred Sharpe: 54.9454
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch43.npy
+  Gradient norms:
+    lstm_encoder: 0.012290
+    lstm_decoder: 0.008601
+    output_layer: 0.094266
+  VSN output std:
+    encoder: 0.209693
+  Attention entropy: 2.841273
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 44
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 44: val_loss=0.4024730920791626
+Epoch 44: train_loss=0.42096811532974243
+
+[CollapseMonitor] Epoch 44
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.027307, range: 0.213753, mean: 0.080026
+  Pos: 100.0%, Neg: 0.0%, Unique: 1261
+  Dir Acc: 54.76%, Pred Sharpe: 46.5218
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch44.npy
+  Gradient norms:
+    lstm_encoder: 0.013065
+    lstm_decoder: 0.009006
+    output_layer: 0.099678
+  VSN output std:
+    encoder: 0.209613
+  Attention entropy: 2.840019
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 45
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 45: val_loss=0.404787540435791
+Epoch 45: train_loss=0.4216741919517517
+
+[CollapseMonitor] Epoch 45
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.024030, range: 0.192558, mean: 0.072456
+  Pos: 100.0%, Neg: 0.0%, Unique: 1255
+  Dir Acc: 54.76%, Pred Sharpe: 47.8647
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch45.npy
+  Gradient norms:
+    lstm_encoder: 0.012623
+    lstm_decoder: 0.009080
+    output_layer: 0.104865
+  VSN output std:
+    encoder: 0.211203
+  Attention entropy: 2.849529
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 46
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 46: val_loss=0.4058464765548706
+Epoch 46: train_loss=0.4214484989643097
+
+[CollapseMonitor] Epoch 46
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.021719, range: 0.183833, mean: 0.074883
+  Pos: 100.0%, Neg: 0.0%, Unique: 1250
+  Dir Acc: 54.76%, Pred Sharpe: 54.7321
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch46.npy
+  Gradient norms:
+    lstm_encoder: 0.012495
+    lstm_decoder: 0.008433
+    output_layer: 0.094692
+  VSN output std:
+    encoder: 0.211818
+  Attention entropy: 2.852790
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 47
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 47: val_loss=0.40560969710350037
+Epoch 47: train_loss=0.4211524724960327
+
+[CollapseMonitor] Epoch 47
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.020806, range: 0.171264, mean: 0.059625
+  Pos: 100.0%, Neg: 0.0%, Unique: 1252
+  Dir Acc: 54.76%, Pred Sharpe: 45.4921
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch47.npy
+  Gradient norms:
+    lstm_encoder: 0.013164
+    lstm_decoder: 0.009066
+    output_layer: 0.098762
+  VSN output std:
+    encoder: 0.210975
+  Attention entropy: 2.840927
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 48
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 48: val_loss=0.403202623128891
+Epoch 48: train_loss=0.42078912258148193
+
+[CollapseMonitor] Epoch 48
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.018373, range: 0.161364, mean: 0.093183
+  Pos: 100.0%, Neg: 0.0%, Unique: 1258
+  Dir Acc: 54.76%, Pred Sharpe: 80.5094
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch48.npy
+  Gradient norms:
+    lstm_encoder: 0.013762
+    lstm_decoder: 0.009504
+    output_layer: 0.103574
+  VSN output std:
+    encoder: 0.208252
+  Attention entropy: 2.813928
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 49
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 49: val_loss=0.40714728832244873
+Epoch 49: train_loss=0.4201009273529053
+
+[CollapseMonitor] Epoch 49
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.013054, range: 0.089594, mean: 0.069263
+  Pos: 100.0%, Neg: 0.0%, Unique: 1266
+  Dir Acc: 54.76%, Pred Sharpe: 84.2260
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch49.npy
+  Gradient norms:
+    lstm_encoder: 0.014294
+    lstm_decoder: 0.009393
+    output_layer: 0.097913
+  VSN output std:
+    encoder: 0.206689
+  Attention entropy: 2.821065
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 50
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 50: val_loss=0.405860036611557
+Epoch 50: train_loss=0.4212115406990051
+
+[CollapseMonitor] Epoch 50
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.018706, range: 0.132351, mean: 0.043429
+  Pos: 100.0%, Neg: 0.0%, Unique: 1261
+  Dir Acc: 54.76%, Pred Sharpe: 36.8549
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch50.npy
+  Gradient norms:
+    lstm_encoder: 0.014413
+    lstm_decoder: 0.009750
+    output_layer: 0.102613
+  VSN output std:
+    encoder: 0.208212
+  Attention entropy: 2.819234
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 51
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 51: val_loss=0.4057691991329193
+Epoch 51: train_loss=0.4198865592479706
+
+[CollapseMonitor] Epoch 51
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.020052, range: 0.130078, mean: 0.058794
+  Pos: 100.0%, Neg: 0.0%, Unique: 1256
+  Dir Acc: 54.76%, Pred Sharpe: 46.5448
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch51.npy
+  Gradient norms:
+    lstm_encoder: 0.013840
+    lstm_decoder: 0.009467
+    output_layer: 0.102341
+  VSN output std:
+    encoder: 0.206881
+  Attention entropy: 2.820350
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 52
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 52: val_loss=0.4057931900024414
+Epoch 52: train_loss=0.4198283851146698
+
+[CollapseMonitor] Epoch 52
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.023354, range: 0.149680, mean: 0.063248
+  Pos: 100.0%, Neg: 0.0%, Unique: 1265
+  Dir Acc: 54.76%, Pred Sharpe: 42.9926
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch52.npy
+  Gradient norms:
+    lstm_encoder: 0.013853
+    lstm_decoder: 0.009457
+    output_layer: 0.101725
+  VSN output std:
+    encoder: 0.206262
+  Attention entropy: 2.820651
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 53
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 53: val_loss=0.4069781005382538
+Epoch 53: train_loss=0.4192064106464386
+
+[CollapseMonitor] Epoch 53
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.022910, range: 0.145163, mean: 0.045726
+  Pos: 100.0%, Neg: 0.0%, Unique: 1259
+  Dir Acc: 54.76%, Pred Sharpe: 31.6841
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch53.npy
+  Gradient norms:
+    lstm_encoder: 0.013539
+    lstm_decoder: 0.009316
+    output_layer: 0.096185
+  VSN output std:
+    encoder: 0.207111
+  Attention entropy: 2.821873
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 54
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 54: val_loss=0.4062268137931824
+Epoch 54: train_loss=0.42033982276916504
+
+[CollapseMonitor] Epoch 54
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.020500, range: 0.127590, mean: 0.061118
+  Pos: 100.0%, Neg: 0.0%, Unique: 1258
+  Dir Acc: 54.76%, Pred Sharpe: 47.3273
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch54.npy
+  Gradient norms:
+    lstm_encoder: 0.014029
+    lstm_decoder: 0.009783
+    output_layer: 0.098009
+  VSN output std:
+    encoder: 0.206885
+  Attention entropy: 2.821827
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 55
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 55: val_loss=0.4070574641227722
+Epoch 55: train_loss=0.42044225335121155
+
+[CollapseMonitor] Epoch 55
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.019584, range: 0.116784, mean: 0.071641
+  Pos: 100.0%, Neg: 0.0%, Unique: 1267
+  Dir Acc: 54.76%, Pred Sharpe: 58.0697
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch55.npy
+  Gradient norms:
+    lstm_encoder: 0.014567
+    lstm_decoder: 0.009647
+    output_layer: 0.103286
+  VSN output std:
+    encoder: 0.207469
+  Attention entropy: 2.830953
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 56
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 56: val_loss=0.40762168169021606
+Epoch 56: train_loss=0.41991910338401794
+
+[CollapseMonitor] Epoch 56
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.020539, range: 0.119751, mean: 0.057455
+  Pos: 100.0%, Neg: 0.0%, Unique: 1261
+  Dir Acc: 54.76%, Pred Sharpe: 44.4068
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch56.npy
+  Gradient norms:
+    lstm_encoder: 0.015161
+    lstm_decoder: 0.009841
+    output_layer: 0.094543
+  VSN output std:
+    encoder: 0.210359
+  Attention entropy: 2.826455
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 57
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 57: val_loss=0.40726080536842346
+Epoch 57: train_loss=0.41995564103126526
+
+[CollapseMonitor] Epoch 57
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.023210, range: 0.121498, mean: 0.084312
+  Pos: 100.0%, Neg: 0.0%, Unique: 1261
+  Dir Acc: 54.76%, Pred Sharpe: 57.6657
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch57.npy
+  Gradient norms:
+    lstm_encoder: 0.013605
+    lstm_decoder: 0.008907
+    output_layer: 0.092907
+  VSN output std:
+    encoder: 0.211859
+  Attention entropy: 2.826986
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 58
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 58: val_loss=0.4062897562980652
+Epoch 58: train_loss=0.4200337529182434
+
+[CollapseMonitor] Epoch 58
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.024199, range: 0.139138, mean: 0.064881
+  Pos: 100.0%, Neg: 0.0%, Unique: 1262
+  Dir Acc: 54.76%, Pred Sharpe: 42.5623
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch58.npy
+  Gradient norms:
+    lstm_encoder: 0.015171
+    lstm_decoder: 0.010202
+    output_layer: 0.103882
+  VSN output std:
+    encoder: 0.210272
+  Attention entropy: 2.825091
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 59
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 59: val_loss=0.4071550965309143
+Epoch 59: train_loss=0.42003607749938965
+
+[CollapseMonitor] Epoch 59
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.026423, range: 0.147936, mean: 0.064552
+  Pos: 100.0%, Neg: 0.0%, Unique: 1269
+  Dir Acc: 54.76%, Pred Sharpe: 38.7816
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch59.npy
+  Gradient norms:
+    lstm_encoder: 0.016266
+    lstm_decoder: 0.010471
+    output_layer: 0.100519
+  VSN output std:
+    encoder: 0.209330
+  Attention entropy: 2.825197
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 60
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 60: val_loss=0.40676721930503845
+Epoch 60: train_loss=0.41948142647743225
+
+[CollapseMonitor] Epoch 60
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.025633, range: 0.145010, mean: 0.066624
+  Pos: 100.0%, Neg: 0.0%, Unique: 1265
+  Dir Acc: 54.76%, Pred Sharpe: 41.2605
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch60.npy
+  Gradient norms:
+    lstm_encoder: 0.015078
+    lstm_decoder: 0.009697
+    output_layer: 0.094287
+  VSN output std:
+    encoder: 0.209645
+  Attention entropy: 2.823366
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 61
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 61: val_loss=0.4077284038066864
+Epoch 61: train_loss=0.4187471568584442
+
+[CollapseMonitor] Epoch 61
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.024623, range: 0.139752, mean: 0.065311
+  Pos: 100.0%, Neg: 0.0%, Unique: 1262
+  Dir Acc: 54.76%, Pred Sharpe: 42.1054
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch61.npy
+  Gradient norms:
+    lstm_encoder: 0.016341
+    lstm_decoder: 0.010827
+    output_layer: 0.103419
+  VSN output std:
+    encoder: 0.209715
+  Attention entropy: 2.824083
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 62
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 62: val_loss=0.4071386754512787
+Epoch 62: train_loss=0.41918274760246277
+
+[CollapseMonitor] Epoch 62
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.024453, range: 0.139960, mean: 0.067263
+  Pos: 100.0%, Neg: 0.0%, Unique: 1270
+  Dir Acc: 54.76%, Pred Sharpe: 43.6664
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch62.npy
+  Gradient norms:
+    lstm_encoder: 0.016061
+    lstm_decoder: 0.010002
+    output_layer: 0.093210
+  VSN output std:
+    encoder: 0.209269
+  Attention entropy: 2.823362
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 63
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 63: val_loss=0.40678203105926514
+Epoch 63: train_loss=0.4205477833747864
+
+[CollapseMonitor] Epoch 63
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.026053, range: 0.144462, mean: 0.073044
+  Pos: 100.0%, Neg: 0.0%, Unique: 1266
+  Dir Acc: 54.76%, Pred Sharpe: 44.5067
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch63.npy
+  Gradient norms:
+    lstm_encoder: 0.015224
+    lstm_decoder: 0.009751
+    output_layer: 0.101815
+  VSN output std:
+    encoder: 0.209339
+  Attention entropy: 2.824259
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 64
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 64: val_loss=0.40726664662361145
+Epoch 64: train_loss=0.4188823699951172
+
+[CollapseMonitor] Epoch 64
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.025990, range: 0.140220, mean: 0.063370
+  Pos: 100.0%, Neg: 0.0%, Unique: 1272
+  Dir Acc: 54.76%, Pred Sharpe: 38.7068
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch64.npy
+  Gradient norms:
+    lstm_encoder: 0.015305
+    lstm_decoder: 0.009805
+    output_layer: 0.094231
+  VSN output std:
+    encoder: 0.210370
+  Attention entropy: 2.818678
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 65
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 65: val_loss=0.4072883129119873
+Epoch 65: train_loss=0.4189751446247101
+
+[CollapseMonitor] Epoch 65
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.028413, range: 0.151293, mean: 0.071951
+  Pos: 100.0%, Neg: 0.0%, Unique: 1267
+  Dir Acc: 54.76%, Pred Sharpe: 40.1993
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch65.npy
+  Gradient norms:
+    lstm_encoder: 0.016869
+    lstm_decoder: 0.010101
+    output_layer: 0.100572
+  VSN output std:
+    encoder: 0.208586
+  Attention entropy: 2.817943
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 66
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 66: val_loss=0.4069811701774597
+Epoch 66: train_loss=0.4195675551891327
+
+[CollapseMonitor] Epoch 66
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.027513, range: 0.148579, mean: 0.068762
+  Pos: 100.0%, Neg: 0.0%, Unique: 1268
+  Dir Acc: 54.76%, Pred Sharpe: 39.6751
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch66.npy
+  Gradient norms:
+    lstm_encoder: 0.014402
+    lstm_decoder: 0.009262
+    output_layer: 0.095966
+  VSN output std:
+    encoder: 0.206147
+  Attention entropy: 2.812848
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 67
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 67: val_loss=0.4071977734565735
+Epoch 67: train_loss=0.41941264271736145
+
+[CollapseMonitor] Epoch 67
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.026474, range: 0.140157, mean: 0.069043
+  Pos: 100.0%, Neg: 0.0%, Unique: 1270
+  Dir Acc: 54.76%, Pred Sharpe: 41.3999
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch67.npy
+  Gradient norms:
+    lstm_encoder: 0.016569
+    lstm_decoder: 0.010191
+    output_layer: 0.098898
+  VSN output std:
+    encoder: 0.205824
+  Attention entropy: 2.809199
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 68
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 68: val_loss=0.4071284532546997
+Epoch 68: train_loss=0.41909563541412354
+
+[CollapseMonitor] Epoch 68
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.026308, range: 0.138660, mean: 0.071701
+  Pos: 100.0%, Neg: 0.0%, Unique: 1262
+  Dir Acc: 54.76%, Pred Sharpe: 43.2651
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch68.npy
+  Gradient norms:
+    lstm_encoder: 0.016150
+    lstm_decoder: 0.009543
+    output_layer: 0.101177
+  VSN output std:
+    encoder: 0.205758
+  Attention entropy: 2.809521
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 69
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 69: val_loss=0.40677109360694885
+Epoch 69: train_loss=0.4192826747894287
+
+[CollapseMonitor] Epoch 69
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.026106, range: 0.139564, mean: 0.065012
+  Pos: 100.0%, Neg: 0.0%, Unique: 1261
+  Dir Acc: 54.76%, Pred Sharpe: 39.5327
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch69.npy
+  Gradient norms:
+    lstm_encoder: 0.016385
+    lstm_decoder: 0.010251
+    output_layer: 0.103415
+  VSN output std:
+    encoder: 0.205924
+  Attention entropy: 2.811995
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 70
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 70: val_loss=0.40716081857681274
+Epoch 70: train_loss=0.418214350938797
+
+[CollapseMonitor] Epoch 70
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.027381, range: 0.144325, mean: 0.068368
+  Pos: 100.0%, Neg: 0.0%, Unique: 1270
+  Dir Acc: 54.76%, Pred Sharpe: 39.6371
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch70.npy
+  Gradient norms:
+    lstm_encoder: 0.014591
+    lstm_decoder: 0.009038
+    output_layer: 0.094096
+  VSN output std:
+    encoder: 0.205224
+  Attention entropy: 2.813004
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 71
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 71: val_loss=0.4071536660194397
+Epoch 71: train_loss=0.4180908203125
+
+[CollapseMonitor] Epoch 71
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.027292, range: 0.141975, mean: 0.066446
+  Pos: 100.0%, Neg: 0.0%, Unique: 1265
+  Dir Acc: 54.76%, Pred Sharpe: 38.6483
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch71.npy
+  Gradient norms:
+    lstm_encoder: 0.017363
+    lstm_decoder: 0.010335
+    output_layer: 0.103696
+  VSN output std:
+    encoder: 0.205182
+  Attention entropy: 2.811045
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 72
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 72: val_loss=0.40712592005729675
+Epoch 72: train_loss=0.4185311794281006
+
+[CollapseMonitor] Epoch 72
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.028000, range: 0.144563, mean: 0.073673
+  Pos: 100.0%, Neg: 0.0%, Unique: 1267
+  Dir Acc: 54.76%, Pred Sharpe: 41.7685
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch72.npy
+  Gradient norms:
+    lstm_encoder: 0.016775
+    lstm_decoder: 0.010431
+    output_layer: 0.107334
+  VSN output std:
+    encoder: 0.205196
+  Attention entropy: 2.810964
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 73
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 73: val_loss=0.4073006808757782
+Epoch 73: train_loss=0.4187546968460083
+
+[CollapseMonitor] Epoch 73
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.027723, range: 0.143582, mean: 0.069005
+  Pos: 100.0%, Neg: 0.0%, Unique: 1270
+  Dir Acc: 54.76%, Pred Sharpe: 39.5134
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch73.npy
+  Gradient norms:
+    lstm_encoder: 0.016664
+    lstm_decoder: 0.010285
+    output_layer: 0.095185
+  VSN output std:
+    encoder: 0.205041
+  Attention entropy: 2.810201
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 74
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 74: val_loss=0.4072782099246979
+Epoch 74: train_loss=0.4185386300086975
+
+[CollapseMonitor] Epoch 74
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.028567, range: 0.147811, mean: 0.066592
+  Pos: 100.0%, Neg: 0.0%, Unique: 1268
+  Dir Acc: 54.76%, Pred Sharpe: 37.0050
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch74.npy
+  Gradient norms:
+    lstm_encoder: 0.016498
+    lstm_decoder: 0.009688
+    output_layer: 0.099296
+  VSN output std:
+    encoder: 0.205157
+  Attention entropy: 2.807485
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 75
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 75: val_loss=0.4071452021598816
+Epoch 75: train_loss=0.4190816581249237
+
+[CollapseMonitor] Epoch 75
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.028575, range: 0.147313, mean: 0.072270
+  Pos: 100.0%, Neg: 0.0%, Unique: 1270
+  Dir Acc: 54.76%, Pred Sharpe: 40.1490
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch75.npy
+  Gradient norms:
+    lstm_encoder: 0.016394
+    lstm_decoder: 0.010280
+    output_layer: 0.098141
+  VSN output std:
+    encoder: 0.206569
+  Attention entropy: 2.808423
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 76
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 76: val_loss=0.40712711215019226
+Epoch 76: train_loss=0.41914862394332886
+
+[CollapseMonitor] Epoch 76
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.029132, range: 0.149156, mean: 0.070734
+  Pos: 100.0%, Neg: 0.0%, Unique: 1272
+  Dir Acc: 54.76%, Pred Sharpe: 38.5443
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch76.npy
+  Gradient norms:
+    lstm_encoder: 0.017145
+    lstm_decoder: 0.010378
+    output_layer: 0.100482
+  VSN output std:
+    encoder: 0.206997
+  Attention entropy: 2.808615
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 77
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 77: val_loss=0.4069436192512512
+Epoch 77: train_loss=0.41971319913864136
+
+[CollapseMonitor] Epoch 77
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.029075, range: 0.149897, mean: 0.067013
+  Pos: 100.0%, Neg: 0.0%, Unique: 1270
+  Dir Acc: 54.76%, Pred Sharpe: 36.5878
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch77.npy
+  Gradient norms:
+    lstm_encoder: 0.016887
+    lstm_decoder: 0.010266
+    output_layer: 0.100336
+  VSN output std:
+    encoder: 0.206566
+  Attention entropy: 2.806404
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 78
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 78: val_loss=0.40695881843566895
+Epoch 78: train_loss=0.41947197914123535
+
+[CollapseMonitor] Epoch 78
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.028936, range: 0.149003, mean: 0.069694
+  Pos: 100.0%, Neg: 0.0%, Unique: 1274
+  Dir Acc: 54.76%, Pred Sharpe: 38.2348
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch78.npy
+  Gradient norms:
+    lstm_encoder: 0.017026
+    lstm_decoder: 0.009918
+    output_layer: 0.094679
+  VSN output std:
+    encoder: 0.206156
+  Attention entropy: 2.805849
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 79
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 79: val_loss=0.4069714844226837
+Epoch 79: train_loss=0.4187180995941162
+
+[CollapseMonitor] Epoch 79
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.028815, range: 0.148684, mean: 0.071547
+  Pos: 100.0%, Neg: 0.0%, Unique: 1266
+  Dir Acc: 54.76%, Pred Sharpe: 39.4163
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch79.npy
+  Gradient norms:
+    lstm_encoder: 0.017777
+    lstm_decoder: 0.011078
+    output_layer: 0.106410
+  VSN output std:
+    encoder: 0.206373
+  Attention entropy: 2.805719
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 80
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 80: val_loss=0.4070352613925934
+Epoch 80: train_loss=0.41859546303749084
+
+[CollapseMonitor] Epoch 80
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.029323, range: 0.153070, mean: 0.065811
+  Pos: 100.0%, Neg: 0.0%, Unique: 1265
+  Dir Acc: 54.76%, Pred Sharpe: 35.6284
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch80.npy
+  Gradient norms:
+    lstm_encoder: 0.016661
+    lstm_decoder: 0.010517
+    output_layer: 0.098563
+  VSN output std:
+    encoder: 0.206222
+  Attention entropy: 2.805597
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 81
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 81: val_loss=0.407272070646286
+Epoch 81: train_loss=0.41864028573036194
+
+[CollapseMonitor] Epoch 81
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.029190, range: 0.149775, mean: 0.069189
+  Pos: 100.0%, Neg: 0.0%, Unique: 1265
+  Dir Acc: 54.76%, Pred Sharpe: 37.6271
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch81.npy
+  Gradient norms:
+    lstm_encoder: 0.016929
+    lstm_decoder: 0.010032
+    output_layer: 0.097601
+  VSN output std:
+    encoder: 0.206325
+  Attention entropy: 2.806131
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 82
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 82: val_loss=0.4071861505508423
+Epoch 82: train_loss=0.4191313087940216
+
+[CollapseMonitor] Epoch 82
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.028913, range: 0.150794, mean: 0.066359
+  Pos: 100.0%, Neg: 0.0%, Unique: 1266
+  Dir Acc: 54.76%, Pred Sharpe: 36.4336
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch82.npy
+  Gradient norms:
+    lstm_encoder: 0.017128
+    lstm_decoder: 0.010159
+    output_layer: 0.095275
+  VSN output std:
+    encoder: 0.205676
+  Attention entropy: 2.804866
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 83
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 83: val_loss=0.4071515202522278
+Epoch 83: train_loss=0.418938010931015
+
+[CollapseMonitor] Epoch 83
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.028862, range: 0.150417, mean: 0.068004
+  Pos: 100.0%, Neg: 0.0%, Unique: 1272
+  Dir Acc: 54.76%, Pred Sharpe: 37.4033
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch83.npy
+  Gradient norms:
+    lstm_encoder: 0.017916
+    lstm_decoder: 0.011222
+    output_layer: 0.100985
+  VSN output std:
+    encoder: 0.205726
+  Attention entropy: 2.805862
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 84
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 84: val_loss=0.4071907699108124
+Epoch 84: train_loss=0.41799330711364746
+
+[CollapseMonitor] Epoch 84
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.029876, range: 0.154582, mean: 0.067841
+  Pos: 100.0%, Neg: 0.0%, Unique: 1262
+  Dir Acc: 54.76%, Pred Sharpe: 36.0470
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch84.npy
+  Gradient norms:
+    lstm_encoder: 0.017922
+    lstm_decoder: 0.010633
+    output_layer: 0.103873
+  VSN output std:
+    encoder: 0.206021
+  Attention entropy: 2.806822
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 85
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 85: val_loss=0.40724945068359375
+Epoch 85: train_loss=0.41944175958633423
+
+[CollapseMonitor] Epoch 85
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.029968, range: 0.155088, mean: 0.066770
+  Pos: 100.0%, Neg: 0.0%, Unique: 1256
+  Dir Acc: 54.76%, Pred Sharpe: 35.3695
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch85.npy
+  Gradient norms:
+    lstm_encoder: 0.017267
+    lstm_decoder: 0.010190
+    output_layer: 0.095907
+  VSN output std:
+    encoder: 0.206382
+  Attention entropy: 2.808030
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 86
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 86: val_loss=0.40721356868743896
+Epoch 86: train_loss=0.4195197820663452
+
+[CollapseMonitor] Epoch 86
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.029994, range: 0.155619, mean: 0.065965
+  Pos: 100.0%, Neg: 0.0%, Unique: 1263
+  Dir Acc: 54.76%, Pred Sharpe: 34.9125
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch86.npy
+  Gradient norms:
+    lstm_encoder: 0.017449
+    lstm_decoder: 0.010475
+    output_layer: 0.099569
+  VSN output std:
+    encoder: 0.206459
+  Attention entropy: 2.808079
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 87
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 87: val_loss=0.4070969223976135
+Epoch 87: train_loss=0.41891640424728394
+
+[CollapseMonitor] Epoch 87
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.030233, range: 0.156706, mean: 0.068449
+  Pos: 100.0%, Neg: 0.0%, Unique: 1266
+  Dir Acc: 54.76%, Pred Sharpe: 35.9401
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch87.npy
+  Gradient norms:
+    lstm_encoder: 0.018431
+    lstm_decoder: 0.011175
+    output_layer: 0.105275
+  VSN output std:
+    encoder: 0.206221
+  Attention entropy: 2.807543
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 88
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 88: val_loss=0.40709924697875977
+Epoch 88: train_loss=0.41843855381011963
+
+[CollapseMonitor] Epoch 88
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.030376, range: 0.157540, mean: 0.068857
+  Pos: 100.0%, Neg: 0.0%, Unique: 1271
+  Dir Acc: 54.76%, Pred Sharpe: 35.9850
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch88.npy
+  Gradient norms:
+    lstm_encoder: 0.016914
+    lstm_decoder: 0.010415
+    output_layer: 0.093885
+  VSN output std:
+    encoder: 0.206210
+  Attention entropy: 2.807178
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 89
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 89: val_loss=0.40715542435646057
+Epoch 89: train_loss=0.41966986656188965
+
+[CollapseMonitor] Epoch 89
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.030363, range: 0.157704, mean: 0.069607
+  Pos: 100.0%, Neg: 0.0%, Unique: 1269
+  Dir Acc: 54.76%, Pred Sharpe: 36.3921
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch89.npy
+  Gradient norms:
+    lstm_encoder: 0.018995
+    lstm_decoder: 0.011276
+    output_layer: 0.100457
+  VSN output std:
+    encoder: 0.206178
+  Attention entropy: 2.807128
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 90
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 90: val_loss=0.40724945068359375
+Epoch 90: train_loss=0.418282151222229
+
+[CollapseMonitor] Epoch 90
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.029966, range: 0.156077, mean: 0.067859
+  Pos: 100.0%, Neg: 0.0%, Unique: 1273
+  Dir Acc: 54.76%, Pred Sharpe: 35.9483
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch90.npy
+  Gradient norms:
+    lstm_encoder: 0.017195
+    lstm_decoder: 0.010230
+    output_layer: 0.099767
+  VSN output std:
+    encoder: 0.206066
+  Attention entropy: 2.806747
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 91
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 91: val_loss=0.40728187561035156
+Epoch 91: train_loss=0.41770878434181213
+
+[CollapseMonitor] Epoch 91
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.030322, range: 0.157379, mean: 0.068075
+  Pos: 100.0%, Neg: 0.0%, Unique: 1268
+  Dir Acc: 54.76%, Pred Sharpe: 35.6398
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch91.npy
+  Gradient norms:
+    lstm_encoder: 0.018305
+    lstm_decoder: 0.010971
+    output_layer: 0.092978
+  VSN output std:
+    encoder: 0.206228
+  Attention entropy: 2.807396
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 92
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 92: val_loss=0.4072643220424652
+Epoch 92: train_loss=0.41901731491088867
+
+[CollapseMonitor] Epoch 92
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.030373, range: 0.158228, mean: 0.067249
+  Pos: 100.0%, Neg: 0.0%, Unique: 1268
+  Dir Acc: 54.76%, Pred Sharpe: 35.1477
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch92.npy
+  Gradient norms:
+    lstm_encoder: 0.016544
+    lstm_decoder: 0.009683
+    output_layer: 0.096264
+  VSN output std:
+    encoder: 0.206356
+  Attention entropy: 2.807840
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 93
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 93: val_loss=0.40716439485549927
+Epoch 93: train_loss=0.41902902722358704
+
+[CollapseMonitor] Epoch 93
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.030476, range: 0.158782, mean: 0.066838
+  Pos: 100.0%, Neg: 0.0%, Unique: 1270
+  Dir Acc: 54.76%, Pred Sharpe: 34.8147
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch93.npy
+  Gradient norms:
+    lstm_encoder: 0.017186
+    lstm_decoder: 0.009853
+    output_layer: 0.097646
+  VSN output std:
+    encoder: 0.206285
+  Attention entropy: 2.807700
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 94
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 94: val_loss=0.40723398327827454
+Epoch 94: train_loss=0.4178277254104614
+
+[CollapseMonitor] Epoch 94
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.030536, range: 0.158657, mean: 0.067243
+  Pos: 100.0%, Neg: 0.0%, Unique: 1265
+  Dir Acc: 54.76%, Pred Sharpe: 34.9577
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch94.npy
+  Gradient norms:
+    lstm_encoder: 0.017339
+    lstm_decoder: 0.010123
+    output_layer: 0.093755
+  VSN output std:
+    encoder: 0.206403
+  Attention entropy: 2.808042
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 95
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 95: val_loss=0.4072049558162689
+Epoch 95: train_loss=0.4190344214439392
+
+[CollapseMonitor] Epoch 95
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.030538, range: 0.158559, mean: 0.067404
+  Pos: 100.0%, Neg: 0.0%, Unique: 1272
+  Dir Acc: 54.76%, Pred Sharpe: 35.0383
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch95.npy
+  Gradient norms:
+    lstm_encoder: 0.018148
+    lstm_decoder: 0.011275
+    output_layer: 0.102567
+  VSN output std:
+    encoder: 0.206387
+  Attention entropy: 2.807980
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 96
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 96: val_loss=0.40719684958457947
+Epoch 96: train_loss=0.41884157061576843
+
+[CollapseMonitor] Epoch 96
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.030547, range: 0.158410, mean: 0.067614
+  Pos: 100.0%, Neg: 0.0%, Unique: 1267
+  Dir Acc: 54.76%, Pred Sharpe: 35.1379
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch96.npy
+  Gradient norms:
+    lstm_encoder: 0.017644
+    lstm_decoder: 0.010255
+    output_layer: 0.098453
+  VSN output std:
+    encoder: 0.206394
+  Attention entropy: 2.808067
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 97
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 97: val_loss=0.4072294533252716
+Epoch 97: train_loss=0.4186688959598541
+
+[CollapseMonitor] Epoch 97
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.030596, range: 0.158569, mean: 0.067966
+  Pos: 100.0%, Neg: 0.0%, Unique: 1262
+  Dir Acc: 54.76%, Pred Sharpe: 35.2630
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch97.npy
+  Gradient norms:
+    lstm_encoder: 0.015916
+    lstm_decoder: 0.009616
+    output_layer: 0.091912
+  VSN output std:
+    encoder: 0.206427
+  Attention entropy: 2.808158
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 98
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 98: val_loss=0.40714186429977417
+Epoch 98: train_loss=0.4184154272079468
+
+[CollapseMonitor] Epoch 98
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.030553, range: 0.158726, mean: 0.068282
+  Pos: 100.0%, Neg: 0.0%, Unique: 1269
+  Dir Acc: 54.76%, Pred Sharpe: 35.4768
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch98.npy
+  Gradient norms:
+    lstm_encoder: 0.017983
+    lstm_decoder: 0.010930
+    output_layer: 0.101963
+  VSN output std:
+    encoder: 0.206447
+  Attention entropy: 2.807781
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 99
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 99: val_loss=0.4071502387523651
+Epoch 99: train_loss=0.4188801646232605
+
+[CollapseMonitor] Epoch 99
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.030555, range: 0.158963, mean: 0.068444
+  Pos: 100.0%, Neg: 0.0%, Unique: 1266
+  Dir Acc: 54.76%, Pred Sharpe: 35.5594
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/val_predictions_epoch99.npy
+  Gradient norms:
+    lstm_encoder: 0.017000
+    lstm_decoder: 0.009796
+    output_layer: 0.095206
+  VSN output std:
+    encoder: 0.206468
+  Attention entropy: 2.807842
+  Staleness attention weight: 0.5000 (decay=prenormalized)
+  Staleness weight grad: not captured
+  Saved to: experiments/11_staleness_attention/attn_fresh_only/collapse_monitoring/collapse_monitor_latest.json
+
+
+======================================================================
+Training complete
+======================================================================
+
+Best val_loss checkpoint: experiments/11_staleness_attention/attn_fresh_only/checkpoints/tft-epoch=epoch=44-valloss=val_loss=0.4025.ckpt
+Best validation loss: 0.402473
+Checkpoints saved:
+  - Best val_loss: experiments/11_staleness_attention/attn_fresh_only/checkpoints/tft-epoch=epoch=44-valloss=val_loss=0.4025.ckpt
+  - Best pred_std: experiments/11_staleness_attention/attn_fresh_only/checkpoints/tft-epoch=epoch=11-predstd=val_pred_std=0.0411.ckpt
+  - Best unique: experiments/11_staleness_attention/attn_fresh_only/checkpoints/tft-epoch=epoch=11-unique=val_num_unique=1276.ckpt
+  - Best dir_acc: experiments/11_staleness_attention/attn_fresh_only/checkpoints/tft-epoch=epoch=25-diracc=val_dir_acc=0.5491.ckpt
+  - Best sharpe: experiments/11_staleness_attention/attn_fresh_only/checkpoints/tft-epoch=epoch=01-sharpe=val_sharpe=747.5019.ckpt
+  - Best composite: experiments/11_staleness_attention/attn_fresh_only/checkpoints/tft-epoch=epoch=27-composite=val_composite=0.4272.ckpt
+Completed at: 2025-12-11 14:30:53
+Log saved to: experiments/11_staleness_attention/attn_fresh_only/training_20251211_142504.log
+======================================================================
