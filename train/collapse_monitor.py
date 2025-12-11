@@ -85,15 +85,17 @@ class CollapseMonitor(Callback):
                 if not hasattr(self, '_regime_gate_grads_epoch'):
                     self._regime_gate_grads_epoch = []
                 self._regime_gate_grads_epoch.append(param.grad.clone().cpu())
-            
-            """
-            if 'regime_gates' in name and param.grad is not None:
-                param.grad *= 100  # Amplify gradient
-                print(f"[DEBUG] regime_gates grad (amplified): {param.grad}")
-    
-            if 'regime_gates' in name:
-                print(f"[DEBUG] regime_gates grad in optimizer step: {param.grad}")
-            """
+        
+        # Staleness weight gradient
+        if hasattr(pl_module, 'multihead_attn') and hasattr(pl_module.multihead_attn, '_staleness_log_weight'):
+            staleness_param = pl_module.multihead_attn._staleness_log_weight
+            #print(f"[DEBUG] staleness_param.grad = {staleness_param.grad}")
+            if staleness_param.grad is not None:
+                if 'staleness_weight_grad' not in self._current_epoch_gradients:
+                    self._current_epoch_gradients['staleness_weight_grad'] = []
+                self._current_epoch_gradients['staleness_weight_grad'].append(staleness_param.grad.item())
+                #print(f"[DEBUG] Appended staleness grad, list len={len(self._current_epoch_gradients['staleness_weight_grad'])}")
+
 
     def on_validation_epoch_start(self, trainer, pl_module):
         """Reset temporal state in loss function before validation epoch."""
@@ -136,6 +138,12 @@ class CollapseMonitor(Callback):
 
         # 8. Regime attention diagnostics (if regime attention enabled)
         self._log_regime_attention_diagnostics(pl_module)
+
+        # 9. Staleness attention diagnostics (if staleness attention enabled)
+        self._log_staleness_attention_diagnostics(pl_module)
+
+        # clear gradient buffer
+        self._current_epoch_gradients = {}
         
         # Save to disk
         self._save_history(trainer.current_epoch)
@@ -441,7 +449,7 @@ class CollapseMonitor(Callback):
             self._regime_gate_grads_epoch = []  # Reset for next epoch
 
         # Clear buffer for next epoch
-        self._current_epoch_gradients = {}
+        #self._current_epoch_gradients = {}
                 
     def _log_weight_statistics(self, pl_module):
         """Log weight matrix statistics."""
@@ -631,6 +639,58 @@ class CollapseMonitor(Callback):
         self.history['regime_attention_gate_values'].append(gate_values.tolist())
         
         print(f"  Regime attention gates: {gate_values.tolist()}")
+
+    def _log_staleness_attention_diagnostics(self, pl_module):
+        """Log staleness attention diagnostics if enabled."""
+        if not hasattr(pl_module, 'multihead_attn'):
+            return
+        
+        attn = pl_module.multihead_attn
+        
+        if not hasattr(attn, 'staleness_mode'):
+            return
+        if attn.staleness_mode == 'disabled':
+            return
+        
+        # Initialize history tracking
+        if 'staleness_attention' not in self.history:
+            self.history['staleness_attention'] = {
+                'weight': [],
+                'penalty_mean': [],
+                'penalty_max': [],
+                'weight_grad': []
+            }
+        
+        # Log current weight value
+        staleness_weight = attn.staleness_weight
+        self.history['staleness_attention']['weight'].append(staleness_weight)
+        print(f"  Staleness attention weight: {staleness_weight:.4f} (decay={attn.staleness_decay})")
+        
+        # Log penalty statistics if cached
+        if attn._cached_staleness_penalty is not None:
+            penalty = attn._cached_staleness_penalty
+            penalty_mean = penalty.mean().item()
+            penalty_max = penalty.max().item()
+            self.history['staleness_attention']['penalty_mean'].append(penalty_mean)
+            self.history['staleness_attention']['penalty_max'].append(penalty_max)
+            print(f"  Staleness penalty - mean: {penalty_mean:.4f}, max: {penalty_max:.4f}")
+        else:
+            self.history['staleness_attention']['penalty_mean'].append(None)
+            self.history['staleness_attention']['penalty_max'].append(None)
+        
+        # Read gradient from captured buffer (not from param.grad which is cleared)
+        if 'staleness_weight_grad' in self._current_epoch_gradients:
+            grads = self._current_epoch_gradients['staleness_weight_grad']
+            #print(f"[DEBUG] _current_epoch_gradients keys: {list(self._current_epoch_gradients.keys())}")
+            if grads:
+                avg_grad = sum(grads) / len(grads)
+                self.history['staleness_attention']['weight_grad'].append(avg_grad)
+                print(f"  Staleness weight grad (log-space, epoch avg): {avg_grad:.6f}")
+            else:
+                self.history['staleness_attention']['weight_grad'].append(None)
+        else:
+            self.history['staleness_attention']['weight_grad'].append(None)
+            print(f"  Staleness weight grad: not captured")
 
     def _log_regime_diagnostics(self, trainer, pl_module):
         """

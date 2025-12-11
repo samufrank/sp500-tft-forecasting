@@ -1,0 +1,2963 @@
+
+[INFO] MPS detected but upsample ops unsupported, using CPU for stability.
+
+[INFO] Patched matplotlib.Axes.errorbar to abs() negative yerr for robustness.
+======================================================================
+Training TFT: 11_staleness_attention/attn_regime_combined
+======================================================================
+Logging to: experiments/11_staleness_attention/attn_regime_combined/training_20251210_181434.log
+Started at: 2025-12-10 18:14:34
+======================================================================
+
+Loading data splits...
+Train: 6074 samples
+Val: 1302 samples
+Test: 1302 samples
+
+Preparing TimeSeriesDataSet...
+
+Adding staleness features to data...
+
+======================================================================
+Adding Staleness Features
+======================================================================
+Mode: Vintage (ALFRED)
+
+Processing: Inflation_YoY (detecting from CPI)
+  Updates detected: 285
+  Avg days stale: 11.3
+  Max days stale: 64
+
+======================================================================
+Total staleness features added: 2
+======================================================================
+
+
+======================================================================
+Adding Staleness Features
+======================================================================
+Mode: Vintage (ALFRED)
+
+Processing: Inflation_YoY (detecting from CPI)
+  Updates detected: 66
+  Avg days stale: 9.8
+  Max days stale: 22
+
+======================================================================
+Total staleness features added: 2
+======================================================================
+
+
+Dropping source columns (used for staleness only): ['CPI']
+
+Final features for TFT: ['SP500_Returns', 'VIX', 'Treasury_10Y', 'Yield_Spread', 'Inflation_YoY', 'days_since_CPI_update', 'CPI_is_fresh']
+
+======================================================================
+FEATURE STATISTICS - BEFORE NORMALIZATION
+======================================================================
+VIX                             mean= 19.7438  std=  8.0295  min=  9.3100  max= 80.8600
+Treasury_10Y                    mean=  4.7672  std=  1.6903  min=  1.4300  max=  8.3600
+Yield_Spread                    mean=  1.2778  std=  0.9179  min= -0.5200  max=  2.9100
+Inflation_YoY                   mean=  2.5322  std=  1.1865  min= -2.1498  max=  6.7300
+days_since_CPI_update           mean= 11.2825  std=  8.3332  min=  0.0000  max= 64.0000
+CPI_is_fresh                    mean=  0.0469  std=  0.2115  min=  0.0000  max=  1.0000
+
+======================================================================
+NORMALIZING STALENESS FEATURES (log transform)
+======================================================================
+Max staleness observed: train=64, val=22
+Using normalization max: 69 days
+
+
+STALENESS FEATURES - AFTER MANUAL NORMALIZATION
+days_since_CPI_update           mean=  0.5239  std=  0.1997  min=  0.0000  max=  0.9826
+
+======================================================================
+FEATURES AFTER GROUPNORMALIZER (first batch, last timestep)
+======================================================================
+VIX                             normalized_value=  1.0000
+Treasury_10Y                    normalized_value= -0.0500
+Yield_Spread                    normalized_value=  0.0817
+Inflation_YoY                   normalized_value=  0.8774
+days_since_CPI_update           normalized_value= -1.0109
+CPI_is_fresh                    normalized_value= -0.3055
+======================================================================
+
+Configuration saved to: experiments/11_staleness_attention/attn_regime_combined/config.json
+[DEBUG] VIX train values: [28.95 30.38 33.3  31.33 32.63]
+[DEBUG] VIX val values: [14.31 15.15 15.13 12.86 13.85]
+Batches per epoch: 94
+[DEBUG] Validation batches: 21
+[DEBUG] Validation dataset size: 1282
+[DEBUG] Batch size: 64
+
+Initializing model...
+
+Quantile configuration: 7q
+  Quantiles: [0.02, 0.1, 0.25, 0.5, 0.75, 0.9, 0.98]
+  Output size: 7
+  Median index: 3
+
+Using standard QuantileLoss (no penalties)
+
+[REGIME OUTPUT] Disabled (using baseline output layer)
+
+[STALENESS ATTENTION] Replaced attention module:
+  Staleness mode: penalty
+  Staleness decay: prenormalized
+  Staleness weight: 0.5 (learnable)
+  Max days: 45.0
+  Regime mode: vix_threshold
+  VIX threshold: 25.0
+  Regime gates: 2 × 2
+[STALENESS TRAINING] Found 'days_since_CPI_update' at index 6
+[STALENESS TRAINING] Found 'VIX' at index 2
+
+[STALENESS ATTENTION] Enabled: decay=prenormalized, weight=0.5, learnable=True, regime_mode=vix_threshold
+
+================================================================================
+BASELINE MODEL FEATURE CONFIGURATION (after from_dataset)
+================================================================================
+tft.hparams.time_varying_reals_encoder: ['relative_time_idx', 'VIX', 'Treasury_10Y', 'Yield_Spread', 'Inflation_YoY', 'days_since_CPI_update', 'CPI_is_fresh']
+  Count: 7
+
+tft.hparams.time_varying_reals_decoder: ['relative_time_idx']
+  Count: 1
+
+tft.hparams.x_reals (all reals passed to model): ['encoder_length', 'relative_time_idx', 'VIX', 'Treasury_10Y', 'Yield_Spread', 'Inflation_YoY', 'days_since_CPI_update', 'CPI_is_fresh']
+  Count: 8
+
+Encoder VSN configuration:
+  num_inputs: 7
+  input_sizes: {'relative_time_idx': 16, 'VIX': 16, 'Treasury_10Y': 16, 'Yield_Spread': 16, 'Inflation_YoY': 16, 'days_since_CPI_update': 16, 'CPI_is_fresh': 16}
+  flattened_grn.fc1: in_features=112, out_features=7
+  -> Params in fc1: 784 (should be 5*16*5=400 if 5 features)
+================================================================================
+
+Model parameters: 25,430
+
+Starting training...
+Checkpoints will be saved to: experiments/11_staleness_attention/attn_regime_combined/checkpoints/
+Logs will be saved to: experiments/11_staleness_attention/attn_regime_combined/logs/
+
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 0
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 0: val_loss=N/A
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 0
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 0: val_loss=0.6401273012161255
+Epoch 0: train_loss=0.7720193862915039
+
+[CollapseMonitor] Epoch 0
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.014162, range: 0.090190, mean: 0.009271
+  Pos: 80.6%, Neg: 19.4%, Unique: 1237
+  Dir Acc: 52.65%, Pred Sharpe: 10.3916
+  Composite: 0.4585 (dist_match: 0.7418, actual_pos: 54.8%, pred_pos: 80.6%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch0.npy
+  Gradient norms:
+    lstm_encoder: 0.020984
+    lstm_decoder: 0.021908
+    output_layer: 0.747307
+  Regime gate grads (epoch avg): tensor([[-0.1059, -0.0750],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.153745
+  Attention entropy: 2.980212
+  Regime attention gates: [[0.5051941871643066, 0.5017725825309753], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4986 (decay=prenormalized)
+  Staleness penalty - mean: 0.1723, max: 0.4986
+  Staleness weight grad (log-space, epoch avg): 0.022772
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 1
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 1: val_loss=0.5412755012512207
+Epoch 1: train_loss=0.6338602900505066
+
+[CollapseMonitor] Epoch 1
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.009060, range: 0.055146, mean: 0.106232
+  Pos: 100.0%, Neg: 0.0%, Unique: 1212
+  Dir Acc: 54.76%, Pred Sharpe: 186.1254
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch1.npy
+  Gradient norms:
+    lstm_encoder: 0.010711
+    lstm_decoder: 0.010619
+    output_layer: 0.509474
+  Regime gate grads (epoch avg): tensor([[-0.0492, -0.0375],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.154589
+  Attention entropy: 2.982662
+  Regime attention gates: [[0.5059074759483337, 0.5023851990699768], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4970 (decay=prenormalized)
+  Staleness penalty - mean: 0.1718, max: 0.4970
+  Staleness weight grad (log-space, epoch avg): 0.006162
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 2
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 2: val_loss=0.4977707266807556
+Epoch 2: train_loss=0.5473471283912659
+
+[CollapseMonitor] Epoch 2
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.006919, range: 0.037408, mean: 0.075443
+  Pos: 100.0%, Neg: 0.0%, Unique: 1229
+  Dir Acc: 54.76%, Pred Sharpe: 173.0892
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch2.npy
+  Gradient norms:
+    lstm_encoder: 0.005330
+    lstm_decoder: 0.004786
+    output_layer: 0.321166
+  Regime gate grads (epoch avg): tensor([[-0.0397, -0.0391],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.141135
+  Attention entropy: 2.978656
+  Regime attention gates: [[0.5069525241851807, 0.5035029649734497], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4965 (decay=prenormalized)
+  Staleness penalty - mean: 0.1716, max: 0.4965
+  Staleness weight grad (log-space, epoch avg): 0.000722
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 3
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 3: val_loss=0.47113651037216187
+Epoch 3: train_loss=0.5036672353744507
+
+[CollapseMonitor] Epoch 3
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.004993, range: 0.025275, mean: 0.053770
+  Pos: 100.0%, Neg: 0.0%, Unique: 1227
+  Dir Acc: 54.76%, Pred Sharpe: 170.9582
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch3.npy
+  Gradient norms:
+    lstm_encoder: 0.003803
+    lstm_decoder: 0.003246
+    output_layer: 0.213197
+  Regime gate grads (epoch avg): tensor([[-0.0217, -0.0207],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.131081
+  Attention entropy: 2.975182
+  Regime attention gates: [[0.5077991485595703, 0.5043817758560181], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4959 (decay=prenormalized)
+  Staleness penalty - mean: 0.1714, max: 0.4959
+  Staleness weight grad (log-space, epoch avg): 0.000746
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 4
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 4: val_loss=0.45915481448173523
+Epoch 4: train_loss=0.4786134958267212
+
+[CollapseMonitor] Epoch 4
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.002651, range: 0.014199, mean: 0.053681
+  Pos: 100.0%, Neg: 0.0%, Unique: 1189
+  Dir Acc: 54.76%, Pred Sharpe: 321.4274
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch4.npy
+  Gradient norms:
+    lstm_encoder: 0.003122
+    lstm_decoder: 0.002658
+    output_layer: 0.154004
+  Regime gate grads (epoch avg): tensor([[-0.0252, -0.0256],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.145811
+  Attention entropy: 2.979281
+  Regime attention gates: [[0.5087494850158691, 0.5054198503494263], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4963 (decay=prenormalized)
+  Staleness penalty - mean: 0.1715, max: 0.4963
+  Staleness weight grad (log-space, epoch avg): 0.000167
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 5
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 5: val_loss=0.45391103625297546
+Epoch 5: train_loss=0.46666428446769714
+
+[CollapseMonitor] Epoch 5
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.002248, range: 0.013733, mean: 0.022715
+  Pos: 100.0%, Neg: 0.0%, Unique: 1169
+  Dir Acc: 54.76%, Pred Sharpe: 160.4005
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch5.npy
+  Gradient norms:
+    lstm_encoder: 0.002655
+    lstm_decoder: 0.002233
+    output_layer: 0.123465
+  Regime gate grads (epoch avg): tensor([[-0.0145, -0.0157],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.148061
+  Attention entropy: 2.980211
+  Regime attention gates: [[0.5094615817070007, 0.5062559843063354], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4957 (decay=prenormalized)
+  Staleness penalty - mean: 0.1713, max: 0.4957
+  Staleness weight grad (log-space, epoch avg): 0.000380
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 6
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 6: val_loss=0.45059308409690857
+Epoch 6: train_loss=0.4592464566230774
+
+[CollapseMonitor] Epoch 6
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.003174, range: 0.020564, mean: 0.070321
+  Pos: 100.0%, Neg: 0.0%, Unique: 1209
+  Dir Acc: 54.76%, Pred Sharpe: 351.6668
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch6.npy
+  Gradient norms:
+    lstm_encoder: 0.002514
+    lstm_decoder: 0.002066
+    output_layer: 0.105210
+  Regime gate grads (epoch avg): tensor([[-0.0185, -0.0192],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.136304
+  Attention entropy: 2.979211
+  Regime attention gates: [[0.5106167197227478, 0.5075066089630127], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4947 (decay=prenormalized)
+  Staleness penalty - mean: 0.1710, max: 0.4947
+  Staleness weight grad (log-space, epoch avg): 0.000603
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 7
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 7: val_loss=0.4457162618637085
+Epoch 7: train_loss=0.4547807276248932
+
+[CollapseMonitor] Epoch 7
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.006355, range: 0.040762, mean: 0.055103
+  Pos: 100.0%, Neg: 0.0%, Unique: 1249
+  Dir Acc: 54.76%, Pred Sharpe: 137.6499
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch7.npy
+  Gradient norms:
+    lstm_encoder: 0.002653
+    lstm_decoder: 0.002112
+    output_layer: 0.108357
+  Regime gate grads (epoch avg): tensor([[-0.0324, -0.0358],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.123809
+  Attention entropy: 2.969623
+  Regime attention gates: [[0.5126907825469971, 0.5099385976791382], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4929 (decay=prenormalized)
+  Staleness penalty - mean: 0.1703, max: 0.4929
+  Staleness weight grad (log-space, epoch avg): 0.001040
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 8
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 8: val_loss=0.43823888897895813
+Epoch 8: train_loss=0.4490929841995239
+
+[CollapseMonitor] Epoch 8
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.014060, range: 0.069863, mean: 0.028133
+  Pos: 99.2%, Neg: 0.8%, Unique: 1255
+  Dir Acc: 54.60%, Pred Sharpe: 31.7639
+  Composite: 0.4246 (dist_match: 0.5554, actual_pos: 54.8%, pred_pos: 99.2%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch8.npy
+  Gradient norms:
+    lstm_encoder: 0.002470
+    lstm_decoder: 0.001990
+    output_layer: 0.097390
+  Regime gate grads (epoch avg): tensor([[-0.0370, -0.0383],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.112064
+  Attention entropy: 2.934305
+  Regime attention gates: [[0.5154627561569214, 0.5128613114356995], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4914 (decay=prenormalized)
+  Staleness penalty - mean: 0.1698, max: 0.4914
+  Staleness weight grad (log-space, epoch avg): 0.001578
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 9
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 9: val_loss=0.43431413173675537
+Epoch 9: train_loss=0.44617530703544617
+
+[CollapseMonitor] Epoch 9
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.017062, range: 0.074598, mean: 0.056881
+  Pos: 100.0%, Neg: 0.0%, Unique: 1258
+  Dir Acc: 54.76%, Pred Sharpe: 52.9218
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch9.npy
+  Gradient norms:
+    lstm_encoder: 0.002508
+    lstm_decoder: 0.002077
+    output_layer: 0.098815
+  Regime gate grads (epoch avg): tensor([[-0.0251, -0.0265],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.112151
+  Attention entropy: 2.924147
+  Regime attention gates: [[0.5170497894287109, 0.5146726965904236], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4907 (decay=prenormalized)
+  Staleness penalty - mean: 0.1696, max: 0.4907
+  Staleness weight grad (log-space, epoch avg): 0.001486
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 10
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 10: val_loss=0.4324479401111603
+Epoch 10: train_loss=0.4443262815475464
+
+[CollapseMonitor] Epoch 10
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.007650, range: 0.039166, mean: 0.084042
+  Pos: 100.0%, Neg: 0.0%, Unique: 1239
+  Dir Acc: 54.76%, Pred Sharpe: 174.3954
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch10.npy
+  Gradient norms:
+    lstm_encoder: 0.002619
+    lstm_decoder: 0.002211
+    output_layer: 0.101154
+  Regime gate grads (epoch avg): tensor([[-0.0311, -0.0321],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.108224
+  Attention entropy: 2.923189
+  Regime attention gates: [[0.518585741519928, 0.51638263463974], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4890 (decay=prenormalized)
+  Staleness penalty - mean: 0.1690, max: 0.4890
+  Staleness weight grad (log-space, epoch avg): -0.000048
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 11
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 11: val_loss=0.4312293827533722
+Epoch 11: train_loss=0.4415571391582489
+
+[CollapseMonitor] Epoch 11
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.007697, range: 0.040185, mean: 0.063042
+  Pos: 100.0%, Neg: 0.0%, Unique: 1250
+  Dir Acc: 54.76%, Pred Sharpe: 130.0251
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch11.npy
+  Gradient norms:
+    lstm_encoder: 0.002742
+    lstm_decoder: 0.002270
+    output_layer: 0.109310
+  Regime gate grads (epoch avg): tensor([[-0.0313, -0.0295],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.104590
+  Attention entropy: 2.930309
+  Regime attention gates: [[0.5194879174232483, 0.5173880457878113], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4896 (decay=prenormalized)
+  Staleness penalty - mean: 0.1692, max: 0.4896
+  Staleness weight grad (log-space, epoch avg): 0.002516
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 12
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 12: val_loss=0.43018341064453125
+Epoch 12: train_loss=0.4408498704433441
+
+[CollapseMonitor] Epoch 12
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.006644, range: 0.031478, mean: 0.068297
+  Pos: 100.0%, Neg: 0.0%, Unique: 1243
+  Dir Acc: 54.76%, Pred Sharpe: 163.1754
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch12.npy
+  Gradient norms:
+    lstm_encoder: 0.002477
+    lstm_decoder: 0.002104
+    output_layer: 0.099235
+  Regime gate grads (epoch avg): tensor([[-0.0214, -0.0179],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.100670
+  Attention entropy: 2.930866
+  Regime attention gates: [[0.5206605792045593, 0.5184293389320374], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4898 (decay=prenormalized)
+  Staleness penalty - mean: 0.1693, max: 0.4898
+  Staleness weight grad (log-space, epoch avg): 0.000564
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 13
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 13: val_loss=0.4286094903945923
+Epoch 13: train_loss=0.43960389494895935
+
+[CollapseMonitor] Epoch 13
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.007943, range: 0.035144, mean: 0.073597
+  Pos: 100.0%, Neg: 0.0%, Unique: 1236
+  Dir Acc: 54.76%, Pred Sharpe: 147.0934
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch13.npy
+  Gradient norms:
+    lstm_encoder: 0.002763
+    lstm_decoder: 0.002261
+    output_layer: 0.102853
+  Regime gate grads (epoch avg): tensor([[-0.0331, -0.0276],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.100915
+  Attention entropy: 2.926949
+  Regime attention gates: [[0.5222482085227966, 0.519828736782074], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4891 (decay=prenormalized)
+  Staleness penalty - mean: 0.1690, max: 0.4891
+  Staleness weight grad (log-space, epoch avg): 0.001708
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 14
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 14: val_loss=0.4274652898311615
+Epoch 14: train_loss=0.43544286489486694
+
+[CollapseMonitor] Epoch 14
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.014777, range: 0.050600, mean: 0.032105
+  Pos: 99.9%, Neg: 0.1%, Unique: 1246
+  Dir Acc: 54.68%, Pred Sharpe: 34.4904
+  Composite: 0.4233 (dist_match: 0.5484, actual_pos: 54.8%, pred_pos: 99.9%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch14.npy
+  Gradient norms:
+    lstm_encoder: 0.002933
+    lstm_decoder: 0.002281
+    output_layer: 0.095560
+  Regime gate grads (epoch avg): tensor([[-0.0206, -0.0210],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.099484
+  Attention entropy: 2.924742
+  Regime attention gates: [[0.522659420967102, 0.5204036831855774], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4875 (decay=prenormalized)
+  Staleness penalty - mean: 0.1685, max: 0.4875
+  Staleness weight grad (log-space, epoch avg): 0.002278
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 15
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 15: val_loss=0.4240275025367737
+Epoch 15: train_loss=0.4361378252506256
+
+[CollapseMonitor] Epoch 15
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.013326, range: 0.048755, mean: 0.080026
+  Pos: 100.0%, Neg: 0.0%, Unique: 1255
+  Dir Acc: 54.76%, Pred Sharpe: 95.3295
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch15.npy
+  Gradient norms:
+    lstm_encoder: 0.003039
+    lstm_decoder: 0.002461
+    output_layer: 0.099525
+  Regime gate grads (epoch avg): tensor([[-0.0484, -0.0516],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.102867
+  Attention entropy: 2.906862
+  Regime attention gates: [[0.5241914391517639, 0.5220733284950256], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4851 (decay=prenormalized)
+  Staleness penalty - mean: 0.1677, max: 0.4851
+  Staleness weight grad (log-space, epoch avg): 0.003802
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 16
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 16: val_loss=0.4233625531196594
+Epoch 16: train_loss=0.43414273858070374
+
+[CollapseMonitor] Epoch 16
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.011566, range: 0.043835, mean: 0.051334
+  Pos: 100.0%, Neg: 0.0%, Unique: 1253
+  Dir Acc: 54.76%, Pred Sharpe: 70.4546
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch16.npy
+  Gradient norms:
+    lstm_encoder: 0.003275
+    lstm_decoder: 0.002464
+    output_layer: 0.096338
+  Regime gate grads (epoch avg): tensor([[-0.0244, -0.0217],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.100490
+  Attention entropy: 2.912961
+  Regime attention gates: [[0.5251018404960632, 0.5229926705360413], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4843 (decay=prenormalized)
+  Staleness penalty - mean: 0.1674, max: 0.4843
+  Staleness weight grad (log-space, epoch avg): 0.001969
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 17
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 17: val_loss=0.4223662316799164
+Epoch 17: train_loss=0.43347057700157166
+
+[CollapseMonitor] Epoch 17
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.013389, range: 0.059802, mean: 0.087662
+  Pos: 100.0%, Neg: 0.0%, Unique: 1256
+  Dir Acc: 54.76%, Pred Sharpe: 103.9333
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch17.npy
+  Gradient norms:
+    lstm_encoder: 0.003569
+    lstm_decoder: 0.002634
+    output_layer: 0.097914
+  Regime gate grads (epoch avg): tensor([[-0.0191, -0.0272],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.097749
+  Attention entropy: 2.912111
+  Regime attention gates: [[0.5256715416908264, 0.5237413644790649], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4839 (decay=prenormalized)
+  Staleness penalty - mean: 0.1672, max: 0.4839
+  Staleness weight grad (log-space, epoch avg): 0.001792
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 18
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 18: val_loss=0.42096424102783203
+Epoch 18: train_loss=0.4318233132362366
+
+[CollapseMonitor] Epoch 18
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.013685, range: 0.064799, mean: 0.078076
+  Pos: 100.0%, Neg: 0.0%, Unique: 1257
+  Dir Acc: 54.76%, Pred Sharpe: 90.5693
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch18.npy
+  Gradient norms:
+    lstm_encoder: 0.003807
+    lstm_decoder: 0.002819
+    output_layer: 0.102171
+  Regime gate grads (epoch avg): tensor([[-0.0025, -0.0045],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.098055
+  Attention entropy: 2.917552
+  Regime attention gates: [[0.5259613990783691, 0.5243574976921082], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4835 (decay=prenormalized)
+  Staleness penalty - mean: 0.1671, max: 0.4835
+  Staleness weight grad (log-space, epoch avg): 0.000606
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 19
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 19: val_loss=0.4199985861778259
+Epoch 19: train_loss=0.4309159815311432
+
+[CollapseMonitor] Epoch 19
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.015307, range: 0.075165, mean: 0.044785
+  Pos: 100.0%, Neg: 0.0%, Unique: 1258
+  Dir Acc: 54.76%, Pred Sharpe: 46.4472
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch19.npy
+  Gradient norms:
+    lstm_encoder: 0.003779
+    lstm_decoder: 0.002929
+    output_layer: 0.096612
+  Regime gate grads (epoch avg): tensor([[-0.0143, -0.0196],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.096533
+  Attention entropy: 2.907485
+  Regime attention gates: [[0.5262156128883362, 0.5248919725418091], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4823 (decay=prenormalized)
+  Staleness penalty - mean: 0.1667, max: 0.4823
+  Staleness weight grad (log-space, epoch avg): 0.002962
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 20
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 20: val_loss=0.4190641939640045
+Epoch 20: train_loss=0.42958083748817444
+
+[CollapseMonitor] Epoch 20
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.016696, range: 0.062354, mean: 0.058840
+  Pos: 100.0%, Neg: 0.0%, Unique: 1256
+  Dir Acc: 54.76%, Pred Sharpe: 55.9452
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch20.npy
+  Gradient norms:
+    lstm_encoder: 0.004372
+    lstm_decoder: 0.002951
+    output_layer: 0.097456
+  Regime gate grads (epoch avg): tensor([[0.0056, 0.0019],
+        [0.0000, 0.0000]])
+  VSN output std:
+    encoder: 0.095445
+  Attention entropy: 2.915438
+  Regime attention gates: [[0.5264407992362976, 0.5252646207809448], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4811 (decay=prenormalized)
+  Staleness penalty - mean: 0.1663, max: 0.4811
+  Staleness weight grad (log-space, epoch avg): 0.003243
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 21
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 21: val_loss=0.4171915352344513
+Epoch 21: train_loss=0.42997026443481445
+
+[CollapseMonitor] Epoch 21
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.016772, range: 0.064395, mean: 0.055953
+  Pos: 100.0%, Neg: 0.0%, Unique: 1270
+  Dir Acc: 54.76%, Pred Sharpe: 52.9583
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch21.npy
+  Gradient norms:
+    lstm_encoder: 0.004714
+    lstm_decoder: 0.003217
+    output_layer: 0.092716
+  Regime gate grads (epoch avg): tensor([[0.0105, 0.0125],
+        [0.0000, 0.0000]])
+  VSN output std:
+    encoder: 0.095116
+  Attention entropy: 2.903450
+  Regime attention gates: [[0.5263118147850037, 0.5252215266227722], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4795 (decay=prenormalized)
+  Staleness penalty - mean: 0.1657, max: 0.4795
+  Staleness weight grad (log-space, epoch avg): 0.002914
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 22
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 22: val_loss=0.4172653257846832
+Epoch 22: train_loss=0.42628127336502075
+
+[CollapseMonitor] Epoch 22
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.014503, range: 0.062777, mean: 0.082038
+  Pos: 100.0%, Neg: 0.0%, Unique: 1253
+  Dir Acc: 54.76%, Pred Sharpe: 89.7944
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch22.npy
+  Gradient norms:
+    lstm_encoder: 0.004787
+    lstm_decoder: 0.003306
+    output_layer: 0.095232
+  Regime gate grads (epoch avg): tensor([[0.0035, 0.0031],
+        [0.0000, 0.0000]])
+  VSN output std:
+    encoder: 0.093988
+  Attention entropy: 2.910789
+  Regime attention gates: [[0.5262762308120728, 0.5253309607505798], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4777 (decay=prenormalized)
+  Staleness penalty - mean: 0.1651, max: 0.4777
+  Staleness weight grad (log-space, epoch avg): 0.002772
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 23
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 23: val_loss=0.4155969023704529
+Epoch 23: train_loss=0.4280298054218292
+
+[CollapseMonitor] Epoch 23
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.016156, range: 0.105689, mean: 0.053627
+  Pos: 100.0%, Neg: 0.0%, Unique: 1258
+  Dir Acc: 54.76%, Pred Sharpe: 52.6939
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch23.npy
+  Gradient norms:
+    lstm_encoder: 0.005564
+    lstm_decoder: 0.003730
+    output_layer: 0.097999
+  Regime gate grads (epoch avg): tensor([[-0.0061, -0.0124],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.093514
+  Attention entropy: 2.911458
+  Regime attention gates: [[0.526871919631958, 0.5262095332145691], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4777 (decay=prenormalized)
+  Staleness penalty - mean: 0.1651, max: 0.4777
+  Staleness weight grad (log-space, epoch avg): -0.000066
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 24
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 24: val_loss=0.41384416818618774
+Epoch 24: train_loss=0.4279267191886902
+
+[CollapseMonitor] Epoch 24
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.016679, range: 0.104628, mean: 0.071462
+  Pos: 100.0%, Neg: 0.0%, Unique: 1262
+  Dir Acc: 54.76%, Pred Sharpe: 68.0154
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch24.npy
+  Gradient norms:
+    lstm_encoder: 0.005775
+    lstm_decoder: 0.003841
+    output_layer: 0.102787
+  Regime gate grads (epoch avg): tensor([[-0.0281, -0.0325],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.094147
+  Attention entropy: 2.894229
+  Regime attention gates: [[0.5274054408073425, 0.5269535183906555], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4772 (decay=prenormalized)
+  Staleness penalty - mean: 0.1649, max: 0.4772
+  Staleness weight grad (log-space, epoch avg): 0.002486
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 25
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 25: val_loss=0.4123916029930115
+Epoch 25: train_loss=0.4272288978099823
+
+[CollapseMonitor] Epoch 25
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.017693, range: 0.112761, mean: 0.049857
+  Pos: 100.0%, Neg: 0.0%, Unique: 1255
+  Dir Acc: 54.76%, Pred Sharpe: 44.7325
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch25.npy
+  Gradient norms:
+    lstm_encoder: 0.006368
+    lstm_decoder: 0.004177
+    output_layer: 0.097371
+  Regime gate grads (epoch avg): tensor([[0.0121, 0.0073],
+        [0.0000, 0.0000]])
+  VSN output std:
+    encoder: 0.094177
+  Attention entropy: 2.885279
+  Regime attention gates: [[0.5272316932678223, 0.5271443128585815], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4765 (decay=prenormalized)
+  Staleness penalty - mean: 0.1647, max: 0.4765
+  Staleness weight grad (log-space, epoch avg): -0.000015
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 26
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 26: val_loss=0.41316449642181396
+Epoch 26: train_loss=0.4272105097770691
+
+[CollapseMonitor] Epoch 26
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.016072, range: 0.106018, mean: 0.078447
+  Pos: 100.0%, Neg: 0.0%, Unique: 1253
+  Dir Acc: 54.76%, Pred Sharpe: 77.4812
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch26.npy
+  Gradient norms:
+    lstm_encoder: 0.006386
+    lstm_decoder: 0.004206
+    output_layer: 0.100252
+  Regime gate grads (epoch avg): tensor([[-0.0023,  0.0004],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.095238
+  Attention entropy: 2.870275
+  Regime attention gates: [[0.5275802612304688, 0.5274372696876526], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4776 (decay=prenormalized)
+  Staleness penalty - mean: 0.1651, max: 0.4776
+  Staleness weight grad (log-space, epoch avg): -0.002470
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 27
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 27: val_loss=0.4124390780925751
+Epoch 27: train_loss=0.42507946491241455
+
+[CollapseMonitor] Epoch 27
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.012277, range: 0.078163, mean: 0.066657
+  Pos: 100.0%, Neg: 0.0%, Unique: 1261
+  Dir Acc: 54.76%, Pred Sharpe: 86.1917
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch27.npy
+  Gradient norms:
+    lstm_encoder: 0.006325
+    lstm_decoder: 0.004145
+    output_layer: 0.097798
+  Regime gate grads (epoch avg): tensor([[-0.0030,  0.0013],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.095013
+  Attention entropy: 2.870896
+  Regime attention gates: [[0.5278537273406982, 0.5276383757591248], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4780 (decay=prenormalized)
+  Staleness penalty - mean: 0.1652, max: 0.4780
+  Staleness weight grad (log-space, epoch avg): -0.001047
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 28
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 28: val_loss=0.41000989079475403
+Epoch 28: train_loss=0.4244723320007324
+
+[CollapseMonitor] Epoch 28
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.013643, range: 0.105366, mean: 0.067431
+  Pos: 100.0%, Neg: 0.0%, Unique: 1241
+  Dir Acc: 54.76%, Pred Sharpe: 78.4606
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch28.npy
+  Gradient norms:
+    lstm_encoder: 0.006073
+    lstm_decoder: 0.003970
+    output_layer: 0.092013
+  Regime gate grads (epoch avg): tensor([[-0.0202, -0.0170],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.096652
+  Attention entropy: 2.838989
+  Regime attention gates: [[0.5285989046096802, 0.5280745029449463], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4787 (decay=prenormalized)
+  Staleness penalty - mean: 0.1655, max: 0.4787
+  Staleness weight grad (log-space, epoch avg): -0.000256
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 29
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 29: val_loss=0.4083617925643921
+Epoch 29: train_loss=0.42498910427093506
+
+[CollapseMonitor] Epoch 29
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.018772, range: 0.133835, mean: 0.060910
+  Pos: 100.0%, Neg: 0.0%, Unique: 1256
+  Dir Acc: 54.76%, Pred Sharpe: 51.5078
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch29.npy
+  Gradient norms:
+    lstm_encoder: 0.006388
+    lstm_decoder: 0.003986
+    output_layer: 0.090193
+  Regime gate grads (epoch avg): tensor([[0.0021, 0.0017],
+        [0.0000, 0.0000]])
+  VSN output std:
+    encoder: 0.099132
+  Attention entropy: 2.789129
+  Regime attention gates: [[0.5287200808525085, 0.5282248854637146], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4785 (decay=prenormalized)
+  Staleness penalty - mean: 0.1654, max: 0.4785
+  Staleness weight grad (log-space, epoch avg): -0.001217
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 30
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 30: val_loss=0.4075533151626587
+Epoch 30: train_loss=0.4234537184238434
+
+[CollapseMonitor] Epoch 30
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.017919, range: 0.127963, mean: 0.078468
+  Pos: 100.0%, Neg: 0.0%, Unique: 1243
+  Dir Acc: 54.76%, Pred Sharpe: 69.5137
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch30.npy
+  Gradient norms:
+    lstm_encoder: 0.007140
+    lstm_decoder: 0.004391
+    output_layer: 0.095317
+  Regime gate grads (epoch avg): tensor([[-0.0108, -0.0094],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.098813
+  Attention entropy: 2.799986
+  Regime attention gates: [[0.5290091633796692, 0.5284914374351501], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4796 (decay=prenormalized)
+  Staleness penalty - mean: 0.1658, max: 0.4796
+  Staleness weight grad (log-space, epoch avg): -0.001831
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 31
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 31: val_loss=0.40756362676620483
+Epoch 31: train_loss=0.42464062571525574
+
+[CollapseMonitor] Epoch 31
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.018546, range: 0.140117, mean: 0.069000
+  Pos: 100.0%, Neg: 0.0%, Unique: 1249
+  Dir Acc: 54.76%, Pred Sharpe: 59.0605
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch31.npy
+  Gradient norms:
+    lstm_encoder: 0.007905
+    lstm_decoder: 0.004984
+    output_layer: 0.095929
+  Regime gate grads (epoch avg): tensor([[ 0.0020, -0.0001],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.100454
+  Attention entropy: 2.751049
+  Regime attention gates: [[0.5292033553123474, 0.5288460850715637], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4798 (decay=prenormalized)
+  Staleness penalty - mean: 0.1658, max: 0.4798
+  Staleness weight grad (log-space, epoch avg): -0.000579
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 32
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 32: val_loss=0.40693965554237366
+Epoch 32: train_loss=0.42409640550613403
+
+[CollapseMonitor] Epoch 32
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.016770, range: 0.127626, mean: 0.045150
+  Pos: 100.0%, Neg: 0.0%, Unique: 1260
+  Dir Acc: 54.76%, Pred Sharpe: 42.7380
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch32.npy
+  Gradient norms:
+    lstm_encoder: 0.008592
+    lstm_decoder: 0.005382
+    output_layer: 0.101409
+  Regime gate grads (epoch avg): tensor([[-0.0065, -0.0110],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.099294
+  Attention entropy: 2.761660
+  Regime attention gates: [[0.5290930271148682, 0.5288399457931519], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4806 (decay=prenormalized)
+  Staleness penalty - mean: 0.1661, max: 0.4806
+  Staleness weight grad (log-space, epoch avg): -0.002071
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 33
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 33: val_loss=0.4053647518157959
+Epoch 33: train_loss=0.42385080456733704
+
+[CollapseMonitor] Epoch 33
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.017979, range: 0.141226, mean: 0.068641
+  Pos: 100.0%, Neg: 0.0%, Unique: 1257
+  Dir Acc: 54.76%, Pred Sharpe: 60.6059
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch33.npy
+  Gradient norms:
+    lstm_encoder: 0.008757
+    lstm_decoder: 0.005397
+    output_layer: 0.105172
+  Regime gate grads (epoch avg): tensor([[-0.0210, -0.0235],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.098078
+  Attention entropy: 2.741978
+  Regime attention gates: [[0.5299783945083618, 0.5299148559570312], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4803 (decay=prenormalized)
+  Staleness penalty - mean: 0.1660, max: 0.4803
+  Staleness weight grad (log-space, epoch avg): 0.001017
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 34
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 34: val_loss=0.4054773449897766
+Epoch 34: train_loss=0.42389944195747375
+
+[CollapseMonitor] Epoch 34
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.020008, range: 0.156008, mean: 0.048968
+  Pos: 100.0%, Neg: 0.0%, Unique: 1255
+  Dir Acc: 54.76%, Pred Sharpe: 38.8504
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch34.npy
+  Gradient norms:
+    lstm_encoder: 0.008271
+    lstm_decoder: 0.005034
+    output_layer: 0.099537
+  Regime gate grads (epoch avg): tensor([[-0.0044,  0.0088],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.098336
+  Attention entropy: 2.762503
+  Regime attention gates: [[0.5304805040359497, 0.529840350151062], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4794 (decay=prenormalized)
+  Staleness penalty - mean: 0.1657, max: 0.4794
+  Staleness weight grad (log-space, epoch avg): 0.001292
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 35
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 35: val_loss=0.4059025049209595
+Epoch 35: train_loss=0.4234192967414856
+
+[CollapseMonitor] Epoch 35
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.015691, range: 0.138887, mean: 0.052798
+  Pos: 100.0%, Neg: 0.0%, Unique: 1257
+  Dir Acc: 54.76%, Pred Sharpe: 53.4154
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch35.npy
+  Gradient norms:
+    lstm_encoder: 0.008934
+    lstm_decoder: 0.005614
+    output_layer: 0.101959
+  Regime gate grads (epoch avg): tensor([[-0.0136, -0.0074],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.099130
+  Attention entropy: 2.748227
+  Regime attention gates: [[0.5310156941413879, 0.5300171375274658], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4795 (decay=prenormalized)
+  Staleness penalty - mean: 0.1657, max: 0.4795
+  Staleness weight grad (log-space, epoch avg): 0.000211
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 36
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 36: val_loss=0.40549564361572266
+Epoch 36: train_loss=0.4232792556285858
+
+[CollapseMonitor] Epoch 36
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.019935, range: 0.159866, mean: 0.072092
+  Pos: 100.0%, Neg: 0.0%, Unique: 1252
+  Dir Acc: 54.76%, Pred Sharpe: 57.4095
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch36.npy
+  Gradient norms:
+    lstm_encoder: 0.008508
+    lstm_decoder: 0.005349
+    output_layer: 0.097237
+  Regime gate grads (epoch avg): tensor([[-0.0149, -0.0059],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.099922
+  Attention entropy: 2.675976
+  Regime attention gates: [[0.5319463610649109, 0.5305368900299072], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4793 (decay=prenormalized)
+  Staleness penalty - mean: 0.1657, max: 0.4793
+  Staleness weight grad (log-space, epoch avg): -0.000244
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 37
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 37: val_loss=0.4044409990310669
+Epoch 37: train_loss=0.4233769476413727
+
+[CollapseMonitor] Epoch 37
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.018983, range: 0.150760, mean: 0.095258
+  Pos: 100.0%, Neg: 0.0%, Unique: 1250
+  Dir Acc: 54.76%, Pred Sharpe: 79.6576
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch37.npy
+  Gradient norms:
+    lstm_encoder: 0.009206
+    lstm_decoder: 0.005819
+    output_layer: 0.103076
+  Regime gate grads (epoch avg): tensor([[0.0024, 0.0005],
+        [0.0000, 0.0000]])
+  VSN output std:
+    encoder: 0.101556
+  Attention entropy: 2.610926
+  Regime attention gates: [[0.5322161912918091, 0.5307938456535339], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4784 (decay=prenormalized)
+  Staleness penalty - mean: 0.1654, max: 0.4784
+  Staleness weight grad (log-space, epoch avg): 0.001351
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 38
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 38: val_loss=0.404334157705307
+Epoch 38: train_loss=0.4234800636768341
+
+[CollapseMonitor] Epoch 38
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.020945, range: 0.170633, mean: 0.043362
+  Pos: 99.9%, Neg: 0.1%, Unique: 1255
+  Dir Acc: 54.84%, Pred Sharpe: 32.8650
+  Composite: 0.4245 (dist_match: 0.5484, actual_pos: 54.8%, pred_pos: 99.9%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch38.npy
+  Gradient norms:
+    lstm_encoder: 0.009167
+    lstm_decoder: 0.005469
+    output_layer: 0.097720
+  Regime gate grads (epoch avg): tensor([[0.0141, 0.0058],
+        [0.0000, 0.0000]])
+  VSN output std:
+    encoder: 0.102497
+  Attention entropy: 2.596595
+  Regime attention gates: [[0.5319103002548218, 0.5308386087417603], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4772 (decay=prenormalized)
+  Staleness penalty - mean: 0.1649, max: 0.4772
+  Staleness weight grad (log-space, epoch avg): 0.000557
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 39
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 39: val_loss=0.4034625291824341
+Epoch 39: train_loss=0.42285770177841187
+
+[CollapseMonitor] Epoch 39
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.020522, range: 0.169404, mean: 0.062195
+  Pos: 100.0%, Neg: 0.0%, Unique: 1268
+  Dir Acc: 54.76%, Pred Sharpe: 48.1103
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch39.npy
+  Gradient norms:
+    lstm_encoder: 0.009078
+    lstm_decoder: 0.005589
+    output_layer: 0.099649
+  Regime gate grads (epoch avg): tensor([[-0.0139, -0.0154],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.099614
+  Attention entropy: 2.531723
+  Regime attention gates: [[0.5320539474487305, 0.5312115550041199], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4765 (decay=prenormalized)
+  Staleness penalty - mean: 0.1647, max: 0.4765
+  Staleness weight grad (log-space, epoch avg): 0.000029
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 40
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 40: val_loss=0.4022056460380554
+Epoch 40: train_loss=0.42219632863998413
+
+[CollapseMonitor] Epoch 40
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.024493, range: 0.182758, mean: 0.065547
+  Pos: 100.0%, Neg: 0.0%, Unique: 1258
+  Dir Acc: 54.76%, Pred Sharpe: 42.4820
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch40.npy
+  Gradient norms:
+    lstm_encoder: 0.009862
+    lstm_decoder: 0.006195
+    output_layer: 0.100382
+  Regime gate grads (epoch avg): tensor([[-0.0019, -0.0004],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.098736
+  Attention entropy: 2.506048
+  Regime attention gates: [[0.532004714012146, 0.5313000679016113], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4761 (decay=prenormalized)
+  Staleness penalty - mean: 0.1646, max: 0.4761
+  Staleness weight grad (log-space, epoch avg): -0.000217
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 41
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 41: val_loss=0.4027657210826874
+Epoch 41: train_loss=0.4223271310329437
+
+[CollapseMonitor] Epoch 41
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.022800, range: 0.185553, mean: 0.048188
+  Pos: 100.0%, Neg: 0.0%, Unique: 1255
+  Dir Acc: 54.76%, Pred Sharpe: 33.5509
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch41.npy
+  Gradient norms:
+    lstm_encoder: 0.009680
+    lstm_decoder: 0.006048
+    output_layer: 0.103567
+  Regime gate grads (epoch avg): tensor([[-0.0078, -0.0107],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.097111
+  Attention entropy: 2.541051
+  Regime attention gates: [[0.5322003364562988, 0.5315616130828857], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4767 (decay=prenormalized)
+  Staleness penalty - mean: 0.1648, max: 0.4767
+  Staleness weight grad (log-space, epoch avg): -0.000219
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 42
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 42: val_loss=0.403350830078125
+Epoch 42: train_loss=0.42216378450393677
+
+[CollapseMonitor] Epoch 42
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.020480, range: 0.164540, mean: 0.058967
+  Pos: 100.0%, Neg: 0.0%, Unique: 1252
+  Dir Acc: 54.76%, Pred Sharpe: 45.7063
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch42.npy
+  Gradient norms:
+    lstm_encoder: 0.010400
+    lstm_decoder: 0.006595
+    output_layer: 0.098541
+  Regime gate grads (epoch avg): tensor([[0.0044, 0.0080],
+        [0.0000, 0.0000]])
+  VSN output std:
+    encoder: 0.098106
+  Attention entropy: 2.518636
+  Regime attention gates: [[0.5319162607192993, 0.5313625335693359], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4777 (decay=prenormalized)
+  Staleness penalty - mean: 0.1651, max: 0.4777
+  Staleness weight grad (log-space, epoch avg): -0.002320
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 43
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 43: val_loss=0.4024544954299927
+Epoch 43: train_loss=0.4224649667739868
+
+[CollapseMonitor] Epoch 43
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.012997, range: 0.116615, mean: 0.075555
+  Pos: 100.0%, Neg: 0.0%, Unique: 1255
+  Dir Acc: 54.76%, Pred Sharpe: 92.2851
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch43.npy
+  Gradient norms:
+    lstm_encoder: 0.009635
+    lstm_decoder: 0.005989
+    output_layer: 0.103552
+  Regime gate grads (epoch avg): tensor([[-0.0070, -0.0050],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.099100
+  Attention entropy: 2.431643
+  Regime attention gates: [[0.5323649048805237, 0.5317011475563049], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4787 (decay=prenormalized)
+  Staleness penalty - mean: 0.1654, max: 0.4787
+  Staleness weight grad (log-space, epoch avg): 0.000223
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 44
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 44: val_loss=0.400852233171463
+Epoch 44: train_loss=0.42205944657325745
+
+[CollapseMonitor] Epoch 44
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.024369, range: 0.173186, mean: 0.047935
+  Pos: 100.0%, Neg: 0.0%, Unique: 1259
+  Dir Acc: 54.76%, Pred Sharpe: 31.2262
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch44.npy
+  Gradient norms:
+    lstm_encoder: 0.009389
+    lstm_decoder: 0.006062
+    output_layer: 0.094565
+  Regime gate grads (epoch avg): tensor([[-0.0082, -0.0046],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.099436
+  Attention entropy: 2.470975
+  Regime attention gates: [[0.5327073931694031, 0.5319147109985352], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4794 (decay=prenormalized)
+  Staleness penalty - mean: 0.1657, max: 0.4794
+  Staleness weight grad (log-space, epoch avg): -0.001013
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 45
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 45: val_loss=0.40063348412513733
+Epoch 45: train_loss=0.4213123023509979
+
+[CollapseMonitor] Epoch 45
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.016321, range: 0.129973, mean: 0.085540
+  Pos: 100.0%, Neg: 0.0%, Unique: 1256
+  Dir Acc: 54.76%, Pred Sharpe: 83.1978
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch45.npy
+  Gradient norms:
+    lstm_encoder: 0.010246
+    lstm_decoder: 0.006628
+    output_layer: 0.097954
+  Regime gate grads (epoch avg): tensor([[-0.0127, -0.0170],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.104407
+  Attention entropy: 2.435771
+  Regime attention gates: [[0.5332222580909729, 0.5325822234153748], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4792 (decay=prenormalized)
+  Staleness penalty - mean: 0.1656, max: 0.4792
+  Staleness weight grad (log-space, epoch avg): -0.000314
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 46
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 46: val_loss=0.40036067366600037
+Epoch 46: train_loss=0.42165541648864746
+
+[CollapseMonitor] Epoch 46
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.012151, range: 0.102561, mean: 0.075165
+  Pos: 100.0%, Neg: 0.0%, Unique: 1260
+  Dir Acc: 54.76%, Pred Sharpe: 98.1991
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch46.npy
+  Gradient norms:
+    lstm_encoder: 0.011031
+    lstm_decoder: 0.006889
+    output_layer: 0.101490
+  Regime gate grads (epoch avg): tensor([[-0.0032, -0.0048],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.101453
+  Attention entropy: 2.407635
+  Regime attention gates: [[0.53310626745224, 0.5327584743499756], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4784 (decay=prenormalized)
+  Staleness penalty - mean: 0.1653, max: 0.4784
+  Staleness weight grad (log-space, epoch avg): 0.000449
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 47
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 47: val_loss=0.4007125496864319
+Epoch 47: train_loss=0.42233806848526
+
+[CollapseMonitor] Epoch 47
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.016963, range: 0.132887, mean: 0.056005
+  Pos: 100.0%, Neg: 0.0%, Unique: 1256
+  Dir Acc: 54.76%, Pred Sharpe: 52.4108
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch47.npy
+  Gradient norms:
+    lstm_encoder: 0.010654
+    lstm_decoder: 0.006864
+    output_layer: 0.102408
+  Regime gate grads (epoch avg): tensor([[0.0090, 0.0108],
+        [0.0000, 0.0000]])
+  VSN output std:
+    encoder: 0.098374
+  Attention entropy: 2.428257
+  Regime attention gates: [[0.532978892326355, 0.5326511263847351], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4796 (decay=prenormalized)
+  Staleness penalty - mean: 0.1658, max: 0.4796
+  Staleness weight grad (log-space, epoch avg): -0.001629
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 48
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 48: val_loss=0.40029606223106384
+Epoch 48: train_loss=0.4206371605396271
+
+[CollapseMonitor] Epoch 48
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.016901, range: 0.127674, mean: 0.078047
+  Pos: 100.0%, Neg: 0.0%, Unique: 1254
+  Dir Acc: 54.76%, Pred Sharpe: 73.3054
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch48.npy
+  Gradient norms:
+    lstm_encoder: 0.010333
+    lstm_decoder: 0.006769
+    output_layer: 0.101931
+  Regime gate grads (epoch avg): tensor([[-0.0156, -0.0138],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.099049
+  Attention entropy: 2.405201
+  Regime attention gates: [[0.5328387022018433, 0.5324599742889404], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4803 (decay=prenormalized)
+  Staleness penalty - mean: 0.1660, max: 0.4803
+  Staleness weight grad (log-space, epoch avg): -0.001425
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 49
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 49: val_loss=0.4005555808544159
+Epoch 49: train_loss=0.42145591974258423
+
+[CollapseMonitor] Epoch 49
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.016932, range: 0.132143, mean: 0.058612
+  Pos: 100.0%, Neg: 0.0%, Unique: 1254
+  Dir Acc: 54.76%, Pred Sharpe: 54.9522
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch49.npy
+  Gradient norms:
+    lstm_encoder: 0.010397
+    lstm_decoder: 0.006687
+    output_layer: 0.093050
+  Regime gate grads (epoch avg): tensor([[-0.0016, -0.0012],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.101760
+  Attention entropy: 2.300150
+  Regime attention gates: [[0.5330596566200256, 0.5324785709381104], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4790 (decay=prenormalized)
+  Staleness penalty - mean: 0.1656, max: 0.4790
+  Staleness weight grad (log-space, epoch avg): 0.001309
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 50
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 50: val_loss=0.4000679850578308
+Epoch 50: train_loss=0.4215697944164276
+
+[CollapseMonitor] Epoch 50
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.013879, range: 0.110333, mean: 0.067604
+  Pos: 100.0%, Neg: 0.0%, Unique: 1258
+  Dir Acc: 54.76%, Pred Sharpe: 77.3268
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch50.npy
+  Gradient norms:
+    lstm_encoder: 0.009667
+    lstm_decoder: 0.006068
+    output_layer: 0.087873
+  Regime gate grads (epoch avg): tensor([[-0.0109, -0.0103],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.102184
+  Attention entropy: 2.205457
+  Regime attention gates: [[0.5334131717681885, 0.532882034778595], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4794 (decay=prenormalized)
+  Staleness penalty - mean: 0.1657, max: 0.4794
+  Staleness weight grad (log-space, epoch avg): -0.000646
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 51
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 51: val_loss=0.4004311263561249
+Epoch 51: train_loss=0.42048710584640503
+
+[CollapseMonitor] Epoch 51
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.016116, range: 0.132261, mean: 0.051832
+  Pos: 100.0%, Neg: 0.0%, Unique: 1253
+  Dir Acc: 54.76%, Pred Sharpe: 51.0543
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch51.npy
+  Gradient norms:
+    lstm_encoder: 0.011985
+    lstm_decoder: 0.007967
+    output_layer: 0.100619
+  Regime gate grads (epoch avg): tensor([[-0.0150, -0.0108],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.103702
+  Attention entropy: 2.260936
+  Regime attention gates: [[0.5337448120117188, 0.5330366492271423], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4786 (decay=prenormalized)
+  Staleness penalty - mean: 0.1654, max: 0.4786
+  Staleness weight grad (log-space, epoch avg): -0.000907
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 52
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 52: val_loss=0.39899778366088867
+Epoch 52: train_loss=0.42091673612594604
+
+[CollapseMonitor] Epoch 52
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.018733, range: 0.133540, mean: 0.073771
+  Pos: 100.0%, Neg: 0.0%, Unique: 1257
+  Dir Acc: 54.76%, Pred Sharpe: 62.5130
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch52.npy
+  Gradient norms:
+    lstm_encoder: 0.010831
+    lstm_decoder: 0.006966
+    output_layer: 0.096331
+  Regime gate grads (epoch avg): tensor([[-0.0052, -0.0096],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.103125
+  Attention entropy: 2.287347
+  Regime attention gates: [[0.5337075591087341, 0.5335982441902161], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4781 (decay=prenormalized)
+  Staleness penalty - mean: 0.1652, max: 0.4781
+  Staleness weight grad (log-space, epoch avg): -0.000152
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 53
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 53: val_loss=0.39964571595191956
+Epoch 53: train_loss=0.42063140869140625
+
+[CollapseMonitor] Epoch 53
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.017066, range: 0.135532, mean: 0.054983
+  Pos: 100.0%, Neg: 0.0%, Unique: 1261
+  Dir Acc: 54.76%, Pred Sharpe: 51.1452
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch53.npy
+  Gradient norms:
+    lstm_encoder: 0.011834
+    lstm_decoder: 0.007392
+    output_layer: 0.096398
+  Regime gate grads (epoch avg): tensor([[-0.0127, -0.0083],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.101131
+  Attention entropy: 2.323610
+  Regime attention gates: [[0.5341982841491699, 0.5339015126228333], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4766 (decay=prenormalized)
+  Staleness penalty - mean: 0.1647, max: 0.4766
+  Staleness weight grad (log-space, epoch avg): 0.002209
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 54
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 54: val_loss=0.40081387758255005
+Epoch 54: train_loss=0.42035362124443054
+
+[CollapseMonitor] Epoch 54
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.019318, range: 0.143567, mean: 0.059995
+  Pos: 100.0%, Neg: 0.0%, Unique: 1262
+  Dir Acc: 54.76%, Pred Sharpe: 49.3001
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch54.npy
+  Gradient norms:
+    lstm_encoder: 0.011777
+    lstm_decoder: 0.007421
+    output_layer: 0.099166
+  Regime gate grads (epoch avg): tensor([[-0.0089, -0.0046],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.102404
+  Attention entropy: 2.349406
+  Regime attention gates: [[0.5344792604446411, 0.5340523719787598], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4770 (decay=prenormalized)
+  Staleness penalty - mean: 0.1649, max: 0.4770
+  Staleness weight grad (log-space, epoch avg): -0.002701
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 55
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 55: val_loss=0.39822205901145935
+Epoch 55: train_loss=0.4208616614341736
+
+[CollapseMonitor] Epoch 55
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.028740, range: 0.174512, mean: 0.064311
+  Pos: 100.0%, Neg: 0.0%, Unique: 1251
+  Dir Acc: 54.76%, Pred Sharpe: 35.5222
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch55.npy
+  Gradient norms:
+    lstm_encoder: 0.012422
+    lstm_decoder: 0.007742
+    output_layer: 0.101846
+  Regime gate grads (epoch avg): tensor([[0.0010, 0.0078],
+        [0.0000, 0.0000]])
+  VSN output std:
+    encoder: 0.101595
+  Attention entropy: 2.220819
+  Regime attention gates: [[0.5347192883491516, 0.5338969826698303], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4763 (decay=prenormalized)
+  Staleness penalty - mean: 0.1646, max: 0.4763
+  Staleness weight grad (log-space, epoch avg): 0.001116
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 56
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 56: val_loss=0.3980083465576172
+Epoch 56: train_loss=0.42017433047294617
+
+[CollapseMonitor] Epoch 56
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.026268, range: 0.149103, mean: 0.087872
+  Pos: 100.0%, Neg: 0.0%, Unique: 1261
+  Dir Acc: 54.76%, Pred Sharpe: 53.1031
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch56.npy
+  Gradient norms:
+    lstm_encoder: 0.012146
+    lstm_decoder: 0.007476
+    output_layer: 0.093058
+  Regime gate grads (epoch avg): tensor([[-0.0126, -0.0040],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.102803
+  Attention entropy: 2.286373
+  Regime attention gates: [[0.5350134372711182, 0.5337041616439819], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4764 (decay=prenormalized)
+  Staleness penalty - mean: 0.1647, max: 0.4764
+  Staleness weight grad (log-space, epoch avg): -0.000618
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 57
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 57: val_loss=0.39704185724258423
+Epoch 57: train_loss=0.4203939735889435
+
+[CollapseMonitor] Epoch 57
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.030374, range: 0.165919, mean: 0.070912
+  Pos: 100.0%, Neg: 0.0%, Unique: 1262
+  Dir Acc: 54.76%, Pred Sharpe: 37.0610
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch57.npy
+  Gradient norms:
+    lstm_encoder: 0.012202
+    lstm_decoder: 0.007469
+    output_layer: 0.097258
+  Regime gate grads (epoch avg): tensor([[-0.0086, -0.0100],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.101581
+  Attention entropy: 2.170875
+  Regime attention gates: [[0.535243034362793, 0.5341418385505676], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4753 (decay=prenormalized)
+  Staleness penalty - mean: 0.1643, max: 0.4753
+  Staleness weight grad (log-space, epoch avg): 0.002288
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 58
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 58: val_loss=0.3982406258583069
+Epoch 58: train_loss=0.4199952781200409
+
+[CollapseMonitor] Epoch 58
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.025574, range: 0.160965, mean: 0.063971
+  Pos: 100.0%, Neg: 0.0%, Unique: 1259
+  Dir Acc: 54.76%, Pred Sharpe: 39.7093
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch58.npy
+  Gradient norms:
+    lstm_encoder: 0.011402
+    lstm_decoder: 0.006790
+    output_layer: 0.095543
+  Regime gate grads (epoch avg): tensor([[-0.0097,  0.0014],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.102284
+  Attention entropy: 2.126631
+  Regime attention gates: [[0.53594970703125, 0.5341899394989014], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4748 (decay=prenormalized)
+  Staleness penalty - mean: 0.1641, max: 0.4748
+  Staleness weight grad (log-space, epoch avg): 0.001126
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 59
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 59: val_loss=0.39804238080978394
+Epoch 59: train_loss=0.4201900064945221
+
+[CollapseMonitor] Epoch 59
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.022327, range: 0.144752, mean: 0.059870
+  Pos: 100.0%, Neg: 0.0%, Unique: 1268
+  Dir Acc: 54.76%, Pred Sharpe: 42.5666
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch59.npy
+  Gradient norms:
+    lstm_encoder: 0.012566
+    lstm_decoder: 0.007748
+    output_layer: 0.101147
+  Regime gate grads (epoch avg): tensor([[-0.0048, -0.0101],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.102541
+  Attention entropy: 2.144221
+  Regime attention gates: [[0.5360547304153442, 0.5344290733337402], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4738 (decay=prenormalized)
+  Staleness penalty - mean: 0.1637, max: 0.4738
+  Staleness weight grad (log-space, epoch avg): 0.000079
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 60
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 60: val_loss=0.39922890067100525
+Epoch 60: train_loss=0.41945135593414307
+
+[CollapseMonitor] Epoch 60
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.026155, range: 0.164706, mean: 0.052682
+  Pos: 100.0%, Neg: 0.0%, Unique: 1261
+  Dir Acc: 54.76%, Pred Sharpe: 31.9748
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch60.npy
+  Gradient norms:
+    lstm_encoder: 0.013187
+    lstm_decoder: 0.007806
+    output_layer: 0.096494
+  Regime gate grads (epoch avg): tensor([[ 0.0025, -0.0005],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.103665
+  Attention entropy: 2.111272
+  Regime attention gates: [[0.5357264876365662, 0.5343713760375977], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4734 (decay=prenormalized)
+  Staleness penalty - mean: 0.1636, max: 0.4734
+  Staleness weight grad (log-space, epoch avg): 0.000126
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 61
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 61: val_loss=0.3982712924480438
+Epoch 61: train_loss=0.42033833265304565
+
+[CollapseMonitor] Epoch 61
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.029707, range: 0.168619, mean: 0.095137
+  Pos: 100.0%, Neg: 0.0%, Unique: 1267
+  Dir Acc: 54.76%, Pred Sharpe: 50.8385
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch61.npy
+  Gradient norms:
+    lstm_encoder: 0.013120
+    lstm_decoder: 0.007988
+    output_layer: 0.098475
+  Regime gate grads (epoch avg): tensor([[-0.0071, -0.0086],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.104954
+  Attention entropy: 2.108977
+  Regime attention gates: [[0.5361965298652649, 0.5350242853164673], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4744 (decay=prenormalized)
+  Staleness penalty - mean: 0.1639, max: 0.4744
+  Staleness weight grad (log-space, epoch avg): 0.000133
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 62
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 62: val_loss=0.39729204773902893
+Epoch 62: train_loss=0.41924211382865906
+
+[CollapseMonitor] Epoch 62
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.023187, range: 0.137966, mean: 0.043883
+  Pos: 100.0%, Neg: 0.0%, Unique: 1266
+  Dir Acc: 54.76%, Pred Sharpe: 30.0444
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch62.npy
+  Gradient norms:
+    lstm_encoder: 0.012885
+    lstm_decoder: 0.007575
+    output_layer: 0.100479
+  Regime gate grads (epoch avg): tensor([[-0.0073, -0.0089],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.102877
+  Attention entropy: 2.006484
+  Regime attention gates: [[0.5360809564590454, 0.5349639654159546], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4740 (decay=prenormalized)
+  Staleness penalty - mean: 0.1638, max: 0.4740
+  Staleness weight grad (log-space, epoch avg): -0.000361
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 63
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 63: val_loss=0.39638465642929077
+Epoch 63: train_loss=0.41981229186058044
+
+[CollapseMonitor] Epoch 63
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.026567, range: 0.157949, mean: 0.053270
+  Pos: 100.0%, Neg: 0.0%, Unique: 1262
+  Dir Acc: 54.76%, Pred Sharpe: 31.8305
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch63.npy
+  Gradient norms:
+    lstm_encoder: 0.013618
+    lstm_decoder: 0.007853
+    output_layer: 0.092987
+  Regime gate grads (epoch avg): tensor([[-0.0035, -0.0080],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.104082
+  Attention entropy: 2.030501
+  Regime attention gates: [[0.5361968874931335, 0.5352759957313538], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4741 (decay=prenormalized)
+  Staleness penalty - mean: 0.1639, max: 0.4741
+  Staleness weight grad (log-space, epoch avg): -0.000577
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 64
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 64: val_loss=0.3968903124332428
+Epoch 64: train_loss=0.4195353388786316
+
+[CollapseMonitor] Epoch 64
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.020526, range: 0.139067, mean: 0.057181
+  Pos: 100.0%, Neg: 0.0%, Unique: 1257
+  Dir Acc: 54.76%, Pred Sharpe: 44.2234
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch64.npy
+  Gradient norms:
+    lstm_encoder: 0.013656
+    lstm_decoder: 0.007993
+    output_layer: 0.095436
+  Regime gate grads (epoch avg): tensor([[-0.0096, -0.0103],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.102491
+  Attention entropy: 2.049526
+  Regime attention gates: [[0.5362418293952942, 0.5353707671165466], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4742 (decay=prenormalized)
+  Staleness penalty - mean: 0.1639, max: 0.4742
+  Staleness weight grad (log-space, epoch avg): 0.000400
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 65
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 65: val_loss=0.3962087333202362
+Epoch 65: train_loss=0.41992539167404175
+
+[CollapseMonitor] Epoch 65
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.022318, range: 0.143643, mean: 0.052553
+  Pos: 100.0%, Neg: 0.0%, Unique: 1260
+  Dir Acc: 54.76%, Pred Sharpe: 37.3806
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch65.npy
+  Gradient norms:
+    lstm_encoder: 0.013009
+    lstm_decoder: 0.007715
+    output_layer: 0.091871
+  Regime gate grads (epoch avg): tensor([[0.0026, 0.0013],
+        [0.0000, 0.0000]])
+  VSN output std:
+    encoder: 0.102304
+  Attention entropy: 2.057639
+  Regime attention gates: [[0.536088228225708, 0.5353130102157593], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4741 (decay=prenormalized)
+  Staleness penalty - mean: 0.1638, max: 0.4741
+  Staleness weight grad (log-space, epoch avg): 0.001565
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 66
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 66: val_loss=0.39807695150375366
+Epoch 66: train_loss=0.419046550989151
+
+[CollapseMonitor] Epoch 66
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.020872, range: 0.135432, mean: 0.069442
+  Pos: 100.0%, Neg: 0.0%, Unique: 1261
+  Dir Acc: 54.76%, Pred Sharpe: 52.8153
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch66.npy
+  Gradient norms:
+    lstm_encoder: 0.013050
+    lstm_decoder: 0.007410
+    output_layer: 0.094531
+  Regime gate grads (epoch avg): tensor([[-0.0175, -0.0111],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.103568
+  Attention entropy: 2.052119
+  Regime attention gates: [[0.5362350344657898, 0.5353626012802124], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4739 (decay=prenormalized)
+  Staleness penalty - mean: 0.1638, max: 0.4739
+  Staleness weight grad (log-space, epoch avg): -0.000839
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 67
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 67: val_loss=0.396539568901062
+Epoch 67: train_loss=0.4190136790275574
+
+[CollapseMonitor] Epoch 67
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.022690, range: 0.150856, mean: 0.059495
+  Pos: 100.0%, Neg: 0.0%, Unique: 1256
+  Dir Acc: 54.76%, Pred Sharpe: 41.6240
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch67.npy
+  Gradient norms:
+    lstm_encoder: 0.013941
+    lstm_decoder: 0.008071
+    output_layer: 0.095752
+  Regime gate grads (epoch avg): tensor([[-0.0111, -0.0065],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.101698
+  Attention entropy: 2.065219
+  Regime attention gates: [[0.5364829301834106, 0.5354976654052734], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4737 (decay=prenormalized)
+  Staleness penalty - mean: 0.1637, max: 0.4737
+  Staleness weight grad (log-space, epoch avg): 0.001355
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 68
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 68: val_loss=0.3974228501319885
+Epoch 68: train_loss=0.4183681309223175
+
+[CollapseMonitor] Epoch 68
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.020877, range: 0.145818, mean: 0.062294
+  Pos: 100.0%, Neg: 0.0%, Unique: 1258
+  Dir Acc: 54.76%, Pred Sharpe: 47.3670
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch68.npy
+  Gradient norms:
+    lstm_encoder: 0.015287
+    lstm_decoder: 0.008579
+    output_layer: 0.107204
+  Regime gate grads (epoch avg): tensor([[-0.0084, -0.0082],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.099967
+  Attention entropy: 2.112381
+  Regime attention gates: [[0.5365595817565918, 0.5355027914047241], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4734 (decay=prenormalized)
+  Staleness penalty - mean: 0.1636, max: 0.4734
+  Staleness weight grad (log-space, epoch avg): -0.000306
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 69
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 69: val_loss=0.3961246609687805
+Epoch 69: train_loss=0.41822004318237305
+
+[CollapseMonitor] Epoch 69
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.020812, range: 0.149926, mean: 0.065999
+  Pos: 100.0%, Neg: 0.0%, Unique: 1261
+  Dir Acc: 54.76%, Pred Sharpe: 50.3408
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch69.npy
+  Gradient norms:
+    lstm_encoder: 0.014731
+    lstm_decoder: 0.008221
+    output_layer: 0.097822
+  Regime gate grads (epoch avg): tensor([[-0.0050, -0.0049],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.099563
+  Attention entropy: 2.113797
+  Regime attention gates: [[0.5365833640098572, 0.5355638265609741], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4730 (decay=prenormalized)
+  Staleness penalty - mean: 0.1635, max: 0.4730
+  Staleness weight grad (log-space, epoch avg): 0.000969
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 70
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 70: val_loss=0.3967396020889282
+Epoch 70: train_loss=0.41940006613731384
+
+[CollapseMonitor] Epoch 70
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.019847, range: 0.143401, mean: 0.065603
+  Pos: 100.0%, Neg: 0.0%, Unique: 1260
+  Dir Acc: 54.76%, Pred Sharpe: 52.4731
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch70.npy
+  Gradient norms:
+    lstm_encoder: 0.014300
+    lstm_decoder: 0.007971
+    output_layer: 0.102747
+  Regime gate grads (epoch avg): tensor([[-0.0012,  0.0042],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.100044
+  Attention entropy: 2.097961
+  Regime attention gates: [[0.5366694927215576, 0.5354771614074707], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4723 (decay=prenormalized)
+  Staleness penalty - mean: 0.1632, max: 0.4723
+  Staleness weight grad (log-space, epoch avg): 0.000967
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 71
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 71: val_loss=0.39617323875427246
+Epoch 71: train_loss=0.41902825236320496
+
+[CollapseMonitor] Epoch 71
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.020550, range: 0.149032, mean: 0.063100
+  Pos: 100.0%, Neg: 0.0%, Unique: 1256
+  Dir Acc: 54.76%, Pred Sharpe: 48.7442
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch71.npy
+  Gradient norms:
+    lstm_encoder: 0.014076
+    lstm_decoder: 0.007831
+    output_layer: 0.096598
+  Regime gate grads (epoch avg): tensor([[-0.0122, -0.0067],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.100648
+  Attention entropy: 2.084599
+  Regime attention gates: [[0.5365297794342041, 0.5353325605392456], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4727 (decay=prenormalized)
+  Staleness penalty - mean: 0.1634, max: 0.4727
+  Staleness weight grad (log-space, epoch avg): -0.000727
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 72
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 72: val_loss=0.39688506722450256
+Epoch 72: train_loss=0.4194992482662201
+
+[CollapseMonitor] Epoch 72
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.020836, range: 0.150481, mean: 0.052201
+  Pos: 100.0%, Neg: 0.0%, Unique: 1260
+  Dir Acc: 54.76%, Pred Sharpe: 39.7716
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch72.npy
+  Gradient norms:
+    lstm_encoder: 0.014622
+    lstm_decoder: 0.008069
+    output_layer: 0.101473
+  Regime gate grads (epoch avg): tensor([[-0.0093, -0.0084],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.100496
+  Attention entropy: 2.111365
+  Regime attention gates: [[0.5364621877670288, 0.5353381037712097], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4727 (decay=prenormalized)
+  Staleness penalty - mean: 0.1634, max: 0.4727
+  Staleness weight grad (log-space, epoch avg): -0.001057
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 73
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 73: val_loss=0.3958197832107544
+Epoch 73: train_loss=0.4191512167453766
+
+[CollapseMonitor] Epoch 73
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.022034, range: 0.159708, mean: 0.061221
+  Pos: 100.0%, Neg: 0.0%, Unique: 1265
+  Dir Acc: 54.76%, Pred Sharpe: 44.1074
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch73.npy
+  Gradient norms:
+    lstm_encoder: 0.015174
+    lstm_decoder: 0.008069
+    output_layer: 0.094978
+  Regime gate grads (epoch avg): tensor([[-0.0253, -0.0240],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.100487
+  Attention entropy: 2.111225
+  Regime attention gates: [[0.5366703867912292, 0.5355052351951599], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4727 (decay=prenormalized)
+  Staleness penalty - mean: 0.1634, max: 0.4727
+  Staleness weight grad (log-space, epoch avg): -0.000119
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 74
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 74: val_loss=0.3956151306629181
+Epoch 74: train_loss=0.419292151927948
+
+[CollapseMonitor] Epoch 74
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.023371, range: 0.165997, mean: 0.056080
+  Pos: 100.0%, Neg: 0.0%, Unique: 1269
+  Dir Acc: 54.76%, Pred Sharpe: 38.0913
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch74.npy
+  Gradient norms:
+    lstm_encoder: 0.015746
+    lstm_decoder: 0.008524
+    output_layer: 0.095646
+  Regime gate grads (epoch avg): tensor([[-0.0045, -0.0037],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.100768
+  Attention entropy: 2.139069
+  Regime attention gates: [[0.5368673205375671, 0.5356286764144897], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4725 (decay=prenormalized)
+  Staleness penalty - mean: 0.1633, max: 0.4725
+  Staleness weight grad (log-space, epoch avg): 0.000130
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 75
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 75: val_loss=0.39666566252708435
+Epoch 75: train_loss=0.4193733334541321
+
+[CollapseMonitor] Epoch 75
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.024511, range: 0.172751, mean: 0.059998
+  Pos: 100.0%, Neg: 0.0%, Unique: 1265
+  Dir Acc: 54.76%, Pred Sharpe: 38.8579
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch75.npy
+  Gradient norms:
+    lstm_encoder: 0.016629
+    lstm_decoder: 0.008782
+    output_layer: 0.098154
+  Regime gate grads (epoch avg): tensor([[-0.0036, -0.0060],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.100053
+  Attention entropy: 2.176140
+  Regime attention gates: [[0.5370293855667114, 0.5358458757400513], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4724 (decay=prenormalized)
+  Staleness penalty - mean: 0.1633, max: 0.4724
+  Staleness weight grad (log-space, epoch avg): 0.000875
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 76
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 76: val_loss=0.3965112268924713
+Epoch 76: train_loss=0.4179950952529907
+
+[CollapseMonitor] Epoch 76
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.023383, range: 0.171942, mean: 0.063949
+  Pos: 100.0%, Neg: 0.0%, Unique: 1269
+  Dir Acc: 54.76%, Pred Sharpe: 43.4145
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch76.npy
+  Gradient norms:
+    lstm_encoder: 0.016770
+    lstm_decoder: 0.008891
+    output_layer: 0.102450
+  Regime gate grads (epoch avg): tensor([[-0.0068, -0.0017],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.099958
+  Attention entropy: 2.199359
+  Regime attention gates: [[0.5371812582015991, 0.5359457731246948], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4725 (decay=prenormalized)
+  Staleness penalty - mean: 0.1633, max: 0.4725
+  Staleness weight grad (log-space, epoch avg): -0.000882
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 77
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 77: val_loss=0.3954971134662628
+Epoch 77: train_loss=0.4186571538448334
+
+[CollapseMonitor] Epoch 77
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.026953, range: 0.187755, mean: 0.053248
+  Pos: 100.0%, Neg: 0.0%, Unique: 1264
+  Dir Acc: 54.76%, Pred Sharpe: 31.3616
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch77.npy
+  Gradient norms:
+    lstm_encoder: 0.016444
+    lstm_decoder: 0.008223
+    output_layer: 0.095482
+  Regime gate grads (epoch avg): tensor([[ 0.0018, -0.0022],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.099747
+  Attention entropy: 2.227814
+  Regime attention gates: [[0.5370768904685974, 0.5359408855438232], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4726 (decay=prenormalized)
+  Staleness penalty - mean: 0.1633, max: 0.4726
+  Staleness weight grad (log-space, epoch avg): -0.001642
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 78
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 78: val_loss=0.3967472314834595
+Epoch 78: train_loss=0.41833001375198364
+
+[CollapseMonitor] Epoch 78
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.023801, range: 0.173624, mean: 0.053280
+  Pos: 100.0%, Neg: 0.0%, Unique: 1270
+  Dir Acc: 54.76%, Pred Sharpe: 35.5353
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch78.npy
+  Gradient norms:
+    lstm_encoder: 0.015702
+    lstm_decoder: 0.007661
+    output_layer: 0.102058
+  Regime gate grads (epoch avg): tensor([[-0.0006, -0.0053],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.101262
+  Attention entropy: 2.224721
+  Regime attention gates: [[0.5369606614112854, 0.5360990166664124], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4726 (decay=prenormalized)
+  Staleness penalty - mean: 0.1633, max: 0.4726
+  Staleness weight grad (log-space, epoch avg): -0.000279
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 79
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 79: val_loss=0.39546799659729004
+Epoch 79: train_loss=0.4189419448375702
+
+[CollapseMonitor] Epoch 79
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.024432, range: 0.179836, mean: 0.055714
+  Pos: 100.0%, Neg: 0.0%, Unique: 1269
+  Dir Acc: 54.76%, Pred Sharpe: 36.1993
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch79.npy
+  Gradient norms:
+    lstm_encoder: 0.017269
+    lstm_decoder: 0.008761
+    output_layer: 0.100055
+  Regime gate grads (epoch avg): tensor([[-0.0051, -0.0029],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.100873
+  Attention entropy: 2.189101
+  Regime attention gates: [[0.5370290279388428, 0.5361489057540894], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4722 (decay=prenormalized)
+  Staleness penalty - mean: 0.1632, max: 0.4722
+  Staleness weight grad (log-space, epoch avg): 0.000582
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 80
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 80: val_loss=0.39540189504623413
+Epoch 80: train_loss=0.4182341694831848
+
+[CollapseMonitor] Epoch 80
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.024414, range: 0.183935, mean: 0.071598
+  Pos: 100.0%, Neg: 0.0%, Unique: 1270
+  Dir Acc: 54.76%, Pred Sharpe: 46.5541
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch80.npy
+  Gradient norms:
+    lstm_encoder: 0.017307
+    lstm_decoder: 0.008594
+    output_layer: 0.099528
+  Regime gate grads (epoch avg): tensor([[-0.0066, -0.0085],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.100704
+  Attention entropy: 2.209972
+  Regime attention gates: [[0.5371622443199158, 0.5362661480903625], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4722 (decay=prenormalized)
+  Staleness penalty - mean: 0.1632, max: 0.4722
+  Staleness weight grad (log-space, epoch avg): -0.001135
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 81
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 81: val_loss=0.3953028917312622
+Epoch 81: train_loss=0.4180966317653656
+
+[CollapseMonitor] Epoch 81
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.027718, range: 0.201809, mean: 0.061807
+  Pos: 100.0%, Neg: 0.0%, Unique: 1268
+  Dir Acc: 54.76%, Pred Sharpe: 35.3973
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch81.npy
+  Gradient norms:
+    lstm_encoder: 0.018111
+    lstm_decoder: 0.008776
+    output_layer: 0.098816
+  Regime gate grads (epoch avg): tensor([[1.2842e-03, 4.7727e-05],
+        [0.0000e+00, 0.0000e+00]])
+  VSN output std:
+    encoder: 0.100789
+  Attention entropy: 2.231924
+  Regime attention gates: [[0.5370223522186279, 0.536189079284668], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4719 (decay=prenormalized)
+  Staleness penalty - mean: 0.1631, max: 0.4719
+  Staleness weight grad (log-space, epoch avg): 0.001472
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 82
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 82: val_loss=0.39600539207458496
+Epoch 82: train_loss=0.4188598096370697
+
+[CollapseMonitor] Epoch 82
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.024594, range: 0.187655, mean: 0.064259
+  Pos: 100.0%, Neg: 0.0%, Unique: 1265
+  Dir Acc: 54.76%, Pred Sharpe: 41.4766
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch82.npy
+  Gradient norms:
+    lstm_encoder: 0.019604
+    lstm_decoder: 0.009438
+    output_layer: 0.096894
+  Regime gate grads (epoch avg): tensor([[ 0.0008, -0.0006],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.101386
+  Attention entropy: 2.285821
+  Regime attention gates: [[0.5366993546485901, 0.5359803438186646], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4711 (decay=prenormalized)
+  Staleness penalty - mean: 0.1628, max: 0.4711
+  Staleness weight grad (log-space, epoch avg): 0.001419
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 83
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 83: val_loss=0.3963214159011841
+Epoch 83: train_loss=0.41948696970939636
+
+[CollapseMonitor] Epoch 83
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.025145, range: 0.187604, mean: 0.058847
+  Pos: 100.0%, Neg: 0.0%, Unique: 1262
+  Dir Acc: 54.76%, Pred Sharpe: 37.1511
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch83.npy
+  Gradient norms:
+    lstm_encoder: 0.018278
+    lstm_decoder: 0.008538
+    output_layer: 0.096123
+  Regime gate grads (epoch avg): tensor([[-0.0031, -0.0003],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.101561
+  Attention entropy: 2.258467
+  Regime attention gates: [[0.5367457270622253, 0.5359280705451965], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4705 (decay=prenormalized)
+  Staleness penalty - mean: 0.1626, max: 0.4705
+  Staleness weight grad (log-space, epoch avg): 0.000114
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 84
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 84: val_loss=0.3957098424434662
+Epoch 84: train_loss=0.4174010455608368
+
+[CollapseMonitor] Epoch 84
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.027280, range: 0.204973, mean: 0.047313
+  Pos: 100.0%, Neg: 0.0%, Unique: 1265
+  Dir Acc: 54.76%, Pred Sharpe: 27.5318
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch84.npy
+  Gradient norms:
+    lstm_encoder: 0.018854
+    lstm_decoder: 0.008649
+    output_layer: 0.092309
+  Regime gate grads (epoch avg): tensor([[-0.0050, -0.0097],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.100455
+  Attention entropy: 2.299801
+  Regime attention gates: [[0.5367642641067505, 0.5361348390579224], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4708 (decay=prenormalized)
+  Staleness penalty - mean: 0.1627, max: 0.4708
+  Staleness weight grad (log-space, epoch avg): -0.000169
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 85
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 85: val_loss=0.39501142501831055
+Epoch 85: train_loss=0.41731297969818115
+
+[CollapseMonitor] Epoch 85
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.026421, range: 0.202415, mean: 0.059352
+  Pos: 100.0%, Neg: 0.0%, Unique: 1261
+  Dir Acc: 54.76%, Pred Sharpe: 35.6600
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch85.npy
+  Gradient norms:
+    lstm_encoder: 0.020174
+    lstm_decoder: 0.008920
+    output_layer: 0.097629
+  Regime gate grads (epoch avg): tensor([[-0.0106, -0.0026],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.100699
+  Attention entropy: 2.312604
+  Regime attention gates: [[0.5370302200317383, 0.5361236929893494], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4703 (decay=prenormalized)
+  Staleness penalty - mean: 0.1625, max: 0.4703
+  Staleness weight grad (log-space, epoch avg): 0.001097
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 86
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 86: val_loss=0.39601197838783264
+Epoch 86: train_loss=0.4185415506362915
+
+[CollapseMonitor] Epoch 86
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.025369, range: 0.195407, mean: 0.051812
+  Pos: 100.0%, Neg: 0.0%, Unique: 1266
+  Dir Acc: 54.76%, Pred Sharpe: 32.4215
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch86.npy
+  Gradient norms:
+    lstm_encoder: 0.021862
+    lstm_decoder: 0.010037
+    output_layer: 0.096697
+  Regime gate grads (epoch avg): tensor([[-0.0052, -0.0067],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.100273
+  Attention entropy: 2.310788
+  Regime attention gates: [[0.5371770858764648, 0.5362106561660767], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4705 (decay=prenormalized)
+  Staleness penalty - mean: 0.1626, max: 0.4705
+  Staleness weight grad (log-space, epoch avg): -0.001481
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 87
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 87: val_loss=0.3952542245388031
+Epoch 87: train_loss=0.41882163286209106
+
+[CollapseMonitor] Epoch 87
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.026221, range: 0.205607, mean: 0.049767
+  Pos: 100.0%, Neg: 0.0%, Unique: 1268
+  Dir Acc: 54.76%, Pred Sharpe: 30.1293
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch87.npy
+  Gradient norms:
+    lstm_encoder: 0.021098
+    lstm_decoder: 0.009172
+    output_layer: 0.101507
+  Regime gate grads (epoch avg): tensor([[-0.0077, -0.0030],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.100651
+  Attention entropy: 2.303554
+  Regime attention gates: [[0.5374155640602112, 0.5363490581512451], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4703 (decay=prenormalized)
+  Staleness penalty - mean: 0.1626, max: 0.4703
+  Staleness weight grad (log-space, epoch avg): -0.000141
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 88
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 88: val_loss=0.3959927260875702
+Epoch 88: train_loss=0.41840460896492004
+
+[CollapseMonitor] Epoch 88
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.027150, range: 0.208897, mean: 0.061155
+  Pos: 100.0%, Neg: 0.0%, Unique: 1269
+  Dir Acc: 54.76%, Pred Sharpe: 35.7576
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch88.npy
+  Gradient norms:
+    lstm_encoder: 0.021662
+    lstm_decoder: 0.009248
+    output_layer: 0.090687
+  Regime gate grads (epoch avg): tensor([[0.0044, 0.0020],
+        [0.0000, 0.0000]])
+  VSN output std:
+    encoder: 0.103337
+  Attention entropy: 2.293788
+  Regime attention gates: [[0.5372738838195801, 0.5362837910652161], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4703 (decay=prenormalized)
+  Staleness penalty - mean: 0.1625, max: 0.4703
+  Staleness weight grad (log-space, epoch avg): -0.000075
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 89
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 89: val_loss=0.39452704787254333
+Epoch 89: train_loss=0.4174058437347412
+
+[CollapseMonitor] Epoch 89
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.029367, range: 0.223914, mean: 0.059379
+  Pos: 100.0%, Neg: 0.0%, Unique: 1272
+  Dir Acc: 54.76%, Pred Sharpe: 32.0973
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch89.npy
+  Gradient norms:
+    lstm_encoder: 0.020662
+    lstm_decoder: 0.008899
+    output_layer: 0.097093
+  Regime gate grads (epoch avg): tensor([[-0.0032, -0.0047],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.101339
+  Attention entropy: 2.295631
+  Regime attention gates: [[0.5373270511627197, 0.5363786220550537], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4706 (decay=prenormalized)
+  Staleness penalty - mean: 0.1626, max: 0.4706
+  Staleness weight grad (log-space, epoch avg): -0.001701
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 90
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 90: val_loss=0.3943491280078888
+Epoch 90: train_loss=0.41803741455078125
+
+[CollapseMonitor] Epoch 90
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.032229, range: 0.243168, mean: 0.059764
+  Pos: 100.0%, Neg: 0.0%, Unique: 1270
+  Dir Acc: 54.76%, Pred Sharpe: 29.4364
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch90.npy
+  Gradient norms:
+    lstm_encoder: 0.020536
+    lstm_decoder: 0.008434
+    output_layer: 0.093550
+  Regime gate grads (epoch avg): tensor([[ 0.0003, -0.0006],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.100626
+  Attention entropy: 2.302545
+  Regime attention gates: [[0.5373067259788513, 0.5364355444908142], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4708 (decay=prenormalized)
+  Staleness penalty - mean: 0.1627, max: 0.4708
+  Staleness weight grad (log-space, epoch avg): -0.001153
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 91
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 91: val_loss=0.3960803747177124
+Epoch 91: train_loss=0.41848060488700867
+
+[CollapseMonitor] Epoch 91
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.031825, range: 0.240825, mean: 0.060735
+  Pos: 100.0%, Neg: 0.0%, Unique: 1267
+  Dir Acc: 54.76%, Pred Sharpe: 30.2949
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch91.npy
+  Gradient norms:
+    lstm_encoder: 0.023514
+    lstm_decoder: 0.009598
+    output_layer: 0.104417
+  Regime gate grads (epoch avg): tensor([[-0.0099, -0.0072],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.101764
+  Attention entropy: 2.308034
+  Regime attention gates: [[0.5374937057495117, 0.536592960357666], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4705 (decay=prenormalized)
+  Staleness penalty - mean: 0.1626, max: 0.4705
+  Staleness weight grad (log-space, epoch avg): 0.001232
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 92
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 92: val_loss=0.3958436846733093
+Epoch 92: train_loss=0.41742143034935
+
+[CollapseMonitor] Epoch 92
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.031858, range: 0.243508, mean: 0.048726
+  Pos: 100.0%, Neg: 0.0%, Unique: 1274
+  Dir Acc: 54.76%, Pred Sharpe: 24.2799
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch92.npy
+  Gradient norms:
+    lstm_encoder: 0.021210
+    lstm_decoder: 0.008819
+    output_layer: 0.093176
+  Regime gate grads (epoch avg): tensor([[8.4662e-05, 1.6878e-03],
+        [0.0000e+00, 0.0000e+00]])
+  VSN output std:
+    encoder: 0.102487
+  Attention entropy: 2.283914
+  Regime attention gates: [[0.5376340746879578, 0.5367072820663452], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4699 (decay=prenormalized)
+  Staleness penalty - mean: 0.1624, max: 0.4699
+  Staleness weight grad (log-space, epoch avg): 0.001481
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 93
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 93: val_loss=0.3956488370895386
+Epoch 93: train_loss=0.41853588819503784
+
+[CollapseMonitor] Epoch 93
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.030311, range: 0.239113, mean: 0.054284
+  Pos: 100.0%, Neg: 0.0%, Unique: 1267
+  Dir Acc: 54.76%, Pred Sharpe: 28.4300
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch93.npy
+  Gradient norms:
+    lstm_encoder: 0.022978
+    lstm_decoder: 0.009115
+    output_layer: 0.096013
+  Regime gate grads (epoch avg): tensor([[-0.0055, -0.0051],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.101759
+  Attention entropy: 2.285462
+  Regime attention gates: [[0.5378972887992859, 0.5368723273277283], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4707 (decay=prenormalized)
+  Staleness penalty - mean: 0.1627, max: 0.4707
+  Staleness weight grad (log-space, epoch avg): -0.003280
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 94
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 94: val_loss=0.3940880298614502
+Epoch 94: train_loss=0.4174021780490875
+
+[CollapseMonitor] Epoch 94
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.034655, range: 0.253223, mean: 0.057809
+  Pos: 100.0%, Neg: 0.0%, Unique: 1272
+  Dir Acc: 54.76%, Pred Sharpe: 26.4804
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch94.npy
+  Gradient norms:
+    lstm_encoder: 0.024439
+    lstm_decoder: 0.009799
+    output_layer: 0.100678
+  Regime gate grads (epoch avg): tensor([[0.0013, 0.0072],
+        [0.0000, 0.0000]])
+  VSN output std:
+    encoder: 0.102021
+  Attention entropy: 2.264045
+  Regime attention gates: [[0.5377773642539978, 0.5366566181182861], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4701 (decay=prenormalized)
+  Staleness penalty - mean: 0.1625, max: 0.4701
+  Staleness weight grad (log-space, epoch avg): -0.000187
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 95
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 95: val_loss=0.3950323462486267
+Epoch 95: train_loss=0.41755831241607666
+
+[CollapseMonitor] Epoch 95
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.031130, range: 0.245599, mean: 0.059687
+  Pos: 100.0%, Neg: 0.0%, Unique: 1273
+  Dir Acc: 54.76%, Pred Sharpe: 30.4366
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch95.npy
+  Gradient norms:
+    lstm_encoder: 0.024193
+    lstm_decoder: 0.009389
+    output_layer: 0.096435
+  Regime gate grads (epoch avg): tensor([[-0.0111, -0.0090],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.100201
+  Attention entropy: 2.274089
+  Regime attention gates: [[0.5381484031677246, 0.536981999874115], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4699 (decay=prenormalized)
+  Staleness penalty - mean: 0.1624, max: 0.4699
+  Staleness weight grad (log-space, epoch avg): 0.001008
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 96
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 96: val_loss=0.39597055315971375
+Epoch 96: train_loss=0.41756513714790344
+
+[CollapseMonitor] Epoch 96
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.031381, range: 0.246730, mean: 0.070770
+  Pos: 100.0%, Neg: 0.0%, Unique: 1271
+  Dir Acc: 54.76%, Pred Sharpe: 35.7996
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch96.npy
+  Gradient norms:
+    lstm_encoder: 0.023622
+    lstm_decoder: 0.008923
+    output_layer: 0.093422
+  Regime gate grads (epoch avg): tensor([[-0.0023,  0.0017],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.100912
+  Attention entropy: 2.302973
+  Regime attention gates: [[0.5383726358413696, 0.5369559526443481], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4692 (decay=prenormalized)
+  Staleness penalty - mean: 0.1622, max: 0.4692
+  Staleness weight grad (log-space, epoch avg): 0.001340
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 97
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 97: val_loss=0.3954371213912964
+Epoch 97: train_loss=0.41853705048561096
+
+[CollapseMonitor] Epoch 97
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.031071, range: 0.243782, mean: 0.062643
+  Pos: 100.0%, Neg: 0.0%, Unique: 1270
+  Dir Acc: 54.76%, Pred Sharpe: 32.0047
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch97.npy
+  Gradient norms:
+    lstm_encoder: 0.026159
+    lstm_decoder: 0.010272
+    output_layer: 0.104849
+  Regime gate grads (epoch avg): tensor([[0.0047, 0.0100],
+        [0.0000, 0.0000]])
+  VSN output std:
+    encoder: 0.101804
+  Attention entropy: 2.265549
+  Regime attention gates: [[0.5384300947189331, 0.536915123462677], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4690 (decay=prenormalized)
+  Staleness penalty - mean: 0.1621, max: 0.4690
+  Staleness weight grad (log-space, epoch avg): 0.000143
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 98
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 98: val_loss=0.39460238814353943
+Epoch 98: train_loss=0.417879194021225
+
+[CollapseMonitor] Epoch 98
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.034179, range: 0.259235, mean: 0.066421
+  Pos: 100.0%, Neg: 0.0%, Unique: 1269
+  Dir Acc: 54.76%, Pred Sharpe: 30.8499
+  Composite: 0.4237 (dist_match: 0.5476, actual_pos: 54.8%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch98.npy
+  Gradient norms:
+    lstm_encoder: 0.026863
+    lstm_decoder: 0.010504
+    output_layer: 0.100686
+  Regime gate grads (epoch avg): tensor([[-0.0037, -0.0002],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.102132
+  Attention entropy: 2.249040
+  Regime attention gates: [[0.5387066006660461, 0.5369574427604675], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4689 (decay=prenormalized)
+  Staleness penalty - mean: 0.1621, max: 0.4689
+  Staleness weight grad (log-space, epoch avg): 0.000050
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 99
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 99: val_loss=0.39430898427963257
+Epoch 99: train_loss=0.4176976978778839
+
+[CollapseMonitor] Epoch 99
+  [DEBUG] Processed 21 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (1282,)
+  Pred std: 0.034442, range: 0.264155, mean: 0.051101
+  Pos: 99.5%, Neg: 0.5%, Unique: 1263
+  Dir Acc: 54.76%, Pred Sharpe: 23.5525
+  Composite: 0.4250 (dist_match: 0.5523, actual_pos: 54.8%, pred_pos: 99.5%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/val_predictions_epoch99.npy
+  Gradient norms:
+    lstm_encoder: 0.027627
+    lstm_decoder: 0.010138
+    output_layer: 0.097432
+  Regime gate grads (epoch avg): tensor([[-0.0081, -0.0032],
+        [ 0.0000,  0.0000]])
+  VSN output std:
+    encoder: 0.100120
+  Attention entropy: 2.231312
+  Regime attention gates: [[0.5390089750289917, 0.5370814204216003], [0.5034714937210083, 0.4982391893863678]]
+  Staleness attention weight: 0.4690 (decay=prenormalized)
+  Staleness penalty - mean: 0.1621, max: 0.4690
+  Staleness weight grad (log-space, epoch avg): -0.000060
+  Saved to: experiments/11_staleness_attention/attn_regime_combined/collapse_monitoring/collapse_monitor_latest.json
+
+
+======================================================================
+Training complete
+======================================================================
+
+Best val_loss checkpoint: experiments/11_staleness_attention/attn_regime_combined/checkpoints/tft-epoch=epoch=94-valloss=val_loss=0.3941.ckpt
+Best validation loss: 0.394088
+Checkpoints saved:
+  - Best val_loss: experiments/11_staleness_attention/attn_regime_combined/checkpoints/tft-epoch=epoch=94-valloss=val_loss=0.3941.ckpt
+  - Best pred_std: experiments/11_staleness_attention/attn_regime_combined/checkpoints/tft-epoch=epoch=94-predstd=val_pred_std=0.0347.ckpt
+  - Best unique: experiments/11_staleness_attention/attn_regime_combined/checkpoints/tft-epoch=epoch=92-unique=val_num_unique=1274.ckpt
+  - Best dir_acc: experiments/11_staleness_attention/attn_regime_combined/checkpoints/tft-epoch=epoch=38-diracc=val_dir_acc=0.5484.ckpt
+  - Best sharpe: experiments/11_staleness_attention/attn_regime_combined/checkpoints/tft-epoch=epoch=06-sharpe=val_sharpe=351.6668.ckpt
+  - Best composite: experiments/11_staleness_attention/attn_regime_combined/checkpoints/tft-epoch=epoch=00-composite=val_composite=0.4585.ckpt
+Completed at: 2025-12-10 18:20:43
+Log saved to: experiments/11_staleness_attention/attn_regime_combined/training_20251210_181434.log
+======================================================================
