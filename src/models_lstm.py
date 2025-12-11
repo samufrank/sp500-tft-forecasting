@@ -11,6 +11,8 @@ from tqdm import tqdm
 import warnings
 warnings.filterwarnings('ignore')
 
+from src.utils_lstm import compute_strategy_returns, compute_sharpe_ratio
+
 
 class FinancialLSTM(nn.Module):
     """
@@ -298,6 +300,7 @@ class LSTMStockPredictor:
             targets.reshape(-1, 1)
         ).flatten()
 
+        
         # Metrics
         mse = mean_squared_error(targets_actual, predictions_actual)
         rmse = np.sqrt(mse)
@@ -309,13 +312,24 @@ class LSTMStockPredictor:
 
         correlation = np.corrcoef(targets_actual, predictions_actual)[0, 1]
 
+        # --- NEW: strategy returns + Sharpe ratio (daily data → 252) ---
+        lstm_strategy_returns = compute_strategy_returns(
+            predictions_actual,
+            targets_actual,
+        )
+        lstm_sharpe = compute_sharpe_ratio(
+            lstm_strategy_returns,  # daily returns
+            periods_per_year=252    # daily trading days
+        )
+
         metrics = {
             'RMSE': rmse,
             'MAE': mae,
             'Directional_Accuracy': directional_accuracy,
             'Correlation': correlation,
             'Predictions': predictions_actual,
-            'Targets': targets_actual
+            'Targets': targets_actual,
+            'Sharpe_Ratio': lstm_sharpe,
         }
 
         print("\nLSTM Model Performance:")
@@ -323,8 +337,10 @@ class LSTMStockPredictor:
         print(f"  MAE: {mae:.4f}%")
         print(f"  Directional Accuracy: {directional_accuracy:.1%}")
         print(f"  Correlation: {correlation:.4f}")
+        print(f"  Sharpe Ratio: {lstm_sharpe:.4f}")
 
         return metrics
+
 
     # Baseline comparison (optional)
     def compare_with_baseline(

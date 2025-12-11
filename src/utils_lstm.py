@@ -16,6 +16,49 @@ plt.rcParams['axes.grid'] = True
 plt.rcParams['grid.alpha'] = 0.3
 
 
+
+def compute_strategy_returns(predicted_returns, actual_returns):
+    """
+    Build a simple long/short strategy based on the sign of the predictions.
+    Assumes both inputs are 1D arrays of (daily) returns.
+    Strategy:
+        - Long if predicted return > 0
+        - Short if predicted return < 0
+        - Flat if predicted return == 0
+    """
+    predicted_returns = np.asarray(predicted_returns).reshape(-1)
+    actual_returns = np.asarray(actual_returns).reshape(-1)
+
+    if predicted_returns.shape != actual_returns.shape:
+        raise ValueError("predicted_returns and actual_returns must have the same shape")
+
+    signal = np.sign(predicted_returns)  # -1, 0, +1
+    strategy_returns = signal * actual_returns
+    return strategy_returns
+
+
+
+def compute_sharpe_ratio(returns, risk_free_rate=0.0, periods_per_year=252):
+    """
+    Annualized Sharpe ratio.
+    `returns` should be per-period (e.g. daily) strategy returns.
+    """
+    returns = np.asarray(returns).reshape(-1)
+
+    if returns.size < 2:
+        return np.nan
+
+    # convert annual risk-free to per-period (optional; often left as 0)
+    excess_returns = returns - risk_free_rate / periods_per_year
+
+    std = np.std(excess_returns, ddof=1)
+    if std == 0 or np.isnan(std):
+        return np.nan
+
+    sharpe = np.sqrt(periods_per_year) * excess_returns.mean() / std
+    return sharpe
+
+
 def load_arimax_baseline(results_path: str = 'reports/results/arimax_baseline_results.csv'):
     """
     Load ARIMAX baseline metrics saved by train_arimax.py.
@@ -51,18 +94,20 @@ def load_arimax_baseline(results_path: str = 'reports/results/arimax_baseline_re
         'rmse': float(df[rmse_col].iloc[0]) if rmse_col in df.columns else None,
         'dir_acc': float(df['Directional_Accuracy'].iloc[0]) if 'Directional_Accuracy' in df.columns else None,
         'corr': float(df['Correlation'].iloc[0]) if 'Correlation' in df.columns else None,
+        'sharpe': float(df['Sharpe_Ratio'].iloc[0]) if 'Sharpe_Ratio' in df.columns else None,
     }
 
     if all(v is not None for v in (baseline['rmse'], baseline['dir_acc'], baseline['corr'])):
-        print(
+        msg = (
             f"[ARIMAX] Loaded baseline ({baseline['model_name']}): "
             f"RMSE={baseline['rmse']:.4f}, "
             f"DA={baseline['dir_acc']:.3f}, "
             f"Corr={baseline['corr']:.4f}"
         )
-    else:
-        print("[ARIMAX] Baseline file loaded but some fields are missing; "
-              "comparison will be partial.")
+        if baseline['sharpe'] is not None:
+            msg += f", Sharpe={baseline['sharpe']:.4f}"
+        print(msg)
+
 
     return baseline
 

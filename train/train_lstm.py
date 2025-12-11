@@ -11,11 +11,15 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import warnings
 
-import sys, os
+import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.models_lstm import LSTMStockPredictor
-from src.utils_lstm import create_comprehensive_visualization
+from src.utils_lstm import (
+    create_comprehensive_visualization,
+    compute_strategy_returns,
+    compute_sharpe_ratio,
+)
 from src.data_processing import create_financial_dataset
 
 
@@ -114,12 +118,18 @@ def main():
     print("Evaluating model on test set...")
     try:
         metrics = predictor.evaluate_model()
-        print()
+
+        # NEW: compute Sharpe ratio for LSTM strategy (test set)
+        lstm_strategy_returns = compute_strategy_returns(
+            metrics['Predictions'], metrics['Targets']
+        )
+        lstm_sharpe = compute_sharpe_ratio(lstm_strategy_returns)
+        metrics['Sharpe_Ratio'] = lstm_sharpe
+
+        print(f"LSTM Sharpe Ratio (test set): {lstm_sharpe:.4f}\n")
     except Exception as e:
         print(f"Error during evaluation: {e}")
         return
-
-
 
 
 
@@ -140,11 +150,18 @@ def main():
     # Save final results
     print("Saving results...")
     try:
+        # Strategy returns: long/short based on LSTM predictions
+        strategy_returns = compute_strategy_returns(
+            metrics['Predictions'],
+            metrics['Targets']
+        )
+
         results_df = pd.DataFrame({
             'Actual_Returns': metrics['Targets'],
             'Predicted_Returns': metrics['Predictions'],
+            'Strategy_Returns': strategy_returns,
             'Actual_Direction': np.sign(metrics['Targets']),
-            'Predicted_Direction': np.sign(metrics['Predictions'])
+            'Predicted_Direction': np.sign(metrics['Predictions']),
         })
         results_df.to_csv('reports/results/lstm_predictions_corrected.csv', index=False)
 
@@ -152,7 +169,8 @@ def main():
             'RMSE': metrics['RMSE'],
             'MAE': metrics['MAE'],
             'Directional_Accuracy': metrics['Directional_Accuracy'],
-            'Correlation': metrics['Correlation']
+            'Correlation': metrics['Correlation'],
+            'Sharpe_Ratio': metrics.get('Sharpe_Ratio', np.nan),
         }
 
         with open('reports/results/model_metrics_corrected.txt', 'w') as f:
@@ -171,6 +189,7 @@ def main():
 
     except Exception as e:
         print(f"Warning: Could not save results: {e}")
+
 
 
     # Comapre with ARIMAX results

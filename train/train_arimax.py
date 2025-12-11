@@ -1,5 +1,5 @@
-# %% 
 import os
+import sys
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -7,12 +7,23 @@ import seaborn as sns
 import warnings
 warnings.filterwarnings('ignore')
 
+# Make sure the project root (with src/) is on sys.path
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+if CURRENT_DIR not in sys.path:
+    sys.path.append(CURRENT_DIR)
+PARENT_DIR = os.path.dirname(CURRENT_DIR)
+if PARENT_DIR not in sys.path:
+    sys.path.append(PARENT_DIR)
+
 from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.stattools import adfuller
 from statsmodels.stats.diagnostic import acorr_ljungbox
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from scipy import stats
 import itertools
+
+from src.utils_lstm import compute_strategy_returns, compute_sharpe_ratio
+
 
 # %% [markdown]
 # ### Step 1: Load sample data
@@ -337,25 +348,33 @@ if model_success:
     print(" Predictions generated successfully!")
     
     def calculate_metrics(actual, predicted, model_name):
-        """Calculate evaluation metrics."""
+        """Calculate evaluation metrics (including Sharpe ratio)."""
         mask = ~(np.isnan(actual) | np.isnan(predicted))
         actual_clean = np.asarray(actual)[mask]
         predicted_clean = np.asarray(predicted)[mask]
-        
+
         if len(actual_clean) == 0:
             return None
-        
+
         mse = mean_squared_error(actual_clean, predicted_clean)
         rmse = np.sqrt(mse)
         mae = mean_absolute_error(actual_clean, predicted_clean)
-        
+
         actual_direction = np.sign(actual_clean)
         predicted_direction = np.sign(predicted_clean)
         directional_accuracy = np.mean(actual_direction == predicted_direction)
-        
-        correlation = (np.corrcoef(actual_clean, predicted_clean)[0, 1]
-                       if len(actual_clean) > 1 else 0.0)
-        
+
+        correlation = (
+            np.corrcoef(actual_clean, predicted_clean)[0, 1]
+            if len(actual_clean) > 1 else 0.0
+        )
+
+        # NEW: strategy returns & Sharpe ratio
+        strategy_returns = compute_strategy_returns(
+            predicted_clean, actual_clean
+        )
+        sharpe = compute_sharpe_ratio(strategy_returns)
+
         return {
             'Model': model_name,
             'MSE': mse,
@@ -363,8 +382,10 @@ if model_success:
             'MAE': mae,
             'Directional_Accuracy': directional_accuracy,
             'Correlation': correlation,
+            'Sharpe_Ratio': sharpe,
             'Observations': len(actual_clean),
         }
+
     
     in_sample_metrics = calculate_metrics(
         train_y.values,
@@ -380,7 +401,7 @@ if model_success:
     
     print(f"\nPERFORMANCE EVALUATION:")
     print("=" * 70)
-    
+
     if in_sample_metrics:
         print("IN-SAMPLE PERFORMANCE:")
         print(f"  RMSE: {in_sample_metrics['RMSE']:.4f}")
@@ -388,7 +409,8 @@ if model_success:
         print(f"  Directional Accuracy: "
               f"{in_sample_metrics['Directional_Accuracy']:.1%}")
         print(f"  Correlation: {in_sample_metrics['Correlation']:.4f}")
-    
+        print(f"  Sharpe Ratio: {in_sample_metrics['Sharpe_Ratio']:.4f}")
+
     if out_sample_metrics:
         print("\nOUT-OF-SAMPLE PERFORMANCE:")
         print(f"  RMSE: {out_sample_metrics['RMSE']:.4f}")
@@ -396,6 +418,8 @@ if model_success:
         print(f"  Directional Accuracy: "
               f"{out_sample_metrics['Directional_Accuracy']:.1%}")
         print(f"  Correlation: {out_sample_metrics['Correlation']:.4f}")
+        print(f"  Sharpe Ratio: {out_sample_metrics['Sharpe_Ratio']:.4f}")
+
     
     print(f"\n MODEL DIAGNOSTICS:")
     print("-" * 30)
@@ -508,25 +532,34 @@ results_summary = {
                              if out_sample_metrics else None),
     'Correlation': (out_sample_metrics['Correlation']
                     if out_sample_metrics else None),
+    'Sharpe_Ratio': (out_sample_metrics['Sharpe_Ratio']
+                     if out_sample_metrics else None),
     'AIC': arimax_fitted.aic if model_success else None,
     'BIC': arimax_fitted.bic if model_success else None,
 }
+
 
 results_df = pd.DataFrame([results_summary])
 results_df.to_csv('reports/results/arimax_baseline_results.csv', index=False)
 print("Saved ARIMAX results to 'reports/results/arimax_baseline_results.csv'")
 
 if model_success and out_sample_metrics:
+    # Strategy returns for ARIMAX: long/short on prediction sign
+    strategy_returns = compute_strategy_returns(
+        forecast.values, test_y.values
+    )
+
     predictions_df = pd.DataFrame({
         'Date': test_y.index,
         'Actual': test_y.values,
         'Predicted': forecast.values,
         'Error': test_y.values - forecast.values,
+        'Strategy_Returns': strategy_returns,
     })
     predictions_df.to_csv('reports/results/arimax_predictions.csv', index=False)
-    print("Saved predictions to 'reports/results/arimax_predictions.csv'")
 else:
     print("Skipping prediction CSV save because model evaluation was incomplete.")
+
 
 print("\nARIMAX IMPLEMENTATION COMPLETE!")
 print("="*50)
@@ -551,10 +584,13 @@ def load_arimax_data():
     """Load ARIMAX results and predictions data."""
     try:
         results_df = pd.read_csv('reports/results/arimax_baseline_results.csv')
+
         model_name = results_df['Model'].iloc[0]
         rmse = results_df['Out_Sample_RMSE'].iloc[0]
         dir_acc = results_df['Directional_Accuracy'].iloc[0]
         correlation = results_df['Correlation'].iloc[0]
+        sharpe = results_df['Sharpe_Ratio'].iloc[0] if 'Sharpe_Ratio' in results_df.columns else None
+
 
         predictions_df = pd.read_csv('reports/results/arimax_predictions.csv')
         predictions_df['Date'] = pd.to_datetime(predictions_df['Date'])
@@ -571,8 +607,10 @@ def load_arimax_data():
             'rmse': rmse,
             'directional_accuracy': dir_acc,
             'correlation': correlation,
+            'sharpe': sharpe,
             'predictions': predictions_df,
         }
+
 
     except FileNotFoundError as e:
         print(f"Error loading ARIMAX data: {e}")
@@ -589,7 +627,9 @@ def plot_arimax_results():
     rmse = data['rmse']
     dir_acc = data['directional_accuracy']
     correlation = data['correlation']
+    sharpe = data.get('sharpe')
     predictions_df = data['predictions']
+
 
     sns.set_style("whitegrid")
     plt.figure(figsize=(18, 10))
@@ -628,6 +668,8 @@ def plot_arimax_results():
     print(f"  Out-of-sample RMSE: {rmse:.4f}")
     print(f"  Directional accuracy: {dir_acc:.1%}")
     print(f"  Correlation: {correlation:.4f}")
+    if sharpe is not None and not np.isnan(sharpe):
+        print(f"  Sharpe ratio: {sharpe:.4f}")
 
 
 if __name__ == "__main__":
