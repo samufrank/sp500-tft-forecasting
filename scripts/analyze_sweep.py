@@ -14,17 +14,50 @@ import sys
 
 
 def parse_experiment_name(name: str) -> dict:
-    """Parse experiment name like 'weekly_3q_h1_s42' into factors."""
-    # Pattern: {freq}_{quant}_{horizon}_{seed}
+    """Parse experiment name like 'weekly_3q_h1_s42' or 'daily_7q_cumret10_s42' into factors."""
+    # Pattern 1: {freq}_{quant}_h{horizon}_{seed} (point-return)
     match = re.match(r'(weekly|daily)_(\d+q)_h(\d+)_s(\d+)', name)
     if match:
         return {
             'frequency': match.group(1),
             'quantiles': match.group(2),
             'horizon': int(match.group(3)),
+            'target': 'SP500_Returns',
             'seed': int(match.group(4))
         }
+    
+    # Pattern 2: {freq}_{quant}_cumret{horizon}_{seed} (cumulative return)
+    match = re.match(r'(weekly|daily)_(\d+q)_cumret(\d+)_s(\d+)', name)
+    if match:
+        return {
+            'frequency': match.group(1),
+            'quantiles': match.group(2),
+            'horizon': int(match.group(3)),
+            'target': f'cumret_{match.group(3)}',
+            'seed': int(match.group(4))
+        }
+    
     return None
+
+
+# Base positive rates for test set by frequency and target
+BASE_RATES = {
+    ('daily', 'SP500_Returns'): 0.536,
+    ('daily', 'cumret_5'): 0.597,
+    ('daily', 'cumret_10'): 0.636,
+    ('daily', 'cumret_20'): 0.671,
+    ('daily', 'cumret_30'): 0.682,
+    ('weekly', 'SP500_Returns'): 0.560,
+    ('weekly', 'cumret_5'): 0.658,
+    ('weekly', 'cumret_10'): 0.737,
+    ('weekly', 'cumret_20'): 0.745,
+    ('weekly', 'cumret_30'): 0.765,
+}
+
+
+def get_base_rate(frequency: str, target: str) -> float:
+    """Get base positive rate for frequency/target combination."""
+    return BASE_RATES.get((frequency, target), 0.5)
 
 
 def load_sweep_results(sweep_dir: Path, min_epoch: int = 20) -> pd.DataFrame:
@@ -54,19 +87,16 @@ def load_sweep_results(sweep_dir: Path, min_epoch: int = 20) -> pd.DataFrame:
         # Get best by dir_acc
         best = df_filtered.loc[df_filtered['dir_acc'].idxmax()]
         
-        # Base rates for each frequency
-        BASE_RATES = {
-            'weekly': 0.568,
-            'daily': 0.539,
-        }
+        # Get base rate for this frequency/target combination
+        base_rate = get_base_rate(factors['frequency'], factors['target'])
         
         results.append({
             'experiment': exp_path.name,
             **factors,
             'epoch': int(best['epoch']),
             'dir_acc': best['dir_acc'],
-            'base_rate': BASE_RATES.get(factors['frequency'], 0.5),
-            'excess_dir_acc': best['dir_acc'] - BASE_RATES.get(factors['frequency'], 0.5),
+            'base_rate': base_rate,
+            'excess_dir_acc': best['dir_acc'] - base_rate,
             'sharpe': best['sharpe'],
             'healthy_pct': best['healthy_pct'],
             'unidirectional_pct': best['unidirectional_pct'],
@@ -88,11 +118,7 @@ def print_factor_analysis(df: pd.DataFrame):
     # Base rates already added in load_sweep_results
     # Just ensure they exist for safety
     if 'excess_dir_acc' not in df.columns:
-        BASE_RATES = {
-            'weekly': 0.568,
-            'daily': 0.539,
-        }
-        df['base_rate'] = df['frequency'].map(BASE_RATES)
+        df['base_rate'] = df.apply(lambda r: get_base_rate(r['frequency'], r['target']), axis=1)
         df['excess_dir_acc'] = df['dir_acc'] - df['base_rate']
     
     metrics = ['dir_acc', 'excess_dir_acc', 'sharpe', 'healthy_pct', 'unidirectional_pct', 'collapse_pct', 'pred_std']
@@ -101,8 +127,22 @@ def print_factor_analysis(df: pd.DataFrame):
     print("FACTOR ANALYSIS (mean ± std across seeds)")
     print("="*90)
     
+    # By Target (if multiple targets exist)
+    unique_targets = df['target'].unique()
+    if len(unique_targets) > 1:
+        print("\n>>> BY TARGET")
+        target_agg = df.groupby('target')[metrics].agg(['mean', 'std'])
+        for target in sorted(target_agg.index):
+            row = target_agg.loc[target]
+            # Get representative base rate (daily, since that's most common)
+            base = get_base_rate('daily', target)
+            print(f"  {target:16s}: DirAcc={row['dir_acc']['mean']*100:.1f}±{row['dir_acc']['std']*100:.1f}%  "
+                  f"Excess={row['excess_dir_acc']['mean']*100:+.1f}%  "
+                  f"Sharpe={row['sharpe']['mean']:.2f}  "
+                  f"BaseRate={base*100:.1f}%")
+    
     # By Frequency
-    print("\n>>> BY FREQUENCY (base rate: weekly=56.8%, daily=53.9%)")
+    print("\n>>> BY FREQUENCY (excess uses target-specific base rates)")
     freq_agg = df.groupby('frequency')[metrics].agg(['mean', 'std'])
     for freq in ['weekly', 'daily']:
         if freq in freq_agg.index:
@@ -161,11 +201,7 @@ def print_top_experiments(df: pd.DataFrame, n: int = 5):
     
     # Base rates already added in load_sweep_results
     if 'excess_dir_acc' not in df.columns:
-        BASE_RATES = {
-            'weekly': 0.568,
-            'daily': 0.539,
-        }
-        df['base_rate'] = df['frequency'].map(BASE_RATES)
+        df['base_rate'] = df.apply(lambda r: get_base_rate(r['frequency'], r['target']), axis=1)
         df['excess_dir_acc'] = df['dir_acc'] - df['base_rate']
     
     print("\n" + "="*90)
@@ -179,10 +215,10 @@ def print_top_experiments(df: pd.DataFrame, n: int = 5):
         print(f"  {row['experiment']:30s} DirAcc={row['dir_acc']*100:.1f}%  Excess={row['excess_dir_acc']*100:+.1f}%  Sharpe={row['sharpe']:.2f}  Healthy={row['healthy_pct']:.1f}%")
     
     # Top by excess_dir_acc (above base rate)
-    print(f"\n>>> By Excess DirAcc (above base rate)")
-    top_excess = df.nlargest(n, 'excess_dir_acc')[['experiment', 'dir_acc', 'excess_dir_acc', 'sharpe', 'healthy_pct', 'pct_positive']]
+    print(f"\n>>> By Excess DirAcc (above target-specific base rate)")
+    top_excess = df.nlargest(n, 'excess_dir_acc')[['experiment', 'dir_acc', 'excess_dir_acc', 'base_rate', 'sharpe', 'healthy_pct', 'pct_positive']]
     for _, row in top_excess.iterrows():
-        print(f"  {row['experiment']:30s} Excess={row['excess_dir_acc']*100:+.1f}%  DirAcc={row['dir_acc']*100:.1f}%  Pct+={row['pct_positive']:.0f}%  Healthy={row['healthy_pct']:.1f}%")
+        print(f"  {row['experiment']:30s} Excess={row['excess_dir_acc']*100:+.1f}%  DirAcc={row['dir_acc']*100:.1f}%  Base={row['base_rate']*100:.1f}%  Healthy={row['healthy_pct']:.1f}%")
     
     # Top by Sharpe
     print(f"\n>>> By Sharpe Ratio")

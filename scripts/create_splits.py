@@ -347,6 +347,19 @@ def main():
             'end': str(test.index[-1])
         }
     
+    # Add positive rates (base rates) for all target columns
+    target_cols = ['SP500_Returns']
+    if args.cumret:
+        target_cols += [f'cumret_{h}' for h in CUMRET_HORIZONS]
+    
+    metadata['positive_rates'] = {}
+    for split_name, split_df in [('train', train), ('val', val), ('test', test)]:
+        if len(split_df) > 0:
+            metadata['positive_rates'][split_name] = {
+                col: round((split_df[col] > 0).mean() * 100, 2)
+                for col in target_cols if col in split_df.columns
+            }
+    
     metadata_path = os.path.join(version_output_dir, f"{split_prefix}_metadata.json")
     with open(metadata_path, 'w') as f:
         json.dump(metadata, f, indent=2)
