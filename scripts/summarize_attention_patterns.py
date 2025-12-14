@@ -491,10 +491,16 @@ def correlate_attention_collapse(summary_df, collapse_df):
 def plot_entropy_distribution(summary_df, output_dir):
     """Plot entropy distributions by phase with clear statistical comparison."""
     # Extract phase from experiment_name (first part before /)
+    summary_df = summary_df.copy()
     summary_df['phase'] = summary_df['experiment_name'].str.split('/').str[0]
     
     phases = sorted(summary_df['phase'].unique())
     n_phases = len(phases)
+    
+    # Skip if only one phase - comparison plot not meaningful
+    if n_phases < 2:
+        print("  Skipping attention_metrics_by_phase.png (only one phase)")
+        return False
     
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     
@@ -591,6 +597,102 @@ def plot_entropy_distribution(summary_df, output_dir):
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()
     
+    print(f"Saved: {output_path}")
+    return True
+
+
+def plot_attention_patterns_heatmap(attention_data, output_dir):
+    """
+    Heatmap of attention weights by period and timestep (averaged across experiments).
+    
+    Similar to VSN feature importance heatmap but for temporal attention.
+    """
+    if not attention_data:
+        print("  No attention data for heatmap")
+        return
+    
+    # Collect all attention patterns by period
+    period_attention = {}  # period -> list of attention arrays
+    
+    for exp_name, data in attention_data.items():
+        period_stats = data.get('period_statistics', {})
+        
+        for period, stats in period_stats.items():
+            mean_attn = stats.get('mean_attention', [])
+            if len(mean_attn) > 0:
+                if period not in period_attention:
+                    period_attention[period] = []
+                period_attention[period].append(np.array(mean_attn))
+    
+    if not period_attention:
+        print("  No attention patterns found in data")
+        return
+    
+    # Get all timestep counts to check consistency
+    all_timestep_counts = []
+    for attns in period_attention.values():
+        for a in attns:
+            all_timestep_counts.append(len(a))
+    
+    if not all_timestep_counts:
+        print("  No timestep counts found")
+        return
+    
+    # Use the most common timestep count
+    from collections import Counter
+    count_freq = Counter(all_timestep_counts)
+    n_timesteps = count_freq.most_common(1)[0][0]
+    
+    print(f"  Timestep counts found: {dict(count_freq)}")
+    print(f"  Using n_timesteps={n_timesteps}")
+    
+    # Filter to periods with consistent timestep count
+    period_attention_filtered = {}
+    for p, attns in period_attention.items():
+        valid_attns = [a for a in attns if len(a) == n_timesteps]
+        if valid_attns:
+            period_attention_filtered[p] = valid_attns
+    
+    if not period_attention_filtered:
+        print("  No consistent attention patterns after filtering")
+        return
+    
+    # Average across experiments for each period
+    periods = sorted(period_attention_filtered.keys())
+    attention_matrix = np.zeros((len(periods), n_timesteps))
+    
+    for i, period in enumerate(periods):
+        attns = period_attention_filtered[period]
+        attention_matrix[i] = np.mean(attns, axis=0)
+    
+    # Create timestep labels (t-19, t-18, ..., t-0)
+    timestep_labels = [f"t-{n_timesteps - 1 - j}" for j in range(n_timesteps)]
+    
+    # Create heatmap
+    fig, ax = plt.subplots(figsize=(max(12, n_timesteps * 0.5), max(6, len(periods) * 0.5)))
+    
+    sns.heatmap(
+        attention_matrix,
+        xticklabels=timestep_labels,
+        yticklabels=periods,
+        cmap='YlOrRd',
+        annot=True if n_timesteps <= 20 else False,
+        fmt='.3f' if n_timesteps <= 20 else '',
+        cbar_kws={'label': 'Mean Attention Weight'},
+        ax=ax
+    )
+    
+    ax.set_title('Attention Patterns by Period (Averaged Across Experiments)', 
+                 fontsize=14, fontweight='bold')
+    ax.set_xlabel('Timestep (lookback)', fontsize=12)
+    ax.set_ylabel('Period', fontsize=12)
+    
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
+    
+    output_path = Path(output_dir) / 'attention_heatmap.png'
+    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    plt.close()
     print(f"Saved: {output_path}")
 
 
@@ -1107,7 +1209,8 @@ def main():
     
     # Generate visualizations
     print("\nGenerating visualizations...")
-    plot_entropy_distribution(summary_df, output_dir)
+    metrics_by_phase_generated = plot_entropy_distribution(summary_df, output_dir)
+    plot_attention_patterns_heatmap(attention_data, output_dir)
     plot_shift_timeline(shift_df, output_dir)
     plot_correlation_heatmap(corr_matrix, output_dir)
     
@@ -1123,7 +1226,9 @@ def main():
     if not shift_df.empty:
         print(f"  - attention_shifts.csv")
     print(f"  - attention_analysis_report.txt")
-    print(f"  - attention_metrics_by_phase.png")
+    if metrics_by_phase_generated:
+        print(f"  - attention_metrics_by_phase.png")
+    print(f"  - attention_heatmap.png")
     if not shift_df.empty:
         print(f"  - attention_shift_timeline.png")
     if corr_matrix is not None:

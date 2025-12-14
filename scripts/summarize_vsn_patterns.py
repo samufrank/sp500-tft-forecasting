@@ -535,9 +535,10 @@ def correlate_vsn_with_collapse(summary_df: pd.DataFrame,
     if not collapse_cols:
         return merged, None
     
-    # Filter to numeric columns
+    # Filter to numeric columns that have at least some non-NaN values and non-zero variance
     numeric_cols = [c for c in vsn_cols + collapse_cols if c in merged.columns and 
-                    pd.api.types.is_numeric_dtype(merged[c])]
+                    pd.api.types.is_numeric_dtype(merged[c]) and 
+                    merged[c].notna().sum() > 1 and merged[c].std() > 0]
     
     if len(numeric_cols) < 2:
         return merged, None
