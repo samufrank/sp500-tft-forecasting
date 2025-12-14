@@ -81,17 +81,6 @@ S&P 500 daily returns have known statistical properties:
 
 TFT models often predict only positive returns (exploiting market drift) or constant values (collapse). Distribution-aware loss encodes domain knowledge as training constraint, forcing model to learn temporal dynamics rather than exploiting simple statistics.
 
-## Implications for custom TFT
-Distribution-aware loss is theoretically sound and should prevent collapse, but implementation requires full control over loss computation:
-- Cannot use monkey-patching (breaks checkpoint serialization)
-- Cannot modify pytorch-forecasting's Metric interface (too restrictive)
-- Must own loss function in custom TFT implementation
-
-Custom TFT will natively support distribution penalties:
-- Add penalties directly in loss computation (no external patching)
-- Toggle via hyperparameters (mean_weight, std_weight)
-- Properly serialize in checkpoints (penalties part of model definition)
-
 ## Alternative investigation: Darts library
 Investigated whether Darts (Unit8's time series framework) could provide easier extensibility than pytorch-forecasting. Conclusion: No.
 
@@ -104,9 +93,7 @@ These experiments cannot be evaluated due to checkpoint corruption. Training log
 
 For future distribution-aware loss testing, use custom TFT implementation where penalties are part of model definition, not runtime patches.
 
-## Next steps
-Implement custom TFT from scratch with:
-1. Native distribution-aware loss (trivial to add once we control the architecture)
-2. Staleness-aware attention mechanisms (modify decoder to weight attention by staleness)
-3. Regime-conditional attention heads (separate mechanisms for different volatility regimes)
-4. Full control over serialization, gradient flow, and architectural modifications
+## Outcome
+This phase demonstrated that monkey-patching is fundamentally incompatible with PyTorch checkpoint serialization. While the distribution-aware loss approach is theoretically sound, implementation via runtime patching creates unrecoverable checkpoints.
+
+**Subsequent phases** (4-11) successfully implemented loss modifications by subclassing pytorch-forecasting components rather than monkey-patching, avoiding serialization issues while maintaining architectural flexibility. Phase 4 demonstrated that directional diversity penalties can be implemented through proper subclassing with full checkpoint compatibility.

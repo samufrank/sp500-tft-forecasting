@@ -120,4 +120,4 @@ python summarize_experiments.py --phase 02_vintage_baseline
 These models were trained with vintage alignment. Do not evaluate with fixed test data - results will not be meaningful.
 
 ## Next
-Phase 3 attempted distribution-aware loss (anti-drift, anti-collapse penalties) via monkey-patching but encountered checkpoint serialization failures. All future work will use custom TFT implementation where loss functions and architectural modifications are fully controlled.
+Phase 3 attempted distribution-aware loss (anti-drift, anti-collapse penalties) via monkey-patching but encountered checkpoint serialization failures. 
