@@ -29,21 +29,76 @@ Example fold structure:
 
 ## Models evaluated
 
-| Config | Frequency | Hidden | Encoder | Dropout | Batch |
-|--------|-----------|--------|---------|---------|-------|
-| daily_h16_baseline | daily | 16 | 20 | 0.10 | 64 |
-| weekly_h16_enc8_d025_bs32 | weekly | 16 | 8 | 0.25 | 32 |
-| weekly_h16_enc12_d015_bs16 | weekly | 16 | 12 | 0.15 | 16 |
+**Phase 06b baseline configs:**
 
-Daily config from Phase 02b best baseline. Weekly configs from Phase 06a top performers.
+| Config | Frequency | Hidden | Encoder | Dropout | Batch | Quantiles | Horizons |
+|--------|-----------|--------|---------|---------|-------|-----------|----------|
+| daily_h16_baseline | daily | 16 | 20 | 0.10 | 64 | 7q | 1 |
+| weekly_h16_enc8_d025_bs32 | weekly | 16 | 8 | 0.25 | 32 | 7q | 1 |
+| weekly_h16_enc12_d015_bs16 | weekly | 16 | 12 | 0.15 | 16 | 7q | 1 |
+
+Daily baseline from Phase 02b. Weekly configs from Phase 06a top performers.
+
+**Phase 10 multi-horizon validation:**
+
+| Config | Frequency | Hidden | Encoder | Dropout | Batch | Quantiles | Horizons |
+|--------|-----------|--------|---------|---------|-------|-----------|----------|
+| daily_7q_h5 | daily | 16 | 20 | 0.10 | 64 | 7q | 5 |
+| daily_7q_h10 | daily | 16 | 20 | 0.10 | 64 | 7q | 10 |
+| daily_7q_h30 | daily | 16 | 20 | 0.10 | 64 | 7q | 30 |
+| daily_7q_h5_drop025 | daily | 16 | 20 | 0.25 | 64 | 7q | 5 |
+
+**Phase 10 parameter budget test (3q):**
+
+| Config | Frequency | Hidden | Encoder | Dropout | Batch | Quantiles | Horizons |
+|--------|-----------|--------|---------|---------|-------|-----------|----------|
+| daily_3q_h1_drop025 | daily | 16 | 20 | 0.25 | 64 | 3q | 1 |
+| daily_3q_h5_drop025 | daily | 16 | 20 | 0.25 | 64 | 3q | 5 |
+| daily_3q_h10_drop025 | daily | 16 | 20 | 0.25 | 64 | 3q | 10 |
+| daily_3q_h20_drop025 | daily | 16 | 20 | 0.25 | 64 | 3q | 20 |
+| daily_3q_h30_drop025 | daily | 16 | 20 | 0.25 | 64 | 3q | 30 |
 
 ## Summary results
 
+**Phase 06b baselines:**
+
 | Config | Dir Acc | Sharpe | Healthy % | Total Return |
 |--------|---------|--------|-----------|--------------|
-| Daily | 53.3% ± 5.2% | 0.95 ± 1.31 | 17.6% ± 13.9% | 11.0% ± 12.7% |
-| Weekly enc8 | 58.5% ± 7.6% | 1.22 ± 1.16 | 11.6% ± 0.8% | 10.5% ± 12.6% |
-| Weekly enc12 | 59.1% ± 8.3% | 1.52 ± 1.33 | 13.0% ± 1.0% | 15.1% ± 20.9% |
+| daily_h16_baseline | 53.3% ± 5.2% | 0.95 ± 1.31 | 17.6% ± 13.9% | 11.0% ± 12.7% |
+| weekly_enc8 | 58.5% ± 7.6% | 1.22 ± 1.16 | 11.6% ± 0.8% | 10.5% ± 12.6% |
+| weekly_enc12 | 59.1% ± 8.3% | 1.52 ± 1.33 | 13.0% ± 1.0% | 15.1% ± 20.9% |
+
+**Phase 10 multi-horizon (7q):**
+
+| Config | Dir Acc | Sharpe | Healthy % | Fold Base Rate | Excess |
+|--------|---------|--------|-----------|----------------|--------|
+| daily_7q_h5 | 52.2% ± 5.2% | 0.82 ± 1.05 | 18.2% ± 7.1% | 54.5% | -2.3pp |
+| daily_7q_h10 | 50.9% ± 5.5% | 0.94 ± 1.04 | 26.8% ± 17.6% | 54.5% | -3.6pp |
+| daily_7q_h30 | 47.3% ± 5.3% | 0.54 ± 0.88 | 22.3% ± 15.2% | 54.5% | -7.2pp |
+
+**Phase 10 parameter budget (3q):**
+
+| Config | Dir Acc | Sharpe | Healthy % | Fold Base Rate | Excess |
+|--------|---------|--------|-----------|----------------|--------|
+| daily_3q_h1 | 54.4% ± 4.7% | 1.11 ± 1.03 | 14.9% ± 0.2% | 54.5% | -0.1pp |
+| daily_3q_h5 | 54.5% ± 4.8% | 1.08 ± 1.11 | 15.2% ± 0.2% | 54.5% | +0.0pp |
+| daily_3q_h10 | 53.8% ± 5.2% | 0.97 ± 1.10 | 16.7% ± 2.6% | 54.5% | -0.7pp |
+| daily_3q_h20 | 52.2% ± 5.0% | 0.75 ± 0.98 | 18.8% ± 5.2% | 54.5% | -2.3pp |
+
+## Multi-horizon and parameter budget findings
+
+**Multi-horizon prediction (7q) shows monotonic degradation:**
+- Longer horizons perform progressively worse: h5 (-2.3pp) < h10 (-3.6pp) < h30 (-7.2pp)
+- Fixed-split improvements (+2.1% excess for h10) did not generalize to rolling evaluation
+- Models with more horizons exhibit higher collapse rates (higher unidirectional_pct)
+
+**Parameter budget hypothesis validated (3q):**
+- Reducing quantiles from 7 to 3 reduces output layer size (15 vs 35 outputs for h5)
+- 3q_h5 achieves 0pp excess vs 7q_h5 at -2.3pp excess
+- 3q configurations maintain near-zero excess across horizons (h1: -0.1pp, h5: 0.0pp, h10: -0.7pp)
+- Pattern suggests output layer capacity constraints limit multi-horizon generalization
+
+**Key insight:** Multi-horizon prediction doesn't provide generalizable improvement for S&P 500 forecasting. Models achieve near-zero excess by predicting predominantly positive returns across all horizons rather than extracting horizon-specific temporal patterns.
 
 ## Key findings
 
@@ -153,28 +208,50 @@ Rolling splits generated per fold in `data/splits/rolling/fold_XXXX/`:
 
 ## Experiments structure
 
-Total: 27 experiments (3 configs × 9 folds)
+Total: 108 experiments across multiple phases
+- Phase 06b baselines: 3 configs × 9 folds = 27 experiments
+- Phase 10 multi-horizon (7q): 4 configs × 9 folds = 36 experiments  
+- Phase 10 parameter budget (3q): 5 configs × 9 folds = 45 experiments
 
 Directory structure:
 ```
 experiments/06b_rolling/
-├── daily_h16_baseline/
+├── README.md
+├── rolling_comparison.csv
+├── rolling_comparison.png
+├── daily_h16_baseline/           # Phase 06b
 │   ├── fold_2016/
 │   ├── fold_2017/
 │   ├── ...
 │   ├── fold_2024/
 │   └── rolling_results_full.csv
-├── weekly_h16_enc8_d025_bs32/
+├── weekly_h16_enc8_d025_bs32/    # Phase 06b
 │   └── ...
-└── weekly_h16_enc12_d015_bs16/
+├── weekly_h16_enc12_d015_bs16/   # Phase 06b
+│   └── ...
+├── daily_7q_h5/                  # Phase 10 multi-horizon
+│   └── ...
+├── daily_7q_h10/                 # Phase 10 multi-horizon
+│   └── ...
+├── daily_7q_h30/                 # Phase 10 multi-horizon
+│   └── ...
+├── daily_3q_h1_drop025/          # Phase 10 parameter budget
+│   └── ...
+├── daily_3q_h5_drop025/          # Phase 10 parameter budget
+│   └── ...
+├── daily_3q_h10_drop025/         # Phase 10 parameter budget
+│   └── ...
+├── daily_3q_h20_drop025/         # Phase 10 parameter budget
+│   └── ...
+└── daily_3q_h30_drop025/         # Phase 10 parameter budget
     └── ...
 ```
 
-Each fold contains full experiment output (checkpoints, evaluation, logs).
+Each experiment directory contains 9 folds with full experiment output (checkpoints, evaluation, logs).
 
 ## Reproducing results
 
-Run rolling evaluation for a new config:
+Run rolling evaluation for baseline config:
 ```bash
 python train/rolling_evaluation.py \
     --experiment-prefix 06b_rolling/my_config \
@@ -187,11 +264,26 @@ python train/rolling_evaluation.py \
     --batch-size 32
 ```
 
+Run rolling evaluation with multi-horizon:
+```bash
+python train/rolling_evaluation.py \
+    --experiment-prefix 06b_rolling/my_multi_horizon \
+    --frequency daily \
+    --mode rolling \
+    --train-years 10 \
+    --hidden-size 16 \
+    --max-encoder-length 20 \
+    --dropout 0.25 \
+    --batch-size 64 \
+    --quantiles 3q \
+    --max-prediction-length 5
+```
+
 Analyze results:
 ```bash
 python scripts/analyze_rolling.py \
     experiments/06b_rolling/daily_h16_baseline \
-    experiments/06b_rolling/weekly_h16_enc8_d025_bs32 \
+    experiments/06b_rolling/daily_3q_h5_drop025 \
     experiments/06b_rolling/weekly_h16_enc12_d015_bs16 \
     --output experiments/06b_rolling/comparison.csv
 ```
