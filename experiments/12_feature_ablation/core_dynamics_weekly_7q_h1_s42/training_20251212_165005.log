@@ -1,0 +1,2320 @@
+
+[INFO] Using AUTO device selection.
+
+[INFO] Patched matplotlib.Axes.errorbar to abs() negative yerr for robustness.
+======================================================================
+Training TFT: 12_feature_ablation/core_dynamics_weekly_7q_h1_s42
+======================================================================
+Logging to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/training_20251212_165005.log
+Started at: 2025-12-12 16:50:05
+======================================================================
+
+Loading data splits...
+Train: 908 samples
+Val: 195 samples
+Test: 195 samples
+
+Preparing TimeSeriesDataSet...
+
+Final features for TFT: ['SP500_Returns', 'VIX', 'Treasury_10Y', 'Yield_Spread', 'Inflation_YoY', 'VIX_relative', 'VIX_spike', 'Treasury_10Y_change', 'CPI']
+
+======================================================================
+FEATURE STATISTICS - BEFORE NORMALIZATION
+======================================================================
+VIX                             mean= 19.6699  std=  8.7549  min=  9.3400  max= 72.9160
+Treasury_10Y                    mean=  3.3845  std=  1.1265  min=  1.3700  max=  5.5200
+Yield_Spread                    mean=  1.5011  std=  0.8234  min= -0.1800  max=  2.9100
+Inflation_YoY                   mean=  2.1526  std=  1.3025  min= -2.1498  max=  5.4850
+VIX_relative                    mean=  1.0055  std=  0.1533  min=  0.7207  max=  2.6535
+VIX_spike                       mean=  0.0121  std=  0.1095  min=  0.0000  max=  1.0000
+Treasury_10Y_change             mean= -0.0029  std=  0.1241  min= -0.5200  max=  0.5700
+CPI                             mean=213.3555  std= 22.3182  min=173.9000  max=249.6190
+
+======================================================================
+TARGET CONFIGURATION
+======================================================================
+Target variable: SP500_Returns
+  Mode: Point return prediction (single-step)
+  Target stats: mean=0.1043, std=2.3760
+======================================================================
+
+======================================================================
+FEATURES AFTER GROUPNORMALIZER (first batch, last timestep)
+======================================================================
+VIX                             normalized_value=  1.0000
+Treasury_10Y                    normalized_value= -0.0833
+Yield_Spread                    normalized_value= -0.8418
+Inflation_YoY                   normalized_value=  1.2483
+VIX_relative                    normalized_value= -1.9092
+VIX_spike                       normalized_value=  1.5356
+Treasury_10Y_change             normalized_value= -0.9321
+CPI                             normalized_value= -0.1107
+======================================================================
+
+Configuration saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/config.json
+[DEBUG] VIX train values: [27.838  25.118  24.686  28.764  27.5725]
+[DEBUG] VIX val values: [16.77  15.612 13.752 13.566 12.926]
+Batches per epoch: 56
+[DEBUG] Validation batches: 12
+[DEBUG] Validation dataset size: 183
+[DEBUG] Batch size: 16
+
+Initializing model...
+
+Quantile configuration: 7q
+  Quantiles: [0.02, 0.1, 0.25, 0.5, 0.75, 0.9, 0.98]
+  Output size: 7
+  Median index: 3
+
+Using standard QuantileLoss (no penalties)
+
+[REGIME OUTPUT] Disabled (using baseline output layer)
+
+[STALENESS ATTENTION] Disabled
+
+================================================================================
+BASELINE MODEL FEATURE CONFIGURATION (after from_dataset)
+================================================================================
+tft.hparams.time_varying_reals_encoder: ['relative_time_idx', 'VIX', 'Treasury_10Y', 'Yield_Spread', 'Inflation_YoY', 'VIX_relative', 'VIX_spike', 'Treasury_10Y_change', 'CPI']
+  Count: 9
+
+tft.hparams.time_varying_reals_decoder: ['relative_time_idx']
+  Count: 1
+
+tft.hparams.x_reals (all reals passed to model): ['encoder_length', 'relative_time_idx', 'VIX', 'Treasury_10Y', 'Yield_Spread', 'Inflation_YoY', 'VIX_relative', 'VIX_spike', 'Treasury_10Y_change', 'CPI']
+  Count: 10
+
+Encoder VSN configuration:
+  num_inputs: 9
+  input_sizes: {'relative_time_idx': 16, 'VIX': 16, 'Treasury_10Y': 16, 'Yield_Spread': 16, 'Inflation_YoY': 16, 'VIX_relative': 16, 'VIX_spike': 16, 'Treasury_10Y_change': 16, 'CPI': 16}
+  flattened_grn.fc1: in_features=144, out_features=9
+  -> Params in fc1: 1296 (should be 5*16*5=400 if 5 features)
+================================================================================
+
+Model parameters: 28,387
+
+Starting training...
+Checkpoints will be saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/checkpoints/
+Logs will be saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/logs/
+
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 0
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 0: val_loss=N/A
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 0
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 0: val_loss=2.626648426055908
+Epoch 0: train_loss=2.6098740100860596
+
+[CollapseMonitor] Epoch 0
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.027774, range: 0.096715, mean: 1.340025
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 765.9018
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch0.npy
+  Gradient norms:
+    lstm_encoder: 0.049993
+    lstm_decoder: 0.067116
+    output_layer: 2.399101
+  VSN output std:
+    encoder: 0.092538
+  Attention entropy: 2.475771
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 1
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 1: val_loss=2.290832281112671
+Epoch 1: train_loss=2.340047836303711
+
+[CollapseMonitor] Epoch 1
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.022400, range: 0.085506, mean: 0.859890
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 609.3959
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch1.npy
+  Gradient norms:
+    lstm_encoder: 0.041811
+    lstm_decoder: 0.060505
+    output_layer: 2.201792
+  VSN output std:
+    encoder: 0.095965
+  Attention entropy: 2.475281
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 2
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 2: val_loss=1.975633144378662
+Epoch 2: train_loss=2.01094651222229
+
+[CollapseMonitor] Epoch 2
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.017226, range: 0.074678, mean: 0.330838
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 304.8822
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch2.npy
+  Gradient norms:
+    lstm_encoder: 0.034550
+    lstm_decoder: 0.050465
+    output_layer: 1.964423
+  VSN output std:
+    encoder: 0.099115
+  Attention entropy: 2.476472
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 3
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 3: val_loss=1.655110478401184
+Epoch 3: train_loss=1.6993424892425537
+
+[CollapseMonitor] Epoch 3
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.014609, range: 0.059609, mean: -0.094327
+  Pos: 0.0%, Neg: 100.0%, Unique: 181
+  Dir Acc: 39.89%, Pred Sharpe: -102.5019
+  Composite: 0.2790 (dist_match: 0.3989, actual_pos: 60.1%, pred_pos: 0.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch3.npy
+  Gradient norms:
+    lstm_encoder: 0.028816
+    lstm_decoder: 0.039639
+    output_layer: 1.631023
+  VSN output std:
+    encoder: 0.101666
+  Attention entropy: 2.478103
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 4
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 4: val_loss=1.3983577489852905
+Epoch 4: train_loss=1.402854561805725
+
+[CollapseMonitor] Epoch 4
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.013669, range: 0.051807, mean: -0.147229
+  Pos: 0.0%, Neg: 100.0%, Unique: 183
+  Dir Acc: 39.89%, Pred Sharpe: -170.9818
+  Composite: 0.2790 (dist_match: 0.3989, actual_pos: 60.1%, pred_pos: 0.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch4.npy
+  Gradient norms:
+    lstm_encoder: 0.022992
+    lstm_decoder: 0.029421
+    output_layer: 1.282924
+  VSN output std:
+    encoder: 0.103279
+  Attention entropy: 2.480239
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 5
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 5: val_loss=1.2498878240585327
+Epoch 5: train_loss=1.216474175453186
+
+[CollapseMonitor] Epoch 5
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.012901, range: 0.047110, mean: -0.050467
+  Pos: 0.0%, Neg: 100.0%, Unique: 182
+  Dir Acc: 39.89%, Pred Sharpe: -62.1015
+  Composite: 0.2790 (dist_match: 0.3989, actual_pos: 60.1%, pred_pos: 0.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch5.npy
+  Gradient norms:
+    lstm_encoder: 0.016557
+    lstm_decoder: 0.019649
+    output_layer: 0.938364
+  VSN output std:
+    encoder: 0.105181
+  Attention entropy: 2.481888
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 6
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 6: val_loss=1.1678087711334229
+Epoch 6: train_loss=1.0992542505264282
+
+[CollapseMonitor] Epoch 6
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.011724, range: 0.041644, mean: 0.058063
+  Pos: 100.0%, Neg: 0.0%, Unique: 180
+  Dir Acc: 60.11%, Pred Sharpe: 78.6161
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch6.npy
+  Gradient norms:
+    lstm_encoder: 0.011878
+    lstm_decoder: 0.013970
+    output_layer: 0.704115
+  VSN output std:
+    encoder: 0.106992
+  Attention entropy: 2.483031
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 7
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 7: val_loss=1.1314685344696045
+Epoch 7: train_loss=1.033618450164795
+
+[CollapseMonitor] Epoch 7
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.011703, range: 0.040770, mean: 0.207478
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 281.4297
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch7.npy
+  Gradient norms:
+    lstm_encoder: 0.009117
+    lstm_decoder: 0.010590
+    output_layer: 0.509833
+  VSN output std:
+    encoder: 0.108828
+  Attention entropy: 2.483442
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 8
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 8: val_loss=1.116219401359558
+Epoch 8: train_loss=1.0054672956466675
+
+[CollapseMonitor] Epoch 8
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.013586, range: 0.047013, mean: 0.243130
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 284.0810
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch8.npy
+  Gradient norms:
+    lstm_encoder: 0.008036
+    lstm_decoder: 0.009138
+    output_layer: 0.464331
+  VSN output std:
+    encoder: 0.108703
+  Attention entropy: 2.483330
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 9
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 9: val_loss=1.1062157154083252
+Epoch 9: train_loss=0.9909374117851257
+
+[CollapseMonitor] Epoch 9
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.014606, range: 0.051867, mean: 0.292451
+  Pos: 100.0%, Neg: 0.0%, Unique: 180
+  Dir Acc: 60.11%, Pred Sharpe: 317.8505
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch9.npy
+  Gradient norms:
+    lstm_encoder: 0.008141
+    lstm_decoder: 0.008430
+    output_layer: 0.450549
+  VSN output std:
+    encoder: 0.109453
+  Attention entropy: 2.483210
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 10
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 10: val_loss=1.0998241901397705
+Epoch 10: train_loss=0.9810532927513123
+
+[CollapseMonitor] Epoch 10
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.015252, range: 0.053403, mean: 0.299675
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 311.8986
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch10.npy
+  Gradient norms:
+    lstm_encoder: 0.007237
+    lstm_decoder: 0.007610
+    output_layer: 0.401365
+  VSN output std:
+    encoder: 0.111446
+  Attention entropy: 2.482964
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 11
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 11: val_loss=1.0986745357513428
+Epoch 11: train_loss=0.9798327088356018
+
+[CollapseMonitor] Epoch 11
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.017315, range: 0.059008, mean: 0.205393
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 188.3098
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch11.npy
+  Gradient norms:
+    lstm_encoder: 0.007366
+    lstm_decoder: 0.007734
+    output_layer: 0.420680
+  VSN output std:
+    encoder: 0.112464
+  Attention entropy: 2.483159
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 12
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 12: val_loss=1.0962697267532349
+Epoch 12: train_loss=0.9737521409988403
+
+[CollapseMonitor] Epoch 12
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.021292, range: 0.068371, mean: 0.254486
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 189.7345
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch12.npy
+  Gradient norms:
+    lstm_encoder: 0.007115
+    lstm_decoder: 0.007069
+    output_layer: 0.420940
+  VSN output std:
+    encoder: 0.115193
+  Attention entropy: 2.482816
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 13
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 13: val_loss=1.095432162284851
+Epoch 13: train_loss=0.9704833626747131
+
+[CollapseMonitor] Epoch 13
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.027024, range: 0.086129, mean: 0.208840
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 122.6769
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch13.npy
+  Gradient norms:
+    lstm_encoder: 0.007324
+    lstm_decoder: 0.007610
+    output_layer: 0.388826
+  VSN output std:
+    encoder: 0.119343
+  Attention entropy: 2.482306
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 14
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 14: val_loss=1.0953965187072754
+Epoch 14: train_loss=0.9675005078315735
+
+[CollapseMonitor] Epoch 14
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.030597, range: 0.096843, mean: 0.197809
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 102.6286
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch14.npy
+  Gradient norms:
+    lstm_encoder: 0.006906
+    lstm_decoder: 0.006959
+    output_layer: 0.406085
+  VSN output std:
+    encoder: 0.123091
+  Attention entropy: 2.482194
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 15
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 15: val_loss=1.0944868326187134
+Epoch 15: train_loss=0.9622308015823364
+
+[CollapseMonitor] Epoch 15
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.036741, range: 0.116860, mean: 0.200659
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 86.6969
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch15.npy
+  Gradient norms:
+    lstm_encoder: 0.007585
+    lstm_decoder: 0.007186
+    output_layer: 0.408690
+  VSN output std:
+    encoder: 0.128470
+  Attention entropy: 2.481360
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 16
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 16: val_loss=1.093563437461853
+Epoch 16: train_loss=0.9623922109603882
+
+[CollapseMonitor] Epoch 16
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.050218, range: 0.158837, mean: 0.174175
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 55.0590
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch16.npy
+  Gradient norms:
+    lstm_encoder: 0.006811
+    lstm_decoder: 0.006671
+    output_layer: 0.397377
+  VSN output std:
+    encoder: 0.137643
+  Attention entropy: 2.477143
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 17
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 17: val_loss=1.0943349599838257
+Epoch 17: train_loss=0.9621005058288574
+
+[CollapseMonitor] Epoch 17
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.060400, range: 0.187157, mean: 0.153244
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 40.2758
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch17.npy
+  Gradient norms:
+    lstm_encoder: 0.007436
+    lstm_decoder: 0.007435
+    output_layer: 0.399771
+  VSN output std:
+    encoder: 0.148023
+  Attention entropy: 2.470698
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 18
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 18: val_loss=1.0924361944198608
+Epoch 18: train_loss=0.9623445868492126
+
+[CollapseMonitor] Epoch 18
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.064599, range: 0.194408, mean: 0.156858
+  Pos: 100.0%, Neg: 0.0%, Unique: 182
+  Dir Acc: 60.11%, Pred Sharpe: 38.5463
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch18.npy
+  Gradient norms:
+    lstm_encoder: 0.006789
+    lstm_decoder: 0.006827
+    output_layer: 0.394508
+  VSN output std:
+    encoder: 0.152942
+  Attention entropy: 2.464929
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 19
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 19: val_loss=1.089046597480774
+Epoch 19: train_loss=0.9589953422546387
+
+[CollapseMonitor] Epoch 19
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.070173, range: 0.211668, mean: 0.121183
+  Pos: 94.0%, Neg: 6.0%, Unique: 183
+  Dir Acc: 57.38%, Pred Sharpe: 27.4141
+  Composite: 0.4766 (dist_match: 0.6612, actual_pos: 60.1%, pred_pos: 94.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch19.npy
+  Gradient norms:
+    lstm_encoder: 0.007545
+    lstm_decoder: 0.007037
+    output_layer: 0.386513
+  VSN output std:
+    encoder: 0.164104
+  Attention entropy: 2.447300
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 20
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 20: val_loss=1.0850019454956055
+Epoch 20: train_loss=0.9589414000511169
+
+[CollapseMonitor] Epoch 20
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.062812, range: 0.209860, mean: 0.156627
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 39.5843
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch20.npy
+  Gradient norms:
+    lstm_encoder: 0.007610
+    lstm_decoder: 0.007718
+    output_layer: 0.453048
+  VSN output std:
+    encoder: 0.174639
+  Attention entropy: 2.436308
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 21
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 21: val_loss=1.0819604396820068
+Epoch 21: train_loss=0.9574912190437317
+
+[CollapseMonitor] Epoch 21
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.054109, range: 0.214032, mean: 0.165336
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 48.5065
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch21.npy
+  Gradient norms:
+    lstm_encoder: 0.008659
+    lstm_decoder: 0.007880
+    output_layer: 0.404779
+  VSN output std:
+    encoder: 0.185938
+  Attention entropy: 2.420772
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 22
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 22: val_loss=1.0799692869186401
+Epoch 22: train_loss=0.9547330141067505
+
+[CollapseMonitor] Epoch 22
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.059815, range: 0.243388, mean: 0.189076
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 50.1794
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch22.npy
+  Gradient norms:
+    lstm_encoder: 0.008192
+    lstm_decoder: 0.007745
+    output_layer: 0.389043
+  VSN output std:
+    encoder: 0.193105
+  Attention entropy: 2.407016
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 23
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 23: val_loss=1.078685998916626
+Epoch 23: train_loss=0.9517059326171875
+
+[CollapseMonitor] Epoch 23
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.055553, range: 0.245687, mean: 0.209728
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 59.9309
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch23.npy
+  Gradient norms:
+    lstm_encoder: 0.008955
+    lstm_decoder: 0.007845
+    output_layer: 0.394355
+  VSN output std:
+    encoder: 0.201457
+  Attention entropy: 2.390492
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 24
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 24: val_loss=1.079193353652954
+Epoch 24: train_loss=0.9495154619216919
+
+[CollapseMonitor] Epoch 24
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.056567, range: 0.244355, mean: 0.163216
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 45.8041
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch24.npy
+  Gradient norms:
+    lstm_encoder: 0.009487
+    lstm_decoder: 0.008325
+    output_layer: 0.402337
+  VSN output std:
+    encoder: 0.203049
+  Attention entropy: 2.376974
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 25
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 25: val_loss=1.0775095224380493
+Epoch 25: train_loss=0.9426295161247253
+
+[CollapseMonitor] Epoch 25
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.062330, range: 0.276991, mean: 0.196465
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 50.0369
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch25.npy
+  Gradient norms:
+    lstm_encoder: 0.009529
+    lstm_decoder: 0.008159
+    output_layer: 0.395874
+  VSN output std:
+    encoder: 0.209811
+  Attention entropy: 2.360547
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 26
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 26: val_loss=1.0756665468215942
+Epoch 26: train_loss=0.9404263496398926
+
+[CollapseMonitor] Epoch 26
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.060980, range: 0.268619, mean: 0.235208
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 61.2304
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch26.npy
+  Gradient norms:
+    lstm_encoder: 0.009728
+    lstm_decoder: 0.007940
+    output_layer: 0.427614
+  VSN output std:
+    encoder: 0.209868
+  Attention entropy: 2.357035
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 27
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 27: val_loss=1.0771111249923706
+Epoch 27: train_loss=0.943015456199646
+
+[CollapseMonitor] Epoch 27
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.065194, range: 0.270720, mean: 0.174015
+  Pos: 100.0%, Neg: 0.0%, Unique: 182
+  Dir Acc: 60.11%, Pred Sharpe: 42.3721
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch27.npy
+  Gradient norms:
+    lstm_encoder: 0.010668
+    lstm_decoder: 0.008704
+    output_layer: 0.409759
+  VSN output std:
+    encoder: 0.212192
+  Attention entropy: 2.337519
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 28
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 28: val_loss=1.076385736465454
+Epoch 28: train_loss=0.9415287971496582
+
+[CollapseMonitor] Epoch 28
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.058179, range: 0.261300, mean: 0.169738
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 46.3142
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch28.npy
+  Gradient norms:
+    lstm_encoder: 0.011292
+    lstm_decoder: 0.008950
+    output_layer: 0.411206
+  VSN output std:
+    encoder: 0.210724
+  Attention entropy: 2.323247
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 29
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 29: val_loss=1.0737028121948242
+Epoch 29: train_loss=0.9398941397666931
+
+[CollapseMonitor] Epoch 29
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.053049, range: 0.259307, mean: 0.222367
+  Pos: 100.0%, Neg: 0.0%, Unique: 182
+  Dir Acc: 60.11%, Pred Sharpe: 66.5419
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch29.npy
+  Gradient norms:
+    lstm_encoder: 0.010653
+    lstm_decoder: 0.008337
+    output_layer: 0.365130
+  VSN output std:
+    encoder: 0.212956
+  Attention entropy: 2.303918
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 30
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 30: val_loss=1.07518470287323
+Epoch 30: train_loss=0.9346361756324768
+
+[CollapseMonitor] Epoch 30
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.054029, range: 0.257542, mean: 0.120700
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 35.4638
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch30.npy
+  Gradient norms:
+    lstm_encoder: 0.011748
+    lstm_decoder: 0.009233
+    output_layer: 0.430361
+  VSN output std:
+    encoder: 0.213630
+  Attention entropy: 2.275249
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 31
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 31: val_loss=1.071643590927124
+Epoch 31: train_loss=0.9329104423522949
+
+[CollapseMonitor] Epoch 31
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.052622, range: 0.255622, mean: 0.222632
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 67.1619
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch31.npy
+  Gradient norms:
+    lstm_encoder: 0.011442
+    lstm_decoder: 0.008916
+    output_layer: 0.381704
+  VSN output std:
+    encoder: 0.214929
+  Attention entropy: 2.273623
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 32
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 32: val_loss=1.0721536874771118
+Epoch 32: train_loss=0.933306872844696
+
+[CollapseMonitor] Epoch 32
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.053910, range: 0.271180, mean: 0.209588
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 61.7162
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch32.npy
+  Gradient norms:
+    lstm_encoder: 0.013208
+    lstm_decoder: 0.009942
+    output_layer: 0.406911
+  VSN output std:
+    encoder: 0.215146
+  Attention entropy: 2.252487
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 33
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 33: val_loss=1.0726182460784912
+Epoch 33: train_loss=0.9353367686271667
+
+[CollapseMonitor] Epoch 33
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.052520, range: 0.264603, mean: 0.198091
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 59.8745
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch33.npy
+  Gradient norms:
+    lstm_encoder: 0.012691
+    lstm_decoder: 0.009780
+    output_layer: 0.426939
+  VSN output std:
+    encoder: 0.216039
+  Attention entropy: 2.247602
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 34
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 34: val_loss=1.0718687772750854
+Epoch 34: train_loss=0.933618426322937
+
+[CollapseMonitor] Epoch 34
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.053478, range: 0.287547, mean: 0.129827
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 38.5378
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch34.npy
+  Gradient norms:
+    lstm_encoder: 0.014120
+    lstm_decoder: 0.009698
+    output_layer: 0.373495
+  VSN output std:
+    encoder: 0.214317
+  Attention entropy: 2.265092
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 35
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 35: val_loss=1.068798542022705
+Epoch 35: train_loss=0.9312773942947388
+
+[CollapseMonitor] Epoch 35
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.051406, range: 0.273384, mean: 0.219099
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 67.6588
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch35.npy
+  Gradient norms:
+    lstm_encoder: 0.015175
+    lstm_decoder: 0.010423
+    output_layer: 0.369202
+  VSN output std:
+    encoder: 0.215097
+  Attention entropy: 2.270852
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 36
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 36: val_loss=1.0673977136611938
+Epoch 36: train_loss=0.930301308631897
+
+[CollapseMonitor] Epoch 36
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.052640, range: 0.276184, mean: 0.244159
+  Pos: 100.0%, Neg: 0.0%, Unique: 182
+  Dir Acc: 60.11%, Pred Sharpe: 73.6299
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch36.npy
+  Gradient norms:
+    lstm_encoder: 0.015664
+    lstm_decoder: 0.011670
+    output_layer: 0.404087
+  VSN output std:
+    encoder: 0.217559
+  Attention entropy: 2.255616
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 37
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 37: val_loss=1.0671712160110474
+Epoch 37: train_loss=0.9285916090011597
+
+[CollapseMonitor] Epoch 37
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.053405, range: 0.255007, mean: 0.174413
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 51.8436
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch37.npy
+  Gradient norms:
+    lstm_encoder: 0.015415
+    lstm_decoder: 0.011008
+    output_layer: 0.393634
+  VSN output std:
+    encoder: 0.217431
+  Attention entropy: 2.253652
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 38
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 38: val_loss=1.0658551454544067
+Epoch 38: train_loss=0.9247263073921204
+
+[CollapseMonitor] Epoch 38
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.052793, range: 0.236616, mean: 0.172185
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 51.7746
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch38.npy
+  Gradient norms:
+    lstm_encoder: 0.016622
+    lstm_decoder: 0.011189
+    output_layer: 0.376598
+  VSN output std:
+    encoder: 0.217923
+  Attention entropy: 2.259799
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 39
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 39: val_loss=1.0635251998901367
+Epoch 39: train_loss=0.9206852316856384
+
+[CollapseMonitor] Epoch 39
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.054138, range: 0.211861, mean: 0.191237
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 56.0751
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch39.npy
+  Gradient norms:
+    lstm_encoder: 0.017506
+    lstm_decoder: 0.012621
+    output_layer: 0.427357
+  VSN output std:
+    encoder: 0.217143
+  Attention entropy: 2.258198
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 40
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 40: val_loss=1.0653893947601318
+Epoch 40: train_loss=0.9212890863418579
+
+[CollapseMonitor] Epoch 40
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.063834, range: 0.263403, mean: 0.169278
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 42.0968
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch40.npy
+  Gradient norms:
+    lstm_encoder: 0.018864
+    lstm_decoder: 0.013219
+    output_layer: 0.415224
+  VSN output std:
+    encoder: 0.217831
+  Attention entropy: 2.236892
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 41
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 41: val_loss=1.0636014938354492
+Epoch 41: train_loss=0.917499840259552
+
+[CollapseMonitor] Epoch 41
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.072190, range: 0.285194, mean: 0.095118
+  Pos: 89.1%, Neg: 10.9%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 20.9164
+  Composite: 0.5140 (dist_match: 0.7104, actual_pos: 60.1%, pred_pos: 89.1%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch41.npy
+  Gradient norms:
+    lstm_encoder: 0.019045
+    lstm_decoder: 0.013548
+    output_layer: 0.424840
+  VSN output std:
+    encoder: 0.215899
+  Attention entropy: 2.244977
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 42
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 42: val_loss=1.0605735778808594
+Epoch 42: train_loss=0.9205732941627502
+
+[CollapseMonitor] Epoch 42
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.073542, range: 0.288826, mean: 0.212302
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 45.8268
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch42.npy
+  Gradient norms:
+    lstm_encoder: 0.021705
+    lstm_decoder: 0.014061
+    output_layer: 0.412958
+  VSN output std:
+    encoder: 0.215677
+  Attention entropy: 2.241382
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 43
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 43: val_loss=1.0588847398757935
+Epoch 43: train_loss=0.9149791598320007
+
+[CollapseMonitor] Epoch 43
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.082365, range: 0.324354, mean: 0.226579
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 43.6693
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch43.npy
+  Gradient norms:
+    lstm_encoder: 0.022914
+    lstm_decoder: 0.015445
+    output_layer: 0.416879
+  VSN output std:
+    encoder: 0.212234
+  Attention entropy: 2.219207
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 44
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 44: val_loss=1.0583380460739136
+Epoch 44: train_loss=0.9167652726173401
+
+[CollapseMonitor] Epoch 44
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.101463, range: 0.369561, mean: 0.219726
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 34.3773
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch44.npy
+  Gradient norms:
+    lstm_encoder: 0.025725
+    lstm_decoder: 0.016540
+    output_layer: 0.370655
+  VSN output std:
+    encoder: 0.207037
+  Attention entropy: 2.224783
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 45
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 45: val_loss=1.0571547746658325
+Epoch 45: train_loss=0.9157124757766724
+
+[CollapseMonitor] Epoch 45
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.085249, range: 0.318224, mean: 0.203420
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 37.8794
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch45.npy
+  Gradient norms:
+    lstm_encoder: 0.027800
+    lstm_decoder: 0.018135
+    output_layer: 0.417048
+  VSN output std:
+    encoder: 0.209074
+  Attention entropy: 2.239093
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 46
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 46: val_loss=1.0547999143600464
+Epoch 46: train_loss=0.9109283089637756
+
+[CollapseMonitor] Epoch 46
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.090274, range: 0.331215, mean: 0.204087
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 35.8882
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch46.npy
+  Gradient norms:
+    lstm_encoder: 0.026756
+    lstm_decoder: 0.016801
+    output_layer: 0.415130
+  VSN output std:
+    encoder: 0.206636
+  Attention entropy: 2.242416
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 47
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 47: val_loss=1.0589420795440674
+Epoch 47: train_loss=0.9126405119895935
+
+[CollapseMonitor] Epoch 47
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.088410, range: 0.314146, mean: 0.218184
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 39.1763
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch47.npy
+  Gradient norms:
+    lstm_encoder: 0.028919
+    lstm_decoder: 0.018181
+    output_layer: 0.379599
+  VSN output std:
+    encoder: 0.213315
+  Attention entropy: 2.241472
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 48
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 48: val_loss=1.0550388097763062
+Epoch 48: train_loss=0.9075940847396851
+
+[CollapseMonitor] Epoch 48
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.099343, range: 0.343571, mean: 0.210027
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 33.5611
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch48.npy
+  Gradient norms:
+    lstm_encoder: 0.027079
+    lstm_decoder: 0.018119
+    output_layer: 0.385879
+  VSN output std:
+    encoder: 0.214286
+  Attention entropy: 2.233689
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 49
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 49: val_loss=1.048337459564209
+Epoch 49: train_loss=0.9075154662132263
+
+[CollapseMonitor] Epoch 49
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.097995, range: 0.396154, mean: 0.226880
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 36.7531
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch49.npy
+  Gradient norms:
+    lstm_encoder: 0.032258
+    lstm_decoder: 0.020127
+    output_layer: 0.381385
+  VSN output std:
+    encoder: 0.210222
+  Attention entropy: 2.255581
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 50
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 50: val_loss=1.0484328269958496
+Epoch 50: train_loss=0.90253746509552
+
+[CollapseMonitor] Epoch 50
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.108560, range: 0.455193, mean: 0.195809
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 28.6327
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch50.npy
+  Gradient norms:
+    lstm_encoder: 0.032668
+    lstm_decoder: 0.020570
+    output_layer: 0.374273
+  VSN output std:
+    encoder: 0.201927
+  Attention entropy: 2.242490
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 51
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 51: val_loss=1.0437674522399902
+Epoch 51: train_loss=0.905495822429657
+
+[CollapseMonitor] Epoch 51
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.090708, range: 0.433855, mean: 0.225633
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 39.4874
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch51.npy
+  Gradient norms:
+    lstm_encoder: 0.034387
+    lstm_decoder: 0.022333
+    output_layer: 0.398328
+  VSN output std:
+    encoder: 0.199218
+  Attention entropy: 2.249217
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 52
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 52: val_loss=1.0498206615447998
+Epoch 52: train_loss=0.904350757598877
+
+[CollapseMonitor] Epoch 52
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.103452, range: 0.408149, mean: 0.196334
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 30.1271
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch52.npy
+  Gradient norms:
+    lstm_encoder: 0.038141
+    lstm_decoder: 0.023680
+    output_layer: 0.396068
+  VSN output std:
+    encoder: 0.206401
+  Attention entropy: 2.218271
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 53
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 53: val_loss=1.0401135683059692
+Epoch 53: train_loss=0.8994145393371582
+
+[CollapseMonitor] Epoch 53
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.097462, range: 0.480503, mean: 0.234402
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 38.1792
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch53.npy
+  Gradient norms:
+    lstm_encoder: 0.034657
+    lstm_decoder: 0.021806
+    output_layer: 0.404936
+  VSN output std:
+    encoder: 0.199959
+  Attention entropy: 2.216341
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 54
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 54: val_loss=1.0405149459838867
+Epoch 54: train_loss=0.8986802697181702
+
+[CollapseMonitor] Epoch 54
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.099843, range: 0.478958, mean: 0.232123
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 36.9065
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch54.npy
+  Gradient norms:
+    lstm_encoder: 0.037235
+    lstm_decoder: 0.022822
+    output_layer: 0.402945
+  VSN output std:
+    encoder: 0.188957
+  Attention entropy: 2.212654
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 55
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 55: val_loss=1.0366897583007812
+Epoch 55: train_loss=0.8983353972434998
+
+[CollapseMonitor] Epoch 55
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.095399, range: 0.437148, mean: 0.218433
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 36.3475
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch55.npy
+  Gradient norms:
+    lstm_encoder: 0.040756
+    lstm_decoder: 0.024973
+    output_layer: 0.388233
+  VSN output std:
+    encoder: 0.191789
+  Attention entropy: 2.209510
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 56
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 56: val_loss=1.0394787788391113
+Epoch 56: train_loss=0.8982078433036804
+
+[CollapseMonitor] Epoch 56
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.098957, range: 0.442791, mean: 0.217775
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 34.9350
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch56.npy
+  Gradient norms:
+    lstm_encoder: 0.037704
+    lstm_decoder: 0.023994
+    output_layer: 0.369710
+  VSN output std:
+    encoder: 0.189416
+  Attention entropy: 2.173110
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 57
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 57: val_loss=1.0358773469924927
+Epoch 57: train_loss=0.899081289768219
+
+[CollapseMonitor] Epoch 57
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.100282, range: 0.425878, mean: 0.208037
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 32.9319
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch57.npy
+  Gradient norms:
+    lstm_encoder: 0.041313
+    lstm_decoder: 0.025595
+    output_layer: 0.349728
+  VSN output std:
+    encoder: 0.182402
+  Attention entropy: 2.166685
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 58
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 58: val_loss=1.0342724323272705
+Epoch 58: train_loss=0.895818829536438
+
+[CollapseMonitor] Epoch 58
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.089630, range: 0.409222, mean: 0.200567
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 35.5227
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch58.npy
+  Gradient norms:
+    lstm_encoder: 0.043226
+    lstm_decoder: 0.027094
+    output_layer: 0.404707
+  VSN output std:
+    encoder: 0.181512
+  Attention entropy: 2.181316
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 59
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 59: val_loss=1.0349550247192383
+Epoch 59: train_loss=0.8997567296028137
+
+[CollapseMonitor] Epoch 59
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.091542, range: 0.430681, mean: 0.165239
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 28.6546
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch59.npy
+  Gradient norms:
+    lstm_encoder: 0.044834
+    lstm_decoder: 0.027467
+    output_layer: 0.402725
+  VSN output std:
+    encoder: 0.174263
+  Attention entropy: 2.189662
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 60
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 60: val_loss=1.0377215147018433
+Epoch 60: train_loss=0.8953511118888855
+
+[CollapseMonitor] Epoch 60
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.104224, range: 0.440527, mean: 0.244869
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 37.2965
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch60.npy
+  Gradient norms:
+    lstm_encoder: 0.045163
+    lstm_decoder: 0.029040
+    output_layer: 0.429552
+  VSN output std:
+    encoder: 0.182809
+  Attention entropy: 2.172730
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 61
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 61: val_loss=1.0306695699691772
+Epoch 61: train_loss=0.8928323984146118
+
+[CollapseMonitor] Epoch 61
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.098241, range: 0.446777, mean: 0.219874
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 35.5290
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch61.npy
+  Gradient norms:
+    lstm_encoder: 0.040300
+    lstm_decoder: 0.024522
+    output_layer: 0.406165
+  VSN output std:
+    encoder: 0.183353
+  Attention entropy: 2.202786
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 62
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 62: val_loss=1.0300767421722412
+Epoch 62: train_loss=0.8958035111427307
+
+[CollapseMonitor] Epoch 62
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.097683, range: 0.459173, mean: 0.249350
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 40.5218
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch62.npy
+  Gradient norms:
+    lstm_encoder: 0.048133
+    lstm_decoder: 0.028794
+    output_layer: 0.402807
+  VSN output std:
+    encoder: 0.184867
+  Attention entropy: 2.216441
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 63
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 63: val_loss=1.0314747095108032
+Epoch 63: train_loss=0.8969107270240784
+
+[CollapseMonitor] Epoch 63
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.098992, range: 0.471649, mean: 0.238301
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 38.2144
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch63.npy
+  Gradient norms:
+    lstm_encoder: 0.047742
+    lstm_decoder: 0.029237
+    output_layer: 0.436674
+  VSN output std:
+    encoder: 0.175113
+  Attention entropy: 2.203171
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 64
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 64: val_loss=1.0298477411270142
+Epoch 64: train_loss=0.8955405354499817
+
+[CollapseMonitor] Epoch 64
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.108824, range: 0.502613, mean: 0.182059
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 26.5576
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch64.npy
+  Gradient norms:
+    lstm_encoder: 0.046099
+    lstm_decoder: 0.026853
+    output_layer: 0.441889
+  VSN output std:
+    encoder: 0.175700
+  Attention entropy: 2.211598
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 65
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 65: val_loss=1.0278571844100952
+Epoch 65: train_loss=0.8957828879356384
+
+[CollapseMonitor] Epoch 65
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.096903, range: 0.463093, mean: 0.264434
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 43.3193
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch65.npy
+  Gradient norms:
+    lstm_encoder: 0.049345
+    lstm_decoder: 0.031513
+    output_layer: 0.412575
+  VSN output std:
+    encoder: 0.171921
+  Attention entropy: 2.204216
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 66
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 66: val_loss=1.0308959484100342
+Epoch 66: train_loss=0.8933029770851135
+
+[CollapseMonitor] Epoch 66
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.095744, range: 0.439775, mean: 0.244496
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 40.5377
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch66.npy
+  Gradient norms:
+    lstm_encoder: 0.044004
+    lstm_decoder: 0.025980
+    output_layer: 0.399990
+  VSN output std:
+    encoder: 0.176543
+  Attention entropy: 2.206168
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 67
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 67: val_loss=1.0304691791534424
+Epoch 67: train_loss=0.8936586380004883
+
+[CollapseMonitor] Epoch 67
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.088514, range: 0.468040, mean: 0.161387
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 28.9439
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch67.npy
+  Gradient norms:
+    lstm_encoder: 0.042879
+    lstm_decoder: 0.026692
+    output_layer: 0.403702
+  VSN output std:
+    encoder: 0.171555
+  Attention entropy: 2.238693
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 68
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 68: val_loss=1.0298874378204346
+Epoch 68: train_loss=0.8917860388755798
+
+[CollapseMonitor] Epoch 68
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.094535, range: 0.459743, mean: 0.203069
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 34.0997
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch68.npy
+  Gradient norms:
+    lstm_encoder: 0.042699
+    lstm_decoder: 0.024494
+    output_layer: 0.370918
+  VSN output std:
+    encoder: 0.172690
+  Attention entropy: 2.208808
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 69
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 69: val_loss=1.0300192832946777
+Epoch 69: train_loss=0.8915044665336609
+
+[CollapseMonitor] Epoch 69
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.103784, range: 0.470622, mean: 0.208710
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 31.9238
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch69.npy
+  Gradient norms:
+    lstm_encoder: 0.045767
+    lstm_decoder: 0.028326
+    output_layer: 0.411020
+  VSN output std:
+    encoder: 0.179682
+  Attention entropy: 2.197237
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 70
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 70: val_loss=1.0326319932937622
+Epoch 70: train_loss=0.8922936320304871
+
+[CollapseMonitor] Epoch 70
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.089577, range: 0.437435, mean: 0.236401
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 41.8939
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch70.npy
+  Gradient norms:
+    lstm_encoder: 0.051802
+    lstm_decoder: 0.031635
+    output_layer: 0.402562
+  VSN output std:
+    encoder: 0.183470
+  Attention entropy: 2.193382
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 71
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 71: val_loss=1.0279195308685303
+Epoch 71: train_loss=0.8906740546226501
+
+[CollapseMonitor] Epoch 71
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.086327, range: 0.449738, mean: 0.206009
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 37.8825
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch71.npy
+  Gradient norms:
+    lstm_encoder: 0.044639
+    lstm_decoder: 0.028564
+    output_layer: 0.411170
+  VSN output std:
+    encoder: 0.176982
+  Attention entropy: 2.202970
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 72
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 72: val_loss=1.0290817022323608
+Epoch 72: train_loss=0.888579785823822
+
+[CollapseMonitor] Epoch 72
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.086397, range: 0.450074, mean: 0.230655
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 42.3805
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch72.npy
+  Gradient norms:
+    lstm_encoder: 0.048266
+    lstm_decoder: 0.029749
+    output_layer: 0.418930
+  VSN output std:
+    encoder: 0.177871
+  Attention entropy: 2.200259
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 73
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 73: val_loss=1.0282483100891113
+Epoch 73: train_loss=0.8902000188827515
+
+[CollapseMonitor] Epoch 73
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.084921, range: 0.451146, mean: 0.233658
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 43.6785
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch73.npy
+  Gradient norms:
+    lstm_encoder: 0.041390
+    lstm_decoder: 0.024865
+    output_layer: 0.381331
+  VSN output std:
+    encoder: 0.179199
+  Attention entropy: 2.194075
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 74
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 74: val_loss=1.0301426649093628
+Epoch 74: train_loss=0.8911935091018677
+
+[CollapseMonitor] Epoch 74
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.094022, range: 0.463150, mean: 0.201806
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 34.0723
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch74.npy
+  Gradient norms:
+    lstm_encoder: 0.041847
+    lstm_decoder: 0.026752
+    output_layer: 0.408498
+  VSN output std:
+    encoder: 0.182088
+  Attention entropy: 2.184328
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 75
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 75: val_loss=1.0289064645767212
+Epoch 75: train_loss=0.8884266018867493
+
+[CollapseMonitor] Epoch 75
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.090846, range: 0.487494, mean: 0.197693
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 34.5451
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch75.npy
+  Gradient norms:
+    lstm_encoder: 0.041690
+    lstm_decoder: 0.024534
+    output_layer: 0.400494
+  VSN output std:
+    encoder: 0.177819
+  Attention entropy: 2.195254
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 76
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 76: val_loss=1.0280261039733887
+Epoch 76: train_loss=0.8895831108093262
+
+[CollapseMonitor] Epoch 76
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.088894, range: 0.484142, mean: 0.192453
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 34.3678
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch76.npy
+  Gradient norms:
+    lstm_encoder: 0.047320
+    lstm_decoder: 0.030321
+    output_layer: 0.430909
+  VSN output std:
+    encoder: 0.175315
+  Attention entropy: 2.194585
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 77
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 77: val_loss=1.0281678438186646
+Epoch 77: train_loss=0.8879221677780151
+
+[CollapseMonitor] Epoch 77
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.085307, range: 0.473731, mean: 0.225418
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 41.9473
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch77.npy
+  Gradient norms:
+    lstm_encoder: 0.047415
+    lstm_decoder: 0.029219
+    output_layer: 0.395076
+  VSN output std:
+    encoder: 0.173634
+  Attention entropy: 2.201149
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 78
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 78: val_loss=1.0305253267288208
+Epoch 78: train_loss=0.8900107145309448
+
+[CollapseMonitor] Epoch 78
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.091068, range: 0.476329, mean: 0.206035
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 35.9149
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch78.npy
+  Gradient norms:
+    lstm_encoder: 0.043348
+    lstm_decoder: 0.025576
+    output_layer: 0.395025
+  VSN output std:
+    encoder: 0.179662
+  Attention entropy: 2.193278
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 79
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 79: val_loss=1.0297645330429077
+Epoch 79: train_loss=0.8889791369438171
+
+[CollapseMonitor] Epoch 79
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.085557, range: 0.468282, mean: 0.241093
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 44.7330
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch79.npy
+  Gradient norms:
+    lstm_encoder: 0.047479
+    lstm_decoder: 0.029190
+    output_layer: 0.452881
+  VSN output std:
+    encoder: 0.180349
+  Attention entropy: 2.199879
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 80
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 80: val_loss=1.0288326740264893
+Epoch 80: train_loss=0.8862127661705017
+
+[CollapseMonitor] Epoch 80
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.086216, range: 0.482901, mean: 0.219922
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 40.4930
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch80.npy
+  Gradient norms:
+    lstm_encoder: 0.045617
+    lstm_decoder: 0.027043
+    output_layer: 0.380792
+  VSN output std:
+    encoder: 0.177579
+  Attention entropy: 2.201589
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 81
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 81: val_loss=1.029616355895996
+Epoch 81: train_loss=0.8873615264892578
+
+[CollapseMonitor] Epoch 81
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.086850, range: 0.486619, mean: 0.212116
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 38.7708
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch81.npy
+  Gradient norms:
+    lstm_encoder: 0.048777
+    lstm_decoder: 0.030068
+    output_layer: 0.389796
+  VSN output std:
+    encoder: 0.178599
+  Attention entropy: 2.204996
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 82
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 82: val_loss=1.0298106670379639
+Epoch 82: train_loss=0.8878716230392456
+
+[CollapseMonitor] Epoch 82
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.088492, range: 0.486006, mean: 0.225410
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 40.4363
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch82.npy
+  Gradient norms:
+    lstm_encoder: 0.046528
+    lstm_decoder: 0.028156
+    output_layer: 0.403868
+  VSN output std:
+    encoder: 0.179401
+  Attention entropy: 2.195784
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 83
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 83: val_loss=1.029402494430542
+Epoch 83: train_loss=0.8870968222618103
+
+[CollapseMonitor] Epoch 83
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.086983, range: 0.487659, mean: 0.210822
+  Pos: 100.0%, Neg: 0.0%, Unique: 182
+  Dir Acc: 60.11%, Pred Sharpe: 38.4752
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch83.npy
+  Gradient norms:
+    lstm_encoder: 0.046455
+    lstm_decoder: 0.029338
+    output_layer: 0.375550
+  VSN output std:
+    encoder: 0.177345
+  Attention entropy: 2.197360
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 84
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 84: val_loss=1.0282487869262695
+Epoch 84: train_loss=0.8856412768363953
+
+[CollapseMonitor] Epoch 84
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.085512, range: 0.485005, mean: 0.228271
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 42.3766
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch84.npy
+  Gradient norms:
+    lstm_encoder: 0.048417
+    lstm_decoder: 0.029241
+    output_layer: 0.408019
+  VSN output std:
+    encoder: 0.176094
+  Attention entropy: 2.201706
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 85
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 85: val_loss=1.0295422077178955
+Epoch 85: train_loss=0.8885853886604309
+
+[CollapseMonitor] Epoch 85
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.086164, range: 0.484816, mean: 0.214302
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 39.4820
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch85.npy
+  Gradient norms:
+    lstm_encoder: 0.048860
+    lstm_decoder: 0.030962
+    output_layer: 0.394396
+  VSN output std:
+    encoder: 0.177158
+  Attention entropy: 2.205439
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 86
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 86: val_loss=1.0303035974502563
+Epoch 86: train_loss=0.88851398229599
+
+[CollapseMonitor] Epoch 86
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.089517, range: 0.496450, mean: 0.203680
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 36.1197
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch86.npy
+  Gradient norms:
+    lstm_encoder: 0.046266
+    lstm_decoder: 0.029108
+    output_layer: 0.398538
+  VSN output std:
+    encoder: 0.176537
+  Attention entropy: 2.193910
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 87
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 87: val_loss=1.0285378694534302
+Epoch 87: train_loss=0.8852965235710144
+
+[CollapseMonitor] Epoch 87
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.088195, range: 0.498078, mean: 0.199410
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 35.8927
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch87.npy
+  Gradient norms:
+    lstm_encoder: 0.042007
+    lstm_decoder: 0.026019
+    output_layer: 0.375152
+  VSN output std:
+    encoder: 0.175300
+  Attention entropy: 2.200464
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 88
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 88: val_loss=1.0299243927001953
+Epoch 88: train_loss=0.8870199918746948
+
+[CollapseMonitor] Epoch 88
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.088630, range: 0.493937, mean: 0.197238
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 35.3273
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch88.npy
+  Gradient norms:
+    lstm_encoder: 0.050666
+    lstm_decoder: 0.029320
+    output_layer: 0.399053
+  VSN output std:
+    encoder: 0.175420
+  Attention entropy: 2.197381
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 89
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 89: val_loss=1.0289604663848877
+Epoch 89: train_loss=0.887786328792572
+
+[CollapseMonitor] Epoch 89
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.088009, range: 0.494938, mean: 0.203423
+  Pos: 100.0%, Neg: 0.0%, Unique: 182
+  Dir Acc: 60.11%, Pred Sharpe: 36.6922
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch89.npy
+  Gradient norms:
+    lstm_encoder: 0.044589
+    lstm_decoder: 0.027030
+    output_layer: 0.414908
+  VSN output std:
+    encoder: 0.174879
+  Attention entropy: 2.198148
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 90
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 90: val_loss=1.028238296508789
+Epoch 90: train_loss=0.8830255270004272
+
+[CollapseMonitor] Epoch 90
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.088085, range: 0.498177, mean: 0.211512
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 38.1181
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch90.npy
+  Gradient norms:
+    lstm_encoder: 0.045809
+    lstm_decoder: 0.027664
+    output_layer: 0.376293
+  VSN output std:
+    encoder: 0.174250
+  Attention entropy: 2.200057
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 91
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 91: val_loss=1.0280276536941528
+Epoch 91: train_loss=0.8862593770027161
+
+[CollapseMonitor] Epoch 91
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.088664, range: 0.501328, mean: 0.210205
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 37.6354
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch91.npy
+  Gradient norms:
+    lstm_encoder: 0.042006
+    lstm_decoder: 0.025157
+    output_layer: 0.383138
+  VSN output std:
+    encoder: 0.173804
+  Attention entropy: 2.198652
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 92
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 92: val_loss=1.0278663635253906
+Epoch 92: train_loss=0.8867209553718567
+
+[CollapseMonitor] Epoch 92
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.087107, range: 0.496097, mean: 0.214652
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 39.1184
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch92.npy
+  Gradient norms:
+    lstm_encoder: 0.051671
+    lstm_decoder: 0.030637
+    output_layer: 0.386747
+  VSN output std:
+    encoder: 0.173389
+  Attention entropy: 2.199233
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 93
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 93: val_loss=1.0280860662460327
+Epoch 93: train_loss=0.8904132843017578
+
+[CollapseMonitor] Epoch 93
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.087443, range: 0.496945, mean: 0.219299
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 39.8121
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch93.npy
+  Gradient norms:
+    lstm_encoder: 0.048480
+    lstm_decoder: 0.030090
+    output_layer: 0.397997
+  VSN output std:
+    encoder: 0.174308
+  Attention entropy: 2.193675
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 94
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 94: val_loss=1.0281133651733398
+Epoch 94: train_loss=0.8879413604736328
+
+[CollapseMonitor] Epoch 94
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.088084, range: 0.499979, mean: 0.213238
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 38.4295
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch94.npy
+  Gradient norms:
+    lstm_encoder: 0.047453
+    lstm_decoder: 0.028542
+    output_layer: 0.400174
+  VSN output std:
+    encoder: 0.174503
+  Attention entropy: 2.196284
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 95
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 95: val_loss=1.0284759998321533
+Epoch 95: train_loss=0.886044442653656
+
+[CollapseMonitor] Epoch 95
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.088603, range: 0.499936, mean: 0.213881
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 38.3198
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch95.npy
+  Gradient norms:
+    lstm_encoder: 0.045143
+    lstm_decoder: 0.027106
+    output_layer: 0.372530
+  VSN output std:
+    encoder: 0.174601
+  Attention entropy: 2.195354
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 96
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 96: val_loss=1.0285202264785767
+Epoch 96: train_loss=0.8839659690856934
+
+[CollapseMonitor] Epoch 96
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.088896, range: 0.501198, mean: 0.211701
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 37.8043
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch96.npy
+  Gradient norms:
+    lstm_encoder: 0.049942
+    lstm_decoder: 0.029075
+    output_layer: 0.379876
+  VSN output std:
+    encoder: 0.174462
+  Attention entropy: 2.197884
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 97
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 97: val_loss=1.0285508632659912
+Epoch 97: train_loss=0.8899230360984802
+
+[CollapseMonitor] Epoch 97
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.090271, range: 0.507535, mean: 0.196798
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 34.6076
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch97.npy
+  Gradient norms:
+    lstm_encoder: 0.048359
+    lstm_decoder: 0.030182
+    output_layer: 0.387787
+  VSN output std:
+    encoder: 0.173492
+  Attention entropy: 2.201305
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 98
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 98: val_loss=1.0281285047531128
+Epoch 98: train_loss=0.8876558542251587
+
+[CollapseMonitor] Epoch 98
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.090117, range: 0.506904, mean: 0.201706
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 35.5315
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch98.npy
+  Gradient norms:
+    lstm_encoder: 0.049843
+    lstm_decoder: 0.032587
+    output_layer: 0.387110
+  VSN output std:
+    encoder: 0.172789
+  Attention entropy: 2.200762
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 99
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 99: val_loss=1.0281422138214111
+Epoch 99: train_loss=0.8879958391189575
+
+[CollapseMonitor] Epoch 99
+  [DEBUG] Processed 12 batches from val_dataloader
+  [DEBUG] Predictions shape after concat: (183,)
+  Pred std: 0.089278, range: 0.503520, mean: 0.200779
+  Pos: 100.0%, Neg: 0.0%, Unique: 183
+  Dir Acc: 60.11%, Pred Sharpe: 35.7005
+  Composite: 0.4812 (dist_match: 0.6011, actual_pos: 60.1%, pred_pos: 100.0%)
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/val_predictions_epoch99.npy
+  Gradient norms:
+    lstm_encoder: 0.046912
+    lstm_decoder: 0.027330
+    output_layer: 0.371536
+  VSN output std:
+    encoder: 0.172855
+  Attention entropy: 2.203633
+  Saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/collapse_monitoring/collapse_monitor_latest.json
+
+
+======================================================================
+Training complete
+======================================================================
+
+Best val_loss checkpoint: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/checkpoints/tft-epoch=epoch=65-valloss=val_loss=1.0279.ckpt
+Best validation loss: 1.027857
+Checkpoints saved:
+  - Best val_loss: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/checkpoints/tft-epoch=epoch=65-valloss=val_loss=1.0279.ckpt
+  - Best pred_std: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/checkpoints/tft-epoch=epoch=64-predstd=val_pred_std=0.1088.ckpt
+  - Best unique: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/checkpoints/tft-epoch=epoch=00-unique=val_num_unique=183.ckpt
+  - Best dir_acc: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/checkpoints/tft-epoch=epoch=00-diracc=val_dir_acc=0.6011.ckpt
+  - Best sharpe: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/checkpoints/tft-epoch=epoch=00-sharpe=val_sharpe=765.9018.ckpt
+  - Best composite: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/checkpoints/tft-epoch=epoch=41-composite=val_composite=0.5140.ckpt
+Completed at: 2025-12-12 17:05:33
+Log saved to: experiments/12_feature_ablation/core_dynamics_weekly_7q_h1_s42/training_20251212_165005.log
+======================================================================

@@ -1,0 +1,2719 @@
+
+[INFO] Using AUTO device selection.
+
+[INFO] Patched matplotlib.Axes.errorbar to abs() negative yerr for robustness.
+======================================================================
+Training TFT: 12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016
+======================================================================
+Logging to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/training_20251214_173615.log
+Started at: 2025-12-14 17:36:15
+======================================================================
+
+Loading data splits...
+Train: 2468 samples
+Val: 220 samples
+Test: 220 samples
+
+Preparing TimeSeriesDataSet...
+
+Dropping source columns (used for staleness only): ['CPI']
+
+Final features for TFT: ['SP500_Returns', 'VIX', 'Inflation_YoY', 'Unemployment', 'Fed_Rate', 'Consumer_Sentiment', 'Industrial_Production', 'cumret_5', 'cumret_10', 'cumret_20', 'cumret_30']
+
+======================================================================
+FEATURE STATISTICS - BEFORE NORMALIZATION
+======================================================================
+VIX                             mean= 20.0672  std=  9.9897  min=  9.8900  max= 80.8600
+Inflation_YoY                   mean=  2.3543  std=  1.4646  min= -2.1498  max=  5.4850
+Unemployment                    mean=  6.9692  std=  1.9056  min=  4.4000  max= 10.2000
+Fed_Rate                        mean=  1.6259  std=  2.0079  min=  0.0700  max=  5.2600
+Consumer_Sentiment              mean= 76.9767  std= 10.2558  min= 55.3000  max= 97.1000
+Industrial_Production           mean=104.2067  std=  8.2725  min= 92.5354  max=119.6780
+
+======================================================================
+TARGET CONFIGURATION
+======================================================================
+Target variable: SP500_Returns
+  Mode: Point return prediction (single-step)
+  Target stats: mean=0.0246, std=1.2713
+  Dropping unused cumret columns: ['cumret_5', 'cumret_10', 'cumret_20', 'cumret_30']
+======================================================================
+
+======================================================================
+FEATURES AFTER GROUPNORMALIZER (first batch, last timestep)
+======================================================================
+VIX                             normalized_value=  1.0000
+Inflation_YoY                   normalized_value= -0.0500
+Unemployment                    normalized_value=  0.1425
+Fed_Rate                        normalized_value= -0.7449
+Consumer_Sentiment              normalized_value=  1.3808
+Industrial_Production           normalized_value= -0.7152
+======================================================================
+
+Configuration saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/config.json
+[DEBUG] VIX train values: [14.08 13.98 14.09 13.58 13.49]
+[DEBUG] VIX val values: [17.79 19.92 21.12 19.31 17.01]
+Batches per epoch: 37
+[DEBUG] Validation batches: 3
+[DEBUG] Validation dataset size: 181
+[DEBUG] Batch size: 64
+
+Initializing model...
+
+Quantile configuration: 3q
+  Quantiles: [0.1, 0.5, 0.9]
+  Output size: 3
+  Median index: 1
+
+Using standard QuantileLoss (no penalties)
+
+[REGIME OUTPUT] Disabled (using baseline output layer)
+
+[STALENESS ATTENTION] Disabled
+
+================================================================================
+BASELINE MODEL FEATURE CONFIGURATION (after from_dataset)
+================================================================================
+tft.hparams.time_varying_reals_encoder: ['relative_time_idx', 'VIX', 'Inflation_YoY', 'Unemployment', 'Fed_Rate', 'Consumer_Sentiment', 'Industrial_Production']
+  Count: 7
+
+tft.hparams.time_varying_reals_decoder: ['relative_time_idx']
+  Count: 1
+
+tft.hparams.x_reals (all reals passed to model): ['encoder_length', 'relative_time_idx', 'VIX', 'Inflation_YoY', 'Unemployment', 'Fed_Rate', 'Consumer_Sentiment', 'Industrial_Production']
+  Count: 8
+
+Encoder VSN configuration:
+  num_inputs: 7
+  input_sizes: {'relative_time_idx': 16, 'VIX': 16, 'Inflation_YoY': 16, 'Unemployment': 16, 'Fed_Rate': 16, 'Consumer_Sentiment': 16, 'Industrial_Production': 16}
+  flattened_grn.fc1: in_features=112, out_features=7
+  -> Params in fc1: 784 (should be 5*16*5=400 if 5 features)
+================================================================================
+
+Model parameters: 25,357
+
+Starting training...
+Checkpoints will be saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/checkpoints/
+Logs will be saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/logs/
+
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 0
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 0: val_loss=N/A
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 0
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 0: val_loss=0.7789438366889954
+Epoch 0: train_loss=0.8793428540229797
+
+[CollapseMonitor] Epoch 0
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0128, dir_acc=50.8%, pos=0%, unique=181, sharpe=-909.49
+    h2: std=0.0120, dir_acc=51.4%, pos=0%, unique=181, sharpe=-885.31
+    h3: std=0.0118, dir_acc=51.4%, pos=0%, unique=180, sharpe=-819.99
+    h4: std=0.0116, dir_acc=50.8%, pos=0%, unique=181, sharpe=-752.07
+    h5: std=0.0115, dir_acc=51.4%, pos=0%, unique=179, sharpe=-683.72
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0116, dir_acc_avg=51.0%, composite_avg=0.3901
+  H1 detail: range=0.0541, mean=-0.7327, dist_match=0.5083
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch0.npz
+  Gradient norms:
+    lstm_encoder: 0.019115
+    lstm_decoder: 0.113769
+    output_layer: 1.143352
+  VSN output std:
+    encoder: 0.172175
+  Attention entropy: 2.993789
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 1
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 1: val_loss=0.6446323990821838
+Epoch 1: train_loss=0.7965074777603149
+
+[CollapseMonitor] Epoch 1
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0199, dir_acc=50.8%, pos=0%, unique=181, sharpe=-453.61
+    h2: std=0.0179, dir_acc=51.4%, pos=0%, unique=179, sharpe=-437.02
+    h3: std=0.0167, dir_acc=51.4%, pos=0%, unique=179, sharpe=-404.83
+    h4: std=0.0159, dir_acc=50.8%, pos=0%, unique=181, sharpe=-361.23
+    h5: std=0.0155, dir_acc=51.4%, pos=0%, unique=180, sharpe=-312.36
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0147, dir_acc_avg=49.9%, composite_avg=0.3800
+  H1 detail: range=0.0795, mean=-0.5696, dist_match=0.5083
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch1.npz
+  Gradient norms:
+    lstm_encoder: 0.015247
+    lstm_decoder: 0.087301
+    output_layer: 0.932630
+  VSN output std:
+    encoder: 0.168917
+  Attention entropy: 2.993334
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 2
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 2: val_loss=0.5470499992370605
+Epoch 2: train_loss=0.7158434987068176
+
+[CollapseMonitor] Epoch 2
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0299, dir_acc=50.8%, pos=0%, unique=181, sharpe=-210.49
+    h2: std=0.0250, dir_acc=51.4%, pos=0%, unique=181, sharpe=-197.83
+    h3: std=0.0223, dir_acc=51.4%, pos=0%, unique=180, sharpe=-170.69
+    h4: std=0.0206, dir_acc=50.8%, pos=0%, unique=179, sharpe=-136.19
+    h5: std=0.0195, dir_acc=51.4%, pos=0%, unique=180, sharpe=-98.26
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0166, dir_acc_avg=49.3%, composite_avg=0.3696
+  H1 detail: range=0.1100, mean=-0.3969, dist_match=0.5083
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch2.npz
+  Gradient norms:
+    lstm_encoder: 0.009669
+    lstm_decoder: 0.053291
+    output_layer: 0.656962
+  VSN output std:
+    encoder: 0.163876
+  Attention entropy: 2.992402
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 3
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 3: val_loss=0.50038743019104
+Epoch 3: train_loss=0.6535875201225281
+
+[CollapseMonitor] Epoch 3
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0390, dir_acc=50.8%, pos=0%, unique=180, sharpe=-118.81
+    h2: std=0.0314, dir_acc=51.4%, pos=0%, unique=181, sharpe=-109.27
+    h3: std=0.0267, dir_acc=51.4%, pos=0%, unique=181, sharpe=-89.69
+    h4: std=0.0236, dir_acc=50.8%, pos=0%, unique=180, sharpe=-63.46
+    h5: std=0.0214, dir_acc=51.9%, pos=6%, unique=181, sharpe=-32.85
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0161, dir_acc_avg=49.1%, composite_avg=0.3713
+  H1 detail: range=0.1389, mean=-0.2919, dist_match=0.5083
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch3.npz
+  Gradient norms:
+    lstm_encoder: 0.004673
+    lstm_decoder: 0.027528
+    output_layer: 0.419564
+  VSN output std:
+    encoder: 0.157141
+  Attention entropy: 2.990499
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 4
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 4: val_loss=0.4791817367076874
+Epoch 4: train_loss=0.621213972568512
+
+[CollapseMonitor] Epoch 4
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0419, dir_acc=50.8%, pos=0%, unique=181, sharpe=-90.78
+    h2: std=0.0337, dir_acc=51.4%, pos=0%, unique=181, sharpe=-86.23
+    h3: std=0.0279, dir_acc=51.4%, pos=0%, unique=181, sharpe=-74.45
+    h4: std=0.0238, dir_acc=50.8%, pos=0%, unique=181, sharpe=-56.41
+    h5: std=0.0206, dir_acc=50.8%, pos=5%, unique=181, sharpe=-33.22
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0142, dir_acc_avg=49.1%, composite_avg=0.3708
+  H1 detail: range=0.1557, mean=-0.2398, dist_match=0.5083
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch4.npz
+  Gradient norms:
+    lstm_encoder: 0.002202
+    lstm_decoder: 0.014149
+    output_layer: 0.252664
+  VSN output std:
+    encoder: 0.152316
+  Attention entropy: 2.987730
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 5
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 5: val_loss=0.4721149504184723
+Epoch 5: train_loss=0.5998175144195557
+
+[CollapseMonitor] Epoch 5
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0390, dir_acc=50.8%, pos=0%, unique=181, sharpe=-71.81
+    h2: std=0.0317, dir_acc=51.4%, pos=0%, unique=181, sharpe=-67.34
+    h3: std=0.0260, dir_acc=51.4%, pos=0%, unique=181, sharpe=-57.35
+    h4: std=0.0217, dir_acc=50.8%, pos=0%, unique=179, sharpe=-42.05
+    h5: std=0.0181, dir_acc=51.9%, pos=13%, unique=181, sharpe=-21.45
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0121, dir_acc_avg=49.0%, composite_avg=0.3728
+  H1 detail: range=0.1480, mean=-0.1764, dist_match=0.5083
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch5.npz
+  Gradient norms:
+    lstm_encoder: 0.001151
+    lstm_decoder: 0.006596
+    output_layer: 0.135246
+  VSN output std:
+    encoder: 0.152070
+  Attention entropy: 2.985317
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 6
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 6: val_loss=0.4704761803150177
+Epoch 6: train_loss=0.5851196050643921
+
+[CollapseMonitor] Epoch 6
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0342, dir_acc=50.8%, pos=0%, unique=181, sharpe=-51.56
+    h2: std=0.0281, dir_acc=51.4%, pos=0%, unique=181, sharpe=-46.16
+    h3: std=0.0230, dir_acc=49.7%, pos=3%, unique=180, sharpe=-36.48
+    h4: std=0.0189, dir_acc=52.5%, pos=13%, unique=181, sharpe=-22.37
+    h5: std=0.0155, dir_acc=51.9%, pos=33%, unique=180, sharpe=-3.17
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0105, dir_acc_avg=49.0%, composite_avg=0.3711
+  H1 detail: range=0.1309, mean=-0.1109, dist_match=0.5083
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch6.npz
+  Gradient norms:
+    lstm_encoder: 0.000651
+    lstm_decoder: 0.002878
+    output_layer: 0.061796
+  VSN output std:
+    encoder: 0.155355
+  Attention entropy: 2.984038
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 7
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 7: val_loss=0.4700224697589874
+Epoch 7: train_loss=0.5845926403999329
+
+[CollapseMonitor] Epoch 7
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0307, dir_acc=50.8%, pos=6%, unique=181, sharpe=-31.98
+    h2: std=0.0258, dir_acc=50.8%, pos=10%, unique=181, sharpe=-25.23
+    h3: std=0.0216, dir_acc=51.9%, pos=18%, unique=180, sharpe=-14.90
+    h4: std=0.0182, dir_acc=54.1%, pos=30%, unique=181, sharpe=-1.07
+    h5: std=0.0153, dir_acc=48.6%, pos=100%, unique=180, sharpe=16.54
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0105, dir_acc_avg=49.0%, composite_avg=0.3730
+  H1 detail: range=0.1195, mean=-0.0618, dist_match=0.5635
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch7.npz
+  Gradient norms:
+    lstm_encoder: 0.000555
+    lstm_decoder: 0.002019
+    output_layer: 0.045356
+  VSN output std:
+    encoder: 0.158347
+  Attention entropy: 2.985519
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 8
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 8: val_loss=0.4685952067375183
+Epoch 8: train_loss=0.577894926071167
+
+[CollapseMonitor] Epoch 8
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0325, dir_acc=52.5%, pos=13%, unique=181, sharpe=-22.26
+    h2: std=0.0282, dir_acc=53.0%, pos=16%, unique=180, sharpe=-16.63
+    h3: std=0.0245, dir_acc=52.5%, pos=23%, unique=181, sharpe=-8.68
+    h4: std=0.0213, dir_acc=53.6%, pos=27%, unique=181, sharpe=1.22
+    h5: std=0.0187, dir_acc=49.2%, pos=99%, unique=180, sharpe=12.94
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0133, dir_acc_avg=49.2%, composite_avg=0.3767
+  H1 detail: range=0.1263, mean=-0.0456, dist_match=0.6354
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch8.npz
+  Gradient norms:
+    lstm_encoder: 0.000552
+    lstm_decoder: 0.001839
+    output_layer: 0.042640
+  VSN output std:
+    encoder: 0.158625
+  Attention entropy: 2.986553
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 9
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 9: val_loss=0.46755021810531616
+Epoch 9: train_loss=0.5793638229370117
+
+[CollapseMonitor] Epoch 9
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0388, dir_acc=52.5%, pos=16%, unique=181, sharpe=-16.53
+    h2: std=0.0347, dir_acc=54.1%, pos=19%, unique=180, sharpe=-12.75
+    h3: std=0.0311, dir_acc=53.6%, pos=21%, unique=179, sharpe=-7.55
+    h4: std=0.0280, dir_acc=54.7%, pos=26%, unique=181, sharpe=-1.33
+    h5: std=0.0254, dir_acc=51.4%, pos=34%, unique=180, sharpe=5.68
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0193, dir_acc_avg=49.5%, composite_avg=0.3841
+  H1 detail: range=0.1480, mean=-0.0404, dist_match=0.6685
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch9.npz
+  Gradient norms:
+    lstm_encoder: 0.000621
+    lstm_decoder: 0.001927
+    output_layer: 0.049584
+  VSN output std:
+    encoder: 0.152650
+  Attention entropy: 2.986684
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 10
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 10: val_loss=0.4670502841472626
+Epoch 10: train_loss=0.5787332057952881
+
+[CollapseMonitor] Epoch 10
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0447, dir_acc=54.1%, pos=20%, unique=181, sharpe=-10.97
+    h2: std=0.0411, dir_acc=53.6%, pos=21%, unique=180, sharpe=-8.42
+    h3: std=0.0378, dir_acc=53.6%, pos=21%, unique=178, sharpe=-4.91
+    h4: std=0.0349, dir_acc=54.1%, pos=25%, unique=179, sharpe=-0.82
+    h5: std=0.0325, dir_acc=53.6%, pos=28%, unique=181, sharpe=3.65
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0269, dir_acc_avg=49.6%, composite_avg=0.3888
+  H1 detail: range=0.1725, mean=-0.0309, dist_match=0.7072
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch10.npz
+  Gradient norms:
+    lstm_encoder: 0.000735
+    lstm_decoder: 0.001923
+    output_layer: 0.047204
+  VSN output std:
+    encoder: 0.144617
+  Attention entropy: 2.985241
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 11
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 11: val_loss=0.467223584651947
+Epoch 11: train_loss=0.5717737674713135
+
+[CollapseMonitor] Epoch 11
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0438, dir_acc=54.1%, pos=21%, unique=178, sharpe=-3.23
+    h2: std=0.0413, dir_acc=54.1%, pos=23%, unique=178, sharpe=-1.36
+    h3: std=0.0388, dir_acc=54.1%, pos=26%, unique=180, sharpe=1.38
+    h4: std=0.0366, dir_acc=54.7%, pos=28%, unique=178, sharpe=4.62
+    h5: std=0.0347, dir_acc=48.6%, pos=67%, unique=180, sharpe=8.14
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0306, dir_acc_avg=49.4%, composite_avg=0.3854
+  H1 detail: range=0.1733, mean=-0.0089, dist_match=0.7182
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch11.npz
+  Gradient norms:
+    lstm_encoder: 0.000800
+    lstm_decoder: 0.002004
+    output_layer: 0.047425
+  VSN output std:
+    encoder: 0.142992
+  Attention entropy: 2.983225
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 12
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 12: val_loss=0.4674719572067261
+Epoch 12: train_loss=0.5659083127975464
+
+[CollapseMonitor] Epoch 12
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0393, dir_acc=50.3%, pos=46%, unique=178, sharpe=7.69
+    h2: std=0.0379, dir_acc=50.8%, pos=80%, unique=177, sharpe=8.55
+    h3: std=0.0363, dir_acc=48.6%, pos=100%, unique=177, sharpe=10.39
+    h4: std=0.0349, dir_acc=49.2%, pos=100%, unique=179, sharpe=12.68
+    h5: std=0.0337, dir_acc=48.6%, pos=100%, unique=176, sharpe=15.18
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0313, dir_acc_avg=48.5%, composite_avg=0.3686
+  H1 detail: range=0.1591, mean=0.0190, dist_match=0.9669
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch12.npz
+  Gradient norms:
+    lstm_encoder: 0.000794
+    lstm_decoder: 0.001942
+    output_layer: 0.045872
+  VSN output std:
+    encoder: 0.138900
+  Attention entropy: 2.979794
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 13
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 13: val_loss=0.4686720073223114
+Epoch 13: train_loss=0.569495439529419
+
+[CollapseMonitor] Epoch 13
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0307, dir_acc=49.2%, pos=100%, unique=180, sharpe=24.74
+    h2: std=0.0303, dir_acc=48.6%, pos=100%, unique=178, sharpe=24.43
+    h3: std=0.0294, dir_acc=48.6%, pos=100%, unique=178, sharpe=25.78
+    h4: std=0.0285, dir_acc=49.2%, pos=100%, unique=178, sharpe=27.82
+    h5: std=0.0278, dir_acc=48.6%, pos=100%, unique=179, sharpe=30.10
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0267, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.1290, mean=0.0479, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch13.npz
+  Gradient norms:
+    lstm_encoder: 0.000848
+    lstm_decoder: 0.001851
+    output_layer: 0.046765
+  VSN output std:
+    encoder: 0.132676
+  Attention entropy: 2.975313
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 14
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 14: val_loss=0.46771955490112305
+Epoch 14: train_loss=0.5651803612709045
+
+[CollapseMonitor] Epoch 14
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0198, dir_acc=49.2%, pos=100%, unique=179, sharpe=46.85
+    h2: std=0.0202, dir_acc=48.6%, pos=100%, unique=181, sharpe=43.58
+    h3: std=0.0199, dir_acc=48.6%, pos=100%, unique=178, sharpe=44.04
+    h4: std=0.0194, dir_acc=49.2%, pos=100%, unique=179, sharpe=46.00
+    h5: std=0.0190, dir_acc=48.6%, pos=100%, unique=178, sharpe=48.53
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0185, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0970, mean=0.0585, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch14.npz
+  Gradient norms:
+    lstm_encoder: 0.001039
+    lstm_decoder: 0.002132
+    output_layer: 0.050870
+  VSN output std:
+    encoder: 0.131618
+  Attention entropy: 2.970151
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 15
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 15: val_loss=0.46861377358436584
+Epoch 15: train_loss=0.5622818470001221
+
+[CollapseMonitor] Epoch 15
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0138, dir_acc=49.2%, pos=100%, unique=178, sharpe=73.75
+    h2: std=0.0145, dir_acc=48.6%, pos=100%, unique=179, sharpe=65.75
+    h3: std=0.0145, dir_acc=48.6%, pos=100%, unique=175, sharpe=64.57
+    h4: std=0.0144, dir_acc=49.2%, pos=100%, unique=175, sharpe=66.11
+    h5: std=0.0142, dir_acc=48.6%, pos=100%, unique=172, sharpe=68.70
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0143, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0836, mean=0.0640, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch15.npz
+  Gradient norms:
+    lstm_encoder: 0.000972
+    lstm_decoder: 0.001714
+    output_layer: 0.042042
+  VSN output std:
+    encoder: 0.132608
+  Attention entropy: 2.963559
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 16
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 16: val_loss=0.4691273868083954
+Epoch 16: train_loss=0.5580918788909912
+
+[CollapseMonitor] Epoch 16
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0101, dir_acc=49.2%, pos=100%, unique=180, sharpe=108.39
+    h2: std=0.0108, dir_acc=48.6%, pos=100%, unique=179, sharpe=95.23
+    h3: std=0.0110, dir_acc=48.6%, pos=100%, unique=178, sharpe=91.96
+    h4: std=0.0110, dir_acc=49.2%, pos=100%, unique=178, sharpe=92.95
+    h5: std=0.0109, dir_acc=48.6%, pos=100%, unique=173, sharpe=95.55
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0114, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0708, mean=0.0689, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch16.npz
+  Gradient norms:
+    lstm_encoder: 0.001009
+    lstm_decoder: 0.001834
+    output_layer: 0.043217
+  VSN output std:
+    encoder: 0.133001
+  Attention entropy: 2.961262
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 17
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 17: val_loss=0.4695468246936798
+Epoch 17: train_loss=0.5606545805931091
+
+[CollapseMonitor] Epoch 17
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0088, dir_acc=49.2%, pos=100%, unique=179, sharpe=125.84
+    h2: std=0.0094, dir_acc=48.6%, pos=100%, unique=178, sharpe=110.36
+    h3: std=0.0097, dir_acc=48.6%, pos=100%, unique=179, sharpe=105.55
+    h4: std=0.0098, dir_acc=49.2%, pos=100%, unique=172, sharpe=105.74
+    h5: std=0.0098, dir_acc=48.6%, pos=100%, unique=171, sharpe=107.81
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0106, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0652, mean=0.0699, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch17.npz
+  Gradient norms:
+    lstm_encoder: 0.000966
+    lstm_decoder: 0.001669
+    output_layer: 0.040188
+  VSN output std:
+    encoder: 0.131606
+  Attention entropy: 2.960870
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 18
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 18: val_loss=0.4697130620479584
+Epoch 18: train_loss=0.5570306777954102
+
+[CollapseMonitor] Epoch 18
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0073, dir_acc=49.2%, pos=100%, unique=180, sharpe=158.03
+    h2: std=0.0074, dir_acc=48.6%, pos=100%, unique=178, sharpe=145.37
+    h3: std=0.0076, dir_acc=48.6%, pos=100%, unique=174, sharpe=138.60
+    h4: std=0.0077, dir_acc=49.2%, pos=100%, unique=169, sharpe=137.40
+    h5: std=0.0079, dir_acc=48.6%, pos=100%, unique=178, sharpe=138.45
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0090, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0584, mean=0.0722, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch18.npz
+  Gradient norms:
+    lstm_encoder: 0.000975
+    lstm_decoder: 0.001706
+    output_layer: 0.039455
+  VSN output std:
+    encoder: 0.130389
+  Attention entropy: 2.962873
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 19
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 19: val_loss=0.4708992540836334
+Epoch 19: train_loss=0.5580328702926636
+
+[CollapseMonitor] Epoch 19
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0067, dir_acc=49.2%, pos=100%, unique=179, sharpe=183.18
+    h2: std=0.0061, dir_acc=48.6%, pos=100%, unique=176, sharpe=189.23
+    h3: std=0.0061, dir_acc=48.6%, pos=100%, unique=179, sharpe=182.82
+    h4: std=0.0063, dir_acc=49.2%, pos=100%, unique=176, sharpe=179.08
+    h5: std=0.0065, dir_acc=48.6%, pos=100%, unique=175, sharpe=177.39
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0079, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0506, mean=0.0769, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch19.npz
+  Gradient norms:
+    lstm_encoder: 0.000978
+    lstm_decoder: 0.001861
+    output_layer: 0.043336
+  VSN output std:
+    encoder: 0.128362
+  Attention entropy: 2.961366
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 20
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 20: val_loss=0.47119849920272827
+Epoch 20: train_loss=0.5572206377983093
+
+[CollapseMonitor] Epoch 20
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0071, dir_acc=49.2%, pos=100%, unique=181, sharpe=169.95
+    h2: std=0.0054, dir_acc=48.6%, pos=100%, unique=178, sharpe=207.43
+    h3: std=0.0051, dir_acc=48.6%, pos=100%, unique=177, sharpe=217.51
+    h4: std=0.0051, dir_acc=49.2%, pos=100%, unique=169, sharpe=217.40
+    h5: std=0.0053, dir_acc=48.6%, pos=100%, unique=176, sharpe=214.99
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0068, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0411, mean=0.0761, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch20.npz
+  Gradient norms:
+    lstm_encoder: 0.001133
+    lstm_decoder: 0.001779
+    output_layer: 0.042896
+  VSN output std:
+    encoder: 0.127085
+  Attention entropy: 2.961982
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 21
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 21: val_loss=0.47047188878059387
+Epoch 21: train_loss=0.5570077896118164
+
+[CollapseMonitor] Epoch 21
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0074, dir_acc=49.2%, pos=100%, unique=176, sharpe=157.14
+    h2: std=0.0056, dir_acc=48.6%, pos=100%, unique=180, sharpe=192.49
+    h3: std=0.0052, dir_acc=48.6%, pos=100%, unique=173, sharpe=202.67
+    h4: std=0.0052, dir_acc=49.2%, pos=100%, unique=170, sharpe=203.07
+    h5: std=0.0054, dir_acc=48.6%, pos=100%, unique=172, sharpe=201.20
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0069, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0409, mean=0.0735, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch21.npz
+  Gradient norms:
+    lstm_encoder: 0.001268
+    lstm_decoder: 0.001776
+    output_layer: 0.040749
+  VSN output std:
+    encoder: 0.126068
+  Attention entropy: 2.961118
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 22
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 22: val_loss=0.470292866230011
+Epoch 22: train_loss=0.555219829082489
+
+[CollapseMonitor] Epoch 22
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0084, dir_acc=49.2%, pos=100%, unique=179, sharpe=140.45
+    h2: std=0.0061, dir_acc=48.6%, pos=100%, unique=171, sharpe=178.44
+    h3: std=0.0054, dir_acc=48.6%, pos=100%, unique=175, sharpe=198.39
+    h4: std=0.0052, dir_acc=49.2%, pos=100%, unique=175, sharpe=205.40
+    h5: std=0.0052, dir_acc=48.6%, pos=100%, unique=170, sharpe=206.83
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0067, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0403, mean=0.0741, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch22.npz
+  Gradient norms:
+    lstm_encoder: 0.001175
+    lstm_decoder: 0.001779
+    output_layer: 0.042522
+  VSN output std:
+    encoder: 0.127413
+  Attention entropy: 2.960095
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 23
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 23: val_loss=0.4710211157798767
+Epoch 23: train_loss=0.5573388338088989
+
+[CollapseMonitor] Epoch 23
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0083, dir_acc=49.2%, pos=100%, unique=180, sharpe=150.97
+    h2: std=0.0060, dir_acc=48.6%, pos=100%, unique=175, sharpe=195.52
+    h3: std=0.0051, dir_acc=48.6%, pos=100%, unique=173, sharpe=221.13
+    h4: std=0.0049, dir_acc=49.2%, pos=100%, unique=167, sharpe=231.02
+    h5: std=0.0050, dir_acc=48.6%, pos=100%, unique=170, sharpe=233.34
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0064, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0396, mean=0.0788, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch23.npz
+  Gradient norms:
+    lstm_encoder: 0.001172
+    lstm_decoder: 0.001826
+    output_layer: 0.040566
+  VSN output std:
+    encoder: 0.127480
+  Attention entropy: 2.958847
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 24
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 24: val_loss=0.4721202552318573
+Epoch 24: train_loss=0.5555896759033203
+
+[CollapseMonitor] Epoch 24
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0099, dir_acc=49.2%, pos=100%, unique=176, sharpe=128.35
+    h2: std=0.0072, dir_acc=48.6%, pos=100%, unique=174, sharpe=164.21
+    h3: std=0.0061, dir_acc=48.6%, pos=100%, unique=173, sharpe=188.10
+    h4: std=0.0057, dir_acc=49.2%, pos=100%, unique=171, sharpe=200.78
+    h5: std=0.0057, dir_acc=48.6%, pos=100%, unique=170, sharpe=207.06
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0068, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0421, mean=0.0799, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch24.npz
+  Gradient norms:
+    lstm_encoder: 0.001128
+    lstm_decoder: 0.001760
+    output_layer: 0.038931
+  VSN output std:
+    encoder: 0.125110
+  Attention entropy: 2.957173
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 25
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 25: val_loss=0.47199156880378723
+Epoch 25: train_loss=0.5559433102607727
+
+[CollapseMonitor] Epoch 25
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0104, dir_acc=49.2%, pos=100%, unique=179, sharpe=118.39
+    h2: std=0.0076, dir_acc=48.6%, pos=100%, unique=178, sharpe=150.59
+    h3: std=0.0065, dir_acc=48.6%, pos=100%, unique=175, sharpe=173.16
+    h4: std=0.0060, dir_acc=49.2%, pos=100%, unique=169, sharpe=186.41
+    h5: std=0.0059, dir_acc=48.6%, pos=100%, unique=167, sharpe=194.08
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0069, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0430, mean=0.0776, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch25.npz
+  Gradient norms:
+    lstm_encoder: 0.001233
+    lstm_decoder: 0.001779
+    output_layer: 0.037071
+  VSN output std:
+    encoder: 0.124401
+  Attention entropy: 2.956860
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 26
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 26: val_loss=0.472201406955719
+Epoch 26: train_loss=0.5512546896934509
+
+[CollapseMonitor] Epoch 26
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0115, dir_acc=49.2%, pos=100%, unique=179, sharpe=108.12
+    h2: std=0.0086, dir_acc=48.6%, pos=100%, unique=173, sharpe=135.23
+    h3: std=0.0073, dir_acc=48.6%, pos=100%, unique=176, sharpe=154.84
+    h4: std=0.0068, dir_acc=49.2%, pos=100%, unique=173, sharpe=167.40
+    h5: std=0.0066, dir_acc=48.6%, pos=100%, unique=169, sharpe=175.62
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0074, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0452, mean=0.0783, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch26.npz
+  Gradient norms:
+    lstm_encoder: 0.001111
+    lstm_decoder: 0.001647
+    output_layer: 0.038418
+  VSN output std:
+    encoder: 0.123976
+  Attention entropy: 2.955793
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 27
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 27: val_loss=0.47217944264411926
+Epoch 27: train_loss=0.5545459985733032
+
+[CollapseMonitor] Epoch 27
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0122, dir_acc=49.2%, pos=100%, unique=179, sharpe=102.75
+    h2: std=0.0092, dir_acc=48.6%, pos=100%, unique=177, sharpe=126.83
+    h3: std=0.0079, dir_acc=48.6%, pos=100%, unique=173, sharpe=144.64
+    h4: std=0.0073, dir_acc=49.2%, pos=100%, unique=176, sharpe=156.63
+    h5: std=0.0071, dir_acc=48.6%, pos=100%, unique=170, sharpe=164.99
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0077, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0464, mean=0.0787, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch27.npz
+  Gradient norms:
+    lstm_encoder: 0.001201
+    lstm_decoder: 0.001889
+    output_layer: 0.040087
+  VSN output std:
+    encoder: 0.123857
+  Attention entropy: 2.954973
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 28
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 28: val_loss=0.47212791442871094
+Epoch 28: train_loss=0.5512235760688782
+
+[CollapseMonitor] Epoch 28
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0124, dir_acc=49.2%, pos=100%, unique=178, sharpe=94.67
+    h2: std=0.0095, dir_acc=48.6%, pos=100%, unique=178, sharpe=115.63
+    h3: std=0.0081, dir_acc=48.6%, pos=100%, unique=177, sharpe=131.51
+    h4: std=0.0075, dir_acc=49.2%, pos=100%, unique=173, sharpe=142.67
+    h5: std=0.0072, dir_acc=48.6%, pos=100%, unique=172, sharpe=150.78
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0078, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0469, mean=0.0740, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch28.npz
+  Gradient norms:
+    lstm_encoder: 0.001159
+    lstm_decoder: 0.001820
+    output_layer: 0.039846
+  VSN output std:
+    encoder: 0.123835
+  Attention entropy: 2.954267
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 29
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 29: val_loss=0.4725886285305023
+Epoch 29: train_loss=0.5544798970222473
+
+[CollapseMonitor] Epoch 29
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0129, dir_acc=49.2%, pos=100%, unique=179, sharpe=97.13
+    h2: std=0.0099, dir_acc=48.6%, pos=100%, unique=176, sharpe=118.69
+    h3: std=0.0085, dir_acc=48.6%, pos=100%, unique=176, sharpe=135.04
+    h4: std=0.0078, dir_acc=49.2%, pos=100%, unique=171, sharpe=146.54
+    h5: std=0.0075, dir_acc=48.6%, pos=100%, unique=174, sharpe=154.89
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0080, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0475, mean=0.0787, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch29.npz
+  Gradient norms:
+    lstm_encoder: 0.001112
+    lstm_decoder: 0.001688
+    output_layer: 0.037370
+  VSN output std:
+    encoder: 0.123294
+  Attention entropy: 2.953727
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 30
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 30: val_loss=0.4722992777824402
+Epoch 30: train_loss=0.553814172744751
+
+[CollapseMonitor] Epoch 30
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0136, dir_acc=49.2%, pos=100%, unique=179, sharpe=94.45
+    h2: std=0.0106, dir_acc=48.6%, pos=100%, unique=178, sharpe=113.31
+    h3: std=0.0092, dir_acc=48.6%, pos=100%, unique=179, sharpe=127.55
+    h4: std=0.0085, dir_acc=49.2%, pos=100%, unique=170, sharpe=137.78
+    h5: std=0.0082, dir_acc=48.6%, pos=100%, unique=173, sharpe=145.45
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0085, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0486, mean=0.0807, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch30.npz
+  Gradient norms:
+    lstm_encoder: 0.001159
+    lstm_decoder: 0.001741
+    output_layer: 0.040304
+  VSN output std:
+    encoder: 0.123493
+  Attention entropy: 2.953985
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 31
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 31: val_loss=0.4719959795475006
+Epoch 31: train_loss=0.5547537803649902
+
+[CollapseMonitor] Epoch 31
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0128, dir_acc=49.2%, pos=100%, unique=180, sharpe=97.74
+    h2: std=0.0099, dir_acc=48.6%, pos=100%, unique=176, sharpe=118.21
+    h3: std=0.0085, dir_acc=48.6%, pos=100%, unique=173, sharpe=133.84
+    h4: std=0.0078, dir_acc=49.2%, pos=100%, unique=172, sharpe=145.04
+    h5: std=0.0075, dir_acc=48.6%, pos=100%, unique=176, sharpe=153.40
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0079, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0467, mean=0.0786, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch31.npz
+  Gradient norms:
+    lstm_encoder: 0.001210
+    lstm_decoder: 0.001868
+    output_layer: 0.036928
+  VSN output std:
+    encoder: 0.123704
+  Attention entropy: 2.953538
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 32
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 32: val_loss=0.47179409861564636
+Epoch 32: train_loss=0.5547976493835449
+
+[CollapseMonitor] Epoch 32
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0128, dir_acc=49.2%, pos=100%, unique=177, sharpe=97.66
+    h2: std=0.0100, dir_acc=48.6%, pos=100%, unique=177, sharpe=117.21
+    h3: std=0.0087, dir_acc=48.6%, pos=100%, unique=176, sharpe=132.06
+    h4: std=0.0080, dir_acc=49.2%, pos=100%, unique=172, sharpe=142.75
+    h5: std=0.0077, dir_acc=48.6%, pos=100%, unique=172, sharpe=150.84
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0080, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0469, mean=0.0790, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch32.npz
+  Gradient norms:
+    lstm_encoder: 0.001286
+    lstm_decoder: 0.001780
+    output_layer: 0.037204
+  VSN output std:
+    encoder: 0.123728
+  Attention entropy: 2.952771
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 33
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 33: val_loss=0.47220632433891296
+Epoch 33: train_loss=0.5530207753181458
+
+[CollapseMonitor] Epoch 33
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0131, dir_acc=49.2%, pos=100%, unique=179, sharpe=96.95
+    h2: std=0.0103, dir_acc=48.6%, pos=100%, unique=178, sharpe=116.02
+    h3: std=0.0089, dir_acc=48.6%, pos=100%, unique=177, sharpe=130.61
+    h4: std=0.0083, dir_acc=49.2%, pos=100%, unique=169, sharpe=141.22
+    h5: std=0.0079, dir_acc=48.6%, pos=100%, unique=169, sharpe=149.36
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0081, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0477, mean=0.0799, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch33.npz
+  Gradient norms:
+    lstm_encoder: 0.001329
+    lstm_decoder: 0.001799
+    output_layer: 0.035746
+  VSN output std:
+    encoder: 0.123399
+  Attention entropy: 2.951377
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 34
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 34: val_loss=0.47188910841941833
+Epoch 34: train_loss=0.5542026162147522
+
+[CollapseMonitor] Epoch 34
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0127, dir_acc=49.2%, pos=100%, unique=179, sharpe=97.56
+    h2: std=0.0099, dir_acc=48.6%, pos=100%, unique=179, sharpe=117.16
+    h3: std=0.0086, dir_acc=48.6%, pos=100%, unique=178, sharpe=132.22
+    h4: std=0.0080, dir_acc=49.2%, pos=100%, unique=173, sharpe=143.20
+    h5: std=0.0076, dir_acc=48.6%, pos=100%, unique=171, sharpe=151.61
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0078, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0468, mean=0.0782, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch34.npz
+  Gradient norms:
+    lstm_encoder: 0.001191
+    lstm_decoder: 0.001883
+    output_layer: 0.038153
+  VSN output std:
+    encoder: 0.123883
+  Attention entropy: 2.951140
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 35
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 35: val_loss=0.47173887491226196
+Epoch 35: train_loss=0.5543654561042786
+
+[CollapseMonitor] Epoch 35
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0126, dir_acc=49.2%, pos=100%, unique=180, sharpe=97.21
+    h2: std=0.0098, dir_acc=48.6%, pos=100%, unique=175, sharpe=117.40
+    h3: std=0.0084, dir_acc=48.6%, pos=100%, unique=175, sharpe=133.13
+    h4: std=0.0078, dir_acc=49.2%, pos=100%, unique=170, sharpe=144.71
+    h5: std=0.0074, dir_acc=48.6%, pos=100%, unique=175, sharpe=153.63
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0076, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0466, mean=0.0772, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch35.npz
+  Gradient norms:
+    lstm_encoder: 0.001290
+    lstm_decoder: 0.001803
+    output_layer: 0.037819
+  VSN output std:
+    encoder: 0.123698
+  Attention entropy: 2.950688
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 36
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 36: val_loss=0.4718472957611084
+Epoch 36: train_loss=0.5545303821563721
+
+[CollapseMonitor] Epoch 36
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0127, dir_acc=49.2%, pos=100%, unique=181, sharpe=98.31
+    h2: std=0.0100, dir_acc=48.6%, pos=100%, unique=177, sharpe=117.65
+    h3: std=0.0087, dir_acc=48.6%, pos=100%, unique=175, sharpe=132.46
+    h4: std=0.0080, dir_acc=49.2%, pos=100%, unique=173, sharpe=143.28
+    h5: std=0.0077, dir_acc=48.6%, pos=100%, unique=169, sharpe=151.61
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0079, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0468, mean=0.0789, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch36.npz
+  Gradient norms:
+    lstm_encoder: 0.001221
+    lstm_decoder: 0.001691
+    output_layer: 0.033439
+  VSN output std:
+    encoder: 0.123277
+  Attention entropy: 2.951004
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 37
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 37: val_loss=0.4716814458370209
+Epoch 37: train_loss=0.5501993298530579
+
+[CollapseMonitor] Epoch 37
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0128, dir_acc=49.2%, pos=100%, unique=174, sharpe=95.83
+    h2: std=0.0101, dir_acc=48.6%, pos=100%, unique=176, sharpe=113.88
+    h3: std=0.0088, dir_acc=48.6%, pos=100%, unique=172, sharpe=127.68
+    h4: std=0.0082, dir_acc=49.2%, pos=100%, unique=178, sharpe=137.82
+    h5: std=0.0079, dir_acc=48.6%, pos=100%, unique=170, sharpe=145.71
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0080, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0471, mean=0.0774, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch37.npz
+  Gradient norms:
+    lstm_encoder: 0.001263
+    lstm_decoder: 0.001645
+    output_layer: 0.036101
+  VSN output std:
+    encoder: 0.122843
+  Attention entropy: 2.951064
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 38
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 38: val_loss=0.4714530408382416
+Epoch 38: train_loss=0.5505591034889221
+
+[CollapseMonitor] Epoch 38
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0133, dir_acc=49.2%, pos=100%, unique=178, sharpe=91.59
+    h2: std=0.0107, dir_acc=48.6%, pos=100%, unique=176, sharpe=107.32
+    h3: std=0.0094, dir_acc=48.6%, pos=100%, unique=174, sharpe=119.26
+    h4: std=0.0088, dir_acc=49.2%, pos=100%, unique=171, sharpe=128.12
+    h5: std=0.0084, dir_acc=48.6%, pos=100%, unique=171, sharpe=135.15
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0085, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0491, mean=0.0769, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch38.npz
+  Gradient norms:
+    lstm_encoder: 0.001297
+    lstm_decoder: 0.001974
+    output_layer: 0.041678
+  VSN output std:
+    encoder: 0.122101
+  Attention entropy: 2.951032
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 39
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 39: val_loss=0.4714615046977997
+Epoch 39: train_loss=0.5514528155326843
+
+[CollapseMonitor] Epoch 39
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0129, dir_acc=49.2%, pos=100%, unique=178, sharpe=93.15
+    h2: std=0.0103, dir_acc=48.6%, pos=100%, unique=177, sharpe=109.82
+    h3: std=0.0090, dir_acc=48.6%, pos=100%, unique=178, sharpe=122.52
+    h4: std=0.0084, dir_acc=49.2%, pos=100%, unique=172, sharpe=131.95
+    h5: std=0.0080, dir_acc=48.6%, pos=100%, unique=173, sharpe=139.40
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0081, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0476, mean=0.0758, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch39.npz
+  Gradient norms:
+    lstm_encoder: 0.001342
+    lstm_decoder: 0.001803
+    output_layer: 0.038599
+  VSN output std:
+    encoder: 0.121312
+  Attention entropy: 2.950518
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 40
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 40: val_loss=0.4714750051498413
+Epoch 40: train_loss=0.5532819628715515
+
+[CollapseMonitor] Epoch 40
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0129, dir_acc=49.2%, pos=100%, unique=180, sharpe=94.64
+    h2: std=0.0103, dir_acc=48.6%, pos=100%, unique=174, sharpe=111.42
+    h3: std=0.0090, dir_acc=48.6%, pos=100%, unique=174, sharpe=124.11
+    h4: std=0.0084, dir_acc=49.2%, pos=100%, unique=175, sharpe=133.44
+    h5: std=0.0081, dir_acc=48.6%, pos=100%, unique=177, sharpe=140.78
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0081, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0476, mean=0.0767, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch40.npz
+  Gradient norms:
+    lstm_encoder: 0.001470
+    lstm_decoder: 0.002008
+    output_layer: 0.040183
+  VSN output std:
+    encoder: 0.120832
+  Attention entropy: 2.950536
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 41
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 41: val_loss=0.47142982482910156
+Epoch 41: train_loss=0.5554026365280151
+
+[CollapseMonitor] Epoch 41
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0126, dir_acc=49.2%, pos=100%, unique=180, sharpe=95.11
+    h2: std=0.0101, dir_acc=48.6%, pos=100%, unique=175, sharpe=111.93
+    h3: std=0.0088, dir_acc=48.6%, pos=100%, unique=174, sharpe=124.62
+    h4: std=0.0083, dir_acc=49.2%, pos=100%, unique=173, sharpe=133.97
+    h5: std=0.0079, dir_acc=48.6%, pos=100%, unique=173, sharpe=141.34
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0080, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0468, mean=0.0756, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch41.npz
+  Gradient norms:
+    lstm_encoder: 0.001343
+    lstm_decoder: 0.001714
+    output_layer: 0.037558
+  VSN output std:
+    encoder: 0.120513
+  Attention entropy: 2.950505
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 42
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 42: val_loss=0.471565842628479
+Epoch 42: train_loss=0.551035463809967
+
+[CollapseMonitor] Epoch 42
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0121, dir_acc=49.2%, pos=100%, unique=179, sharpe=100.88
+    h2: std=0.0096, dir_acc=48.6%, pos=100%, unique=178, sharpe=119.76
+    h3: std=0.0084, dir_acc=48.6%, pos=100%, unique=175, sharpe=134.03
+    h4: std=0.0078, dir_acc=49.2%, pos=100%, unique=172, sharpe=144.43
+    h5: std=0.0075, dir_acc=48.6%, pos=100%, unique=171, sharpe=152.55
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0076, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0452, mean=0.0772, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch42.npz
+  Gradient norms:
+    lstm_encoder: 0.001433
+    lstm_decoder: 0.001720
+    output_layer: 0.036011
+  VSN output std:
+    encoder: 0.119982
+  Attention entropy: 2.949805
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 43
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 43: val_loss=0.4715011417865753
+Epoch 43: train_loss=0.5515772700309753
+
+[CollapseMonitor] Epoch 43
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0120, dir_acc=49.2%, pos=100%, unique=176, sharpe=102.49
+    h2: std=0.0095, dir_acc=48.6%, pos=100%, unique=174, sharpe=121.66
+    h3: std=0.0083, dir_acc=48.6%, pos=100%, unique=174, sharpe=136.09
+    h4: std=0.0078, dir_acc=49.2%, pos=100%, unique=174, sharpe=146.58
+    h5: std=0.0075, dir_acc=48.6%, pos=100%, unique=176, sharpe=154.71
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0075, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0448, mean=0.0775, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch43.npz
+  Gradient norms:
+    lstm_encoder: 0.001423
+    lstm_decoder: 0.002054
+    output_layer: 0.042794
+  VSN output std:
+    encoder: 0.119942
+  Attention entropy: 2.949361
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 44
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 44: val_loss=0.47142407298088074
+Epoch 44: train_loss=0.5530426502227783
+
+[CollapseMonitor] Epoch 44
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0119, dir_acc=49.2%, pos=100%, unique=178, sharpe=103.61
+    h2: std=0.0094, dir_acc=48.6%, pos=100%, unique=177, sharpe=123.16
+    h3: std=0.0082, dir_acc=48.6%, pos=100%, unique=175, sharpe=137.86
+    h4: std=0.0077, dir_acc=49.2%, pos=100%, unique=171, sharpe=148.52
+    h5: std=0.0074, dir_acc=48.6%, pos=100%, unique=171, sharpe=156.79
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0074, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0444, mean=0.0776, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch44.npz
+  Gradient norms:
+    lstm_encoder: 0.001415
+    lstm_decoder: 0.001955
+    output_layer: 0.037527
+  VSN output std:
+    encoder: 0.119744
+  Attention entropy: 2.949226
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 45
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 45: val_loss=0.47152793407440186
+Epoch 45: train_loss=0.5493809580802917
+
+[CollapseMonitor] Epoch 45
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0118, dir_acc=49.2%, pos=100%, unique=174, sharpe=104.68
+    h2: std=0.0093, dir_acc=48.6%, pos=100%, unique=175, sharpe=124.18
+    h3: std=0.0082, dir_acc=48.6%, pos=100%, unique=173, sharpe=138.74
+    h4: std=0.0076, dir_acc=49.2%, pos=100%, unique=176, sharpe=149.22
+    h5: std=0.0073, dir_acc=48.6%, pos=100%, unique=174, sharpe=157.31
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0074, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0441, mean=0.0777, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch45.npz
+  Gradient norms:
+    lstm_encoder: 0.001523
+    lstm_decoder: 0.001779
+    output_layer: 0.038694
+  VSN output std:
+    encoder: 0.119551
+  Attention entropy: 2.948918
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 46
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 46: val_loss=0.47131919860839844
+Epoch 46: train_loss=0.5528300404548645
+
+[CollapseMonitor] Epoch 46
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0116, dir_acc=49.2%, pos=100%, unique=178, sharpe=105.44
+    h2: std=0.0092, dir_acc=48.6%, pos=100%, unique=179, sharpe=124.79
+    h3: std=0.0081, dir_acc=48.6%, pos=100%, unique=171, sharpe=139.07
+    h4: std=0.0076, dir_acc=49.2%, pos=100%, unique=170, sharpe=149.26
+    h5: std=0.0073, dir_acc=48.6%, pos=100%, unique=172, sharpe=157.07
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0074, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0437, mean=0.0772, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch46.npz
+  Gradient norms:
+    lstm_encoder: 0.001485
+    lstm_decoder: 0.001885
+    output_layer: 0.038853
+  VSN output std:
+    encoder: 0.119412
+  Attention entropy: 2.948951
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 47
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 47: val_loss=0.4712096154689789
+Epoch 47: train_loss=0.5540005564689636
+
+[CollapseMonitor] Epoch 47
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0116, dir_acc=49.2%, pos=100%, unique=175, sharpe=104.29
+    h2: std=0.0092, dir_acc=48.6%, pos=100%, unique=178, sharpe=123.49
+    h3: std=0.0081, dir_acc=48.6%, pos=100%, unique=175, sharpe=137.74
+    h4: std=0.0075, dir_acc=49.2%, pos=100%, unique=173, sharpe=147.96
+    h5: std=0.0073, dir_acc=48.6%, pos=100%, unique=173, sharpe=155.82
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0073, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0436, mean=0.0762, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch47.npz
+  Gradient norms:
+    lstm_encoder: 0.001558
+    lstm_decoder: 0.001923
+    output_layer: 0.037202
+  VSN output std:
+    encoder: 0.119172
+  Attention entropy: 2.948741
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 48
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 48: val_loss=0.47131481766700745
+Epoch 48: train_loss=0.5519115328788757
+
+[CollapseMonitor] Epoch 48
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0115, dir_acc=49.2%, pos=100%, unique=180, sharpe=106.10
+    h2: std=0.0091, dir_acc=48.6%, pos=100%, unique=176, sharpe=125.91
+    h3: std=0.0080, dir_acc=48.6%, pos=100%, unique=170, sharpe=140.59
+    h4: std=0.0075, dir_acc=49.2%, pos=100%, unique=173, sharpe=151.04
+    h5: std=0.0072, dir_acc=48.6%, pos=100%, unique=168, sharpe=159.04
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0073, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0432, mean=0.0769, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch48.npz
+  Gradient norms:
+    lstm_encoder: 0.001455
+    lstm_decoder: 0.001805
+    output_layer: 0.034679
+  VSN output std:
+    encoder: 0.119063
+  Attention entropy: 2.948424
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 49
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 49: val_loss=0.47128185629844666
+Epoch 49: train_loss=0.5514055490493774
+
+[CollapseMonitor] Epoch 49
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0116, dir_acc=49.2%, pos=100%, unique=178, sharpe=105.22
+    h2: std=0.0092, dir_acc=48.6%, pos=100%, unique=174, sharpe=124.25
+    h3: std=0.0081, dir_acc=48.6%, pos=100%, unique=176, sharpe=138.25
+    h4: std=0.0076, dir_acc=49.2%, pos=100%, unique=173, sharpe=148.23
+    h5: std=0.0073, dir_acc=48.6%, pos=100%, unique=175, sharpe=155.85
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0074, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0435, mean=0.0767, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch49.npz
+  Gradient norms:
+    lstm_encoder: 0.001480
+    lstm_decoder: 0.001826
+    output_layer: 0.037848
+  VSN output std:
+    encoder: 0.118918
+  Attention entropy: 2.948594
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 50
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 50: val_loss=0.4712172746658325
+Epoch 50: train_loss=0.5515769720077515
+
+[CollapseMonitor] Epoch 50
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0114, dir_acc=49.2%, pos=100%, unique=175, sharpe=106.90
+    h2: std=0.0091, dir_acc=48.6%, pos=100%, unique=175, sharpe=126.12
+    h3: std=0.0080, dir_acc=48.6%, pos=100%, unique=177, sharpe=140.16
+    h4: std=0.0075, dir_acc=49.2%, pos=100%, unique=174, sharpe=150.02
+    h5: std=0.0072, dir_acc=48.6%, pos=100%, unique=172, sharpe=157.48
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0074, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0431, mean=0.0769, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch50.npz
+  Gradient norms:
+    lstm_encoder: 0.001276
+    lstm_decoder: 0.001918
+    output_layer: 0.038707
+  VSN output std:
+    encoder: 0.118901
+  Attention entropy: 2.948766
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 51
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 51: val_loss=0.47108274698257446
+Epoch 51: train_loss=0.5516651272773743
+
+[CollapseMonitor] Epoch 51
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0113, dir_acc=49.2%, pos=100%, unique=175, sharpe=108.65
+    h2: std=0.0090, dir_acc=48.6%, pos=100%, unique=177, sharpe=128.26
+    h3: std=0.0079, dir_acc=48.6%, pos=100%, unique=173, sharpe=142.53
+    h4: std=0.0074, dir_acc=49.2%, pos=100%, unique=173, sharpe=152.52
+    h5: std=0.0072, dir_acc=48.6%, pos=100%, unique=172, sharpe=160.01
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0073, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0427, mean=0.0774, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch51.npz
+  Gradient norms:
+    lstm_encoder: 0.001522
+    lstm_decoder: 0.001795
+    output_layer: 0.035946
+  VSN output std:
+    encoder: 0.118822
+  Attention entropy: 2.948757
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 52
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 52: val_loss=0.4710264205932617
+Epoch 52: train_loss=0.5536465644836426
+
+[CollapseMonitor] Epoch 52
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0114, dir_acc=49.2%, pos=100%, unique=180, sharpe=107.94
+    h2: std=0.0090, dir_acc=48.6%, pos=100%, unique=176, sharpe=127.40
+    h3: std=0.0080, dir_acc=48.6%, pos=100%, unique=175, sharpe=141.63
+    h4: std=0.0075, dir_acc=49.2%, pos=100%, unique=175, sharpe=151.62
+    h5: std=0.0072, dir_acc=48.6%, pos=100%, unique=172, sharpe=159.17
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0074, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0428, mean=0.0772, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch52.npz
+  Gradient norms:
+    lstm_encoder: 0.001389
+    lstm_decoder: 0.001870
+    output_layer: 0.039318
+  VSN output std:
+    encoder: 0.118761
+  Attention entropy: 2.948683
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 53
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 53: val_loss=0.47104552388191223
+Epoch 53: train_loss=0.5515846610069275
+
+[CollapseMonitor] Epoch 53
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0114, dir_acc=49.2%, pos=100%, unique=177, sharpe=105.68
+    h2: std=0.0091, dir_acc=48.6%, pos=100%, unique=177, sharpe=124.32
+    h3: std=0.0080, dir_acc=48.6%, pos=100%, unique=173, sharpe=137.96
+    h4: std=0.0075, dir_acc=49.2%, pos=100%, unique=174, sharpe=147.58
+    h5: std=0.0073, dir_acc=48.6%, pos=100%, unique=173, sharpe=154.89
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0074, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0430, mean=0.0760, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch53.npz
+  Gradient norms:
+    lstm_encoder: 0.001493
+    lstm_decoder: 0.001953
+    output_layer: 0.037342
+  VSN output std:
+    encoder: 0.118711
+  Attention entropy: 2.948670
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 54
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 54: val_loss=0.4710606634616852
+Epoch 54: train_loss=0.5535370111465454
+
+[CollapseMonitor] Epoch 54
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0114, dir_acc=49.2%, pos=100%, unique=177, sharpe=105.60
+    h2: std=0.0091, dir_acc=48.6%, pos=100%, unique=176, sharpe=124.12
+    h3: std=0.0081, dir_acc=48.6%, pos=100%, unique=171, sharpe=137.65
+    h4: std=0.0076, dir_acc=49.2%, pos=100%, unique=170, sharpe=147.17
+    h5: std=0.0073, dir_acc=48.6%, pos=100%, unique=172, sharpe=154.38
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0075, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0431, mean=0.0760, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch54.npz
+  Gradient norms:
+    lstm_encoder: 0.001657
+    lstm_decoder: 0.001884
+    output_layer: 0.041884
+  VSN output std:
+    encoder: 0.118574
+  Attention entropy: 2.948626
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 55
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 55: val_loss=0.4710751473903656
+Epoch 55: train_loss=0.5531425476074219
+
+[CollapseMonitor] Epoch 55
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0114, dir_acc=49.2%, pos=100%, unique=179, sharpe=105.87
+    h2: std=0.0091, dir_acc=48.6%, pos=100%, unique=174, sharpe=124.66
+    h3: std=0.0080, dir_acc=48.6%, pos=100%, unique=173, sharpe=138.45
+    h4: std=0.0075, dir_acc=49.2%, pos=100%, unique=174, sharpe=148.19
+    h5: std=0.0073, dir_acc=48.6%, pos=100%, unique=173, sharpe=155.56
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0074, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0429, mean=0.0762, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch55.npz
+  Gradient norms:
+    lstm_encoder: 0.001618
+    lstm_decoder: 0.002031
+    output_layer: 0.041184
+  VSN output std:
+    encoder: 0.118486
+  Attention entropy: 2.948328
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 56
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 56: val_loss=0.4710754156112671
+Epoch 56: train_loss=0.5528858304023743
+
+[CollapseMonitor] Epoch 56
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0115, dir_acc=49.2%, pos=100%, unique=179, sharpe=106.36
+    h2: std=0.0092, dir_acc=48.6%, pos=100%, unique=178, sharpe=124.99
+    h3: std=0.0081, dir_acc=48.6%, pos=100%, unique=174, sharpe=138.61
+    h4: std=0.0076, dir_acc=49.2%, pos=100%, unique=176, sharpe=148.20
+    h5: std=0.0074, dir_acc=48.6%, pos=100%, unique=174, sharpe=155.46
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0076, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0433, mean=0.0771, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch56.npz
+  Gradient norms:
+    lstm_encoder: 0.001469
+    lstm_decoder: 0.001922
+    output_layer: 0.037768
+  VSN output std:
+    encoder: 0.118404
+  Attention entropy: 2.948280
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 57
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 57: val_loss=0.4710545837879181
+Epoch 57: train_loss=0.552141010761261
+
+[CollapseMonitor] Epoch 57
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0115, dir_acc=49.2%, pos=100%, unique=178, sharpe=107.87
+    h2: std=0.0092, dir_acc=48.6%, pos=100%, unique=177, sharpe=126.78
+    h3: std=0.0081, dir_acc=48.6%, pos=100%, unique=175, sharpe=140.53
+    h4: std=0.0076, dir_acc=49.2%, pos=100%, unique=175, sharpe=150.16
+    h5: std=0.0074, dir_acc=48.6%, pos=100%, unique=170, sharpe=157.37
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0075, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0431, mean=0.0778, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch57.npz
+  Gradient norms:
+    lstm_encoder: 0.001562
+    lstm_decoder: 0.002075
+    output_layer: 0.039916
+  VSN output std:
+    encoder: 0.118327
+  Attention entropy: 2.948362
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 58
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 58: val_loss=0.4711504280567169
+Epoch 58: train_loss=0.5518410205841064
+
+[CollapseMonitor] Epoch 58
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0114, dir_acc=49.2%, pos=100%, unique=177, sharpe=108.49
+    h2: std=0.0091, dir_acc=48.6%, pos=100%, unique=171, sharpe=127.42
+    h3: std=0.0081, dir_acc=48.6%, pos=100%, unique=173, sharpe=141.12
+    h4: std=0.0076, dir_acc=49.2%, pos=100%, unique=173, sharpe=150.64
+    h5: std=0.0073, dir_acc=48.6%, pos=100%, unique=172, sharpe=157.73
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0075, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0430, mean=0.0778, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch58.npz
+  Gradient norms:
+    lstm_encoder: 0.001642
+    lstm_decoder: 0.002112
+    output_layer: 0.041673
+  VSN output std:
+    encoder: 0.118206
+  Attention entropy: 2.948422
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 59
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 59: val_loss=0.4711344242095947
+Epoch 59: train_loss=0.5487329363822937
+
+[CollapseMonitor] Epoch 59
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0113, dir_acc=49.2%, pos=100%, unique=177, sharpe=108.71
+    h2: std=0.0090, dir_acc=48.6%, pos=100%, unique=174, sharpe=127.68
+    h3: std=0.0080, dir_acc=48.6%, pos=100%, unique=172, sharpe=141.38
+    h4: std=0.0075, dir_acc=49.2%, pos=100%, unique=176, sharpe=150.85
+    h5: std=0.0073, dir_acc=48.6%, pos=100%, unique=170, sharpe=157.89
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0075, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0427, mean=0.0775, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch59.npz
+  Gradient norms:
+    lstm_encoder: 0.001629
+    lstm_decoder: 0.002095
+    output_layer: 0.043055
+  VSN output std:
+    encoder: 0.118179
+  Attention entropy: 2.948334
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 60
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 60: val_loss=0.47110211849212646
+Epoch 60: train_loss=0.5526517629623413
+
+[CollapseMonitor] Epoch 60
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0113, dir_acc=49.2%, pos=100%, unique=176, sharpe=109.70
+    h2: std=0.0090, dir_acc=48.6%, pos=100%, unique=175, sharpe=128.64
+    h3: std=0.0080, dir_acc=48.6%, pos=100%, unique=172, sharpe=142.25
+    h4: std=0.0075, dir_acc=49.2%, pos=100%, unique=175, sharpe=151.62
+    h5: std=0.0073, dir_acc=48.6%, pos=100%, unique=171, sharpe=158.52
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0075, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0428, mean=0.0780, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch60.npz
+  Gradient norms:
+    lstm_encoder: 0.001733
+    lstm_decoder: 0.001903
+    output_layer: 0.037752
+  VSN output std:
+    encoder: 0.118149
+  Attention entropy: 2.948406
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 61
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 61: val_loss=0.47103676199913025
+Epoch 61: train_loss=0.5532243847846985
+
+[CollapseMonitor] Epoch 61
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0113, dir_acc=49.2%, pos=100%, unique=178, sharpe=109.28
+    h2: std=0.0091, dir_acc=48.6%, pos=100%, unique=173, sharpe=128.19
+    h3: std=0.0080, dir_acc=48.6%, pos=100%, unique=174, sharpe=141.83
+    h4: std=0.0076, dir_acc=49.2%, pos=100%, unique=174, sharpe=151.24
+    h5: std=0.0073, dir_acc=48.6%, pos=100%, unique=173, sharpe=158.21
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0075, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0428, mean=0.0779, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch61.npz
+  Gradient norms:
+    lstm_encoder: 0.001526
+    lstm_decoder: 0.002045
+    output_layer: 0.040058
+  VSN output std:
+    encoder: 0.118077
+  Attention entropy: 2.948349
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 62
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 62: val_loss=0.47102785110473633
+Epoch 62: train_loss=0.5510029196739197
+
+[CollapseMonitor] Epoch 62
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0113, dir_acc=49.2%, pos=100%, unique=178, sharpe=109.37
+    h2: std=0.0091, dir_acc=48.6%, pos=100%, unique=180, sharpe=128.38
+    h3: std=0.0080, dir_acc=48.6%, pos=100%, unique=171, sharpe=142.10
+    h4: std=0.0075, dir_acc=49.2%, pos=100%, unique=176, sharpe=151.58
+    h5: std=0.0073, dir_acc=48.6%, pos=100%, unique=171, sharpe=158.59
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0075, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0428, mean=0.0780, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch62.npz
+  Gradient norms:
+    lstm_encoder: 0.001477
+    lstm_decoder: 0.001998
+    output_layer: 0.040411
+  VSN output std:
+    encoder: 0.117976
+  Attention entropy: 2.948257
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 63
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 63: val_loss=0.47097349166870117
+Epoch 63: train_loss=0.5523942708969116
+
+[CollapseMonitor] Epoch 63
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0113, dir_acc=49.2%, pos=100%, unique=179, sharpe=108.36
+    h2: std=0.0091, dir_acc=48.6%, pos=100%, unique=179, sharpe=126.96
+    h3: std=0.0080, dir_acc=48.6%, pos=100%, unique=176, sharpe=140.39
+    h4: std=0.0076, dir_acc=49.2%, pos=100%, unique=176, sharpe=149.67
+    h5: std=0.0073, dir_acc=48.6%, pos=100%, unique=170, sharpe=156.55
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0075, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0428, mean=0.0772, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch63.npz
+  Gradient norms:
+    lstm_encoder: 0.001412
+    lstm_decoder: 0.001945
+    output_layer: 0.037227
+  VSN output std:
+    encoder: 0.117960
+  Attention entropy: 2.948245
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 64
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 64: val_loss=0.4709779620170593
+Epoch 64: train_loss=0.5528542995452881
+
+[CollapseMonitor] Epoch 64
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0113, dir_acc=49.2%, pos=100%, unique=178, sharpe=108.65
+    h2: std=0.0091, dir_acc=48.6%, pos=100%, unique=176, sharpe=127.19
+    h3: std=0.0081, dir_acc=48.6%, pos=100%, unique=170, sharpe=140.54
+    h4: std=0.0076, dir_acc=49.2%, pos=100%, unique=174, sharpe=149.75
+    h5: std=0.0073, dir_acc=48.6%, pos=100%, unique=170, sharpe=156.53
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0076, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0428, mean=0.0775, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch64.npz
+  Gradient norms:
+    lstm_encoder: 0.001543
+    lstm_decoder: 0.001961
+    output_layer: 0.040048
+  VSN output std:
+    encoder: 0.117915
+  Attention entropy: 2.948263
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 65
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 65: val_loss=0.4709717929363251
+Epoch 65: train_loss=0.5521774888038635
+
+[CollapseMonitor] Epoch 65
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0113, dir_acc=49.2%, pos=100%, unique=179, sharpe=109.34
+    h2: std=0.0091, dir_acc=48.6%, pos=100%, unique=173, sharpe=127.95
+    h3: std=0.0081, dir_acc=48.6%, pos=100%, unique=172, sharpe=141.32
+    h4: std=0.0076, dir_acc=49.2%, pos=100%, unique=177, sharpe=150.49
+    h5: std=0.0074, dir_acc=48.6%, pos=100%, unique=175, sharpe=157.24
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0076, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0429, mean=0.0780, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch65.npz
+  Gradient norms:
+    lstm_encoder: 0.001565
+    lstm_decoder: 0.001917
+    output_layer: 0.038031
+  VSN output std:
+    encoder: 0.117868
+  Attention entropy: 2.948307
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 66
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 66: val_loss=0.470929890871048
+Epoch 66: train_loss=0.5492651462554932
+
+[CollapseMonitor] Epoch 66
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0113, dir_acc=49.2%, pos=100%, unique=177, sharpe=109.02
+    h2: std=0.0091, dir_acc=48.6%, pos=100%, unique=174, sharpe=127.34
+    h3: std=0.0081, dir_acc=48.6%, pos=100%, unique=173, sharpe=140.45
+    h4: std=0.0076, dir_acc=49.2%, pos=100%, unique=171, sharpe=149.45
+    h5: std=0.0074, dir_acc=48.6%, pos=100%, unique=176, sharpe=156.06
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0076, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0430, mean=0.0778, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch66.npz
+  Gradient norms:
+    lstm_encoder: 0.001681
+    lstm_decoder: 0.001968
+    output_layer: 0.038188
+  VSN output std:
+    encoder: 0.117864
+  Attention entropy: 2.948384
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 67
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 67: val_loss=0.47092872858047485
+Epoch 67: train_loss=0.5506727695465088
+
+[CollapseMonitor] Epoch 67
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0113, dir_acc=49.2%, pos=100%, unique=177, sharpe=109.13
+    h2: std=0.0091, dir_acc=48.6%, pos=100%, unique=175, sharpe=127.41
+    h3: std=0.0081, dir_acc=48.6%, pos=100%, unique=171, sharpe=140.49
+    h4: std=0.0076, dir_acc=49.2%, pos=100%, unique=177, sharpe=149.46
+    h5: std=0.0074, dir_acc=48.6%, pos=100%, unique=175, sharpe=156.01
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0076, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0429, mean=0.0778, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch67.npz
+  Gradient norms:
+    lstm_encoder: 0.001495
+    lstm_decoder: 0.001926
+    output_layer: 0.037333
+  VSN output std:
+    encoder: 0.117828
+  Attention entropy: 2.948363
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 68
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 68: val_loss=0.47091928124427795
+Epoch 68: train_loss=0.5530326962471008
+
+[CollapseMonitor] Epoch 68
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0113, dir_acc=49.2%, pos=100%, unique=176, sharpe=109.46
+    h2: std=0.0091, dir_acc=48.6%, pos=100%, unique=176, sharpe=127.61
+    h3: std=0.0081, dir_acc=48.6%, pos=100%, unique=174, sharpe=140.56
+    h4: std=0.0077, dir_acc=49.2%, pos=100%, unique=175, sharpe=149.41
+    h5: std=0.0074, dir_acc=48.6%, pos=100%, unique=174, sharpe=155.89
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0077, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0431, mean=0.0782, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch68.npz
+  Gradient norms:
+    lstm_encoder: 0.001567
+    lstm_decoder: 0.001747
+    output_layer: 0.035439
+  VSN output std:
+    encoder: 0.117842
+  Attention entropy: 2.948385
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 69
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 69: val_loss=0.4709025025367737
+Epoch 69: train_loss=0.5523205995559692
+
+[CollapseMonitor] Epoch 69
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0113, dir_acc=49.2%, pos=100%, unique=177, sharpe=109.68
+    h2: std=0.0091, dir_acc=48.6%, pos=100%, unique=173, sharpe=127.79
+    h3: std=0.0081, dir_acc=48.6%, pos=100%, unique=173, sharpe=140.70
+    h4: std=0.0077, dir_acc=49.2%, pos=100%, unique=172, sharpe=149.52
+    h5: std=0.0075, dir_acc=48.6%, pos=100%, unique=176, sharpe=155.96
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0077, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0431, mean=0.0784, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch69.npz
+  Gradient norms:
+    lstm_encoder: 0.001623
+    lstm_decoder: 0.002116
+    output_layer: 0.039050
+  VSN output std:
+    encoder: 0.117820
+  Attention entropy: 2.948335
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 70
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 70: val_loss=0.4708493947982788
+Epoch 70: train_loss=0.5517432689666748
+
+[CollapseMonitor] Epoch 70
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0113, dir_acc=49.2%, pos=100%, unique=177, sharpe=109.18
+    h2: std=0.0091, dir_acc=48.6%, pos=100%, unique=175, sharpe=127.15
+    h3: std=0.0081, dir_acc=48.6%, pos=100%, unique=176, sharpe=139.98
+    h4: std=0.0077, dir_acc=49.2%, pos=100%, unique=174, sharpe=148.77
+    h5: std=0.0075, dir_acc=48.6%, pos=100%, unique=173, sharpe=155.20
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0077, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0431, mean=0.0779, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch70.npz
+  Gradient norms:
+    lstm_encoder: 0.001566
+    lstm_decoder: 0.002089
+    output_layer: 0.040399
+  VSN output std:
+    encoder: 0.117756
+  Attention entropy: 2.948294
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 71
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 71: val_loss=0.47082099318504333
+Epoch 71: train_loss=0.5509253740310669
+
+[CollapseMonitor] Epoch 71
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0113, dir_acc=49.2%, pos=100%, unique=178, sharpe=109.72
+    h2: std=0.0091, dir_acc=48.6%, pos=100%, unique=177, sharpe=127.81
+    h3: std=0.0081, dir_acc=48.6%, pos=100%, unique=175, sharpe=140.71
+    h4: std=0.0076, dir_acc=49.2%, pos=100%, unique=179, sharpe=149.51
+    h5: std=0.0074, dir_acc=48.6%, pos=100%, unique=171, sharpe=155.92
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0077, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0429, mean=0.0780, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch71.npz
+  Gradient norms:
+    lstm_encoder: 0.001687
+    lstm_decoder: 0.001853
+    output_layer: 0.036898
+  VSN output std:
+    encoder: 0.117717
+  Attention entropy: 2.948375
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 72
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 72: val_loss=0.47082990407943726
+Epoch 72: train_loss=0.5522680878639221
+
+[CollapseMonitor] Epoch 72
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0113, dir_acc=49.2%, pos=100%, unique=175, sharpe=109.45
+    h2: std=0.0091, dir_acc=48.6%, pos=100%, unique=176, sharpe=127.51
+    h3: std=0.0081, dir_acc=48.6%, pos=100%, unique=172, sharpe=140.39
+    h4: std=0.0076, dir_acc=49.2%, pos=100%, unique=173, sharpe=149.19
+    h5: std=0.0074, dir_acc=48.6%, pos=100%, unique=173, sharpe=155.60
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0077, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0429, mean=0.0777, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch72.npz
+  Gradient norms:
+    lstm_encoder: 0.001715
+    lstm_decoder: 0.002047
+    output_layer: 0.038744
+  VSN output std:
+    encoder: 0.117668
+  Attention entropy: 2.948313
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 73
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 73: val_loss=0.4708350598812103
+Epoch 73: train_loss=0.5525701642036438
+
+[CollapseMonitor] Epoch 73
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0113, dir_acc=49.2%, pos=100%, unique=177, sharpe=110.43
+    h2: std=0.0091, dir_acc=48.6%, pos=100%, unique=176, sharpe=128.77
+    h3: std=0.0081, dir_acc=48.6%, pos=100%, unique=171, sharpe=141.85
+    h4: std=0.0076, dir_acc=49.2%, pos=100%, unique=172, sharpe=150.76
+    h5: std=0.0074, dir_acc=48.6%, pos=100%, unique=171, sharpe=157.21
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0077, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0428, mean=0.0783, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch73.npz
+  Gradient norms:
+    lstm_encoder: 0.001778
+    lstm_decoder: 0.002027
+    output_layer: 0.034946
+  VSN output std:
+    encoder: 0.117599
+  Attention entropy: 2.948236
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 74
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 74: val_loss=0.4708523452281952
+Epoch 74: train_loss=0.5503824353218079
+
+[CollapseMonitor] Epoch 74
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0112, dir_acc=49.2%, pos=100%, unique=179, sharpe=110.29
+    h2: std=0.0091, dir_acc=48.6%, pos=100%, unique=176, sharpe=128.64
+    h3: std=0.0081, dir_acc=48.6%, pos=100%, unique=179, sharpe=141.74
+    h4: std=0.0076, dir_acc=49.2%, pos=100%, unique=173, sharpe=150.66
+    h5: std=0.0074, dir_acc=48.6%, pos=100%, unique=175, sharpe=157.12
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0077, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0428, mean=0.0781, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch74.npz
+  Gradient norms:
+    lstm_encoder: 0.001600
+    lstm_decoder: 0.001907
+    output_layer: 0.038339
+  VSN output std:
+    encoder: 0.117514
+  Attention entropy: 2.948160
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 75
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 75: val_loss=0.4708254039287567
+Epoch 75: train_loss=0.5511260628700256
+
+[CollapseMonitor] Epoch 75
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0113, dir_acc=49.2%, pos=100%, unique=177, sharpe=109.97
+    h2: std=0.0091, dir_acc=48.6%, pos=100%, unique=176, sharpe=128.18
+    h3: std=0.0081, dir_acc=48.6%, pos=100%, unique=176, sharpe=141.19
+    h4: std=0.0076, dir_acc=49.2%, pos=100%, unique=171, sharpe=150.06
+    h5: std=0.0074, dir_acc=48.6%, pos=100%, unique=176, sharpe=156.50
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0077, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0429, mean=0.0781, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch75.npz
+  Gradient norms:
+    lstm_encoder: 0.001558
+    lstm_decoder: 0.001998
+    output_layer: 0.039163
+  VSN output std:
+    encoder: 0.117463
+  Attention entropy: 2.948053
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 76
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 76: val_loss=0.47080767154693604
+Epoch 76: train_loss=0.5515441298484802
+
+[CollapseMonitor] Epoch 76
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0113, dir_acc=49.2%, pos=100%, unique=177, sharpe=109.21
+    h2: std=0.0091, dir_acc=48.6%, pos=100%, unique=174, sharpe=127.14
+    h3: std=0.0081, dir_acc=48.6%, pos=100%, unique=175, sharpe=139.96
+    h4: std=0.0077, dir_acc=49.2%, pos=100%, unique=171, sharpe=148.67
+    h5: std=0.0074, dir_acc=48.6%, pos=100%, unique=176, sharpe=155.00
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0077, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0429, mean=0.0777, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch76.npz
+  Gradient norms:
+    lstm_encoder: 0.001718
+    lstm_decoder: 0.001933
+    output_layer: 0.037421
+  VSN output std:
+    encoder: 0.117382
+  Attention entropy: 2.948120
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 77
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 77: val_loss=0.47078877687454224
+Epoch 77: train_loss=0.5506904721260071
+
+[CollapseMonitor] Epoch 77
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0113, dir_acc=49.2%, pos=100%, unique=176, sharpe=108.15
+    h2: std=0.0091, dir_acc=48.6%, pos=100%, unique=176, sharpe=125.79
+    h3: std=0.0081, dir_acc=48.6%, pos=100%, unique=170, sharpe=138.41
+    h4: std=0.0077, dir_acc=49.2%, pos=100%, unique=176, sharpe=147.02
+    h5: std=0.0075, dir_acc=48.6%, pos=100%, unique=169, sharpe=153.27
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0078, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0430, mean=0.0770, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch77.npz
+  Gradient norms:
+    lstm_encoder: 0.001603
+    lstm_decoder: 0.002034
+    output_layer: 0.037647
+  VSN output std:
+    encoder: 0.117304
+  Attention entropy: 2.948089
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 78
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 78: val_loss=0.47077950835227966
+Epoch 78: train_loss=0.5521608591079712
+
+[CollapseMonitor] Epoch 78
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0113, dir_acc=49.2%, pos=100%, unique=178, sharpe=108.48
+    h2: std=0.0091, dir_acc=48.6%, pos=100%, unique=177, sharpe=126.14
+    h3: std=0.0081, dir_acc=48.6%, pos=100%, unique=172, sharpe=138.77
+    h4: std=0.0077, dir_acc=49.2%, pos=100%, unique=171, sharpe=147.36
+    h5: std=0.0075, dir_acc=48.6%, pos=100%, unique=175, sharpe=153.58
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0078, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0430, mean=0.0773, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch78.npz
+  Gradient norms:
+    lstm_encoder: 0.001630
+    lstm_decoder: 0.001906
+    output_layer: 0.035446
+  VSN output std:
+    encoder: 0.117231
+  Attention entropy: 2.948031
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 79
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 79: val_loss=0.4707905352115631
+Epoch 79: train_loss=0.5510579943656921
+
+[CollapseMonitor] Epoch 79
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0113, dir_acc=49.2%, pos=100%, unique=180, sharpe=109.59
+    h2: std=0.0091, dir_acc=48.6%, pos=100%, unique=179, sharpe=127.57
+    h3: std=0.0081, dir_acc=48.6%, pos=100%, unique=179, sharpe=140.39
+    h4: std=0.0076, dir_acc=49.2%, pos=100%, unique=170, sharpe=149.07
+    h5: std=0.0074, dir_acc=48.6%, pos=100%, unique=173, sharpe=155.31
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0077, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0428, mean=0.0777, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch79.npz
+  Gradient norms:
+    lstm_encoder: 0.001403
+    lstm_decoder: 0.001922
+    output_layer: 0.039133
+  VSN output std:
+    encoder: 0.117160
+  Attention entropy: 2.948102
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 80
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 80: val_loss=0.47080564498901367
+Epoch 80: train_loss=0.5530771613121033
+
+[CollapseMonitor] Epoch 80
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0112, dir_acc=49.2%, pos=100%, unique=178, sharpe=110.72
+    h2: std=0.0090, dir_acc=48.6%, pos=100%, unique=176, sharpe=129.00
+    h3: std=0.0080, dir_acc=48.6%, pos=100%, unique=174, sharpe=142.01
+    h4: std=0.0076, dir_acc=49.2%, pos=100%, unique=170, sharpe=150.80
+    h5: std=0.0074, dir_acc=48.6%, pos=100%, unique=173, sharpe=157.09
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0077, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0427, mean=0.0781, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch80.npz
+  Gradient norms:
+    lstm_encoder: 0.001507
+    lstm_decoder: 0.002143
+    output_layer: 0.043837
+  VSN output std:
+    encoder: 0.117129
+  Attention entropy: 2.948056
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 81
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 81: val_loss=0.47081053256988525
+Epoch 81: train_loss=0.5512261986732483
+
+[CollapseMonitor] Epoch 81
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0111, dir_acc=49.2%, pos=100%, unique=179, sharpe=110.98
+    h2: std=0.0090, dir_acc=48.6%, pos=100%, unique=175, sharpe=129.28
+    h3: std=0.0080, dir_acc=48.6%, pos=100%, unique=172, sharpe=142.28
+    h4: std=0.0076, dir_acc=49.2%, pos=100%, unique=170, sharpe=151.04
+    h5: std=0.0074, dir_acc=48.6%, pos=100%, unique=171, sharpe=157.28
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0077, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0425, mean=0.0779, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch81.npz
+  Gradient norms:
+    lstm_encoder: 0.001578
+    lstm_decoder: 0.001753
+    output_layer: 0.037649
+  VSN output std:
+    encoder: 0.117093
+  Attention entropy: 2.948028
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 82
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 82: val_loss=0.4707515239715576
+Epoch 82: train_loss=0.551837146282196
+
+[CollapseMonitor] Epoch 82
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0111, dir_acc=49.2%, pos=100%, unique=181, sharpe=110.95
+    h2: std=0.0090, dir_acc=48.6%, pos=100%, unique=177, sharpe=129.26
+    h3: std=0.0080, dir_acc=48.6%, pos=100%, unique=171, sharpe=142.27
+    h4: std=0.0075, dir_acc=49.2%, pos=100%, unique=174, sharpe=151.02
+    h5: std=0.0073, dir_acc=48.6%, pos=100%, unique=173, sharpe=157.27
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0077, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0424, mean=0.0777, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch82.npz
+  Gradient norms:
+    lstm_encoder: 0.001623
+    lstm_decoder: 0.001954
+    output_layer: 0.039121
+  VSN output std:
+    encoder: 0.117073
+  Attention entropy: 2.948019
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 83
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 83: val_loss=0.4707334637641907
+Epoch 83: train_loss=0.5540422201156616
+
+[CollapseMonitor] Epoch 83
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0111, dir_acc=49.2%, pos=100%, unique=178, sharpe=110.24
+    h2: std=0.0090, dir_acc=48.6%, pos=100%, unique=179, sharpe=128.31
+    h3: std=0.0080, dir_acc=48.6%, pos=100%, unique=174, sharpe=141.15
+    h4: std=0.0076, dir_acc=49.2%, pos=100%, unique=176, sharpe=149.81
+    h5: std=0.0074, dir_acc=48.6%, pos=100%, unique=174, sharpe=155.97
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0077, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0425, mean=0.0773, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch83.npz
+  Gradient norms:
+    lstm_encoder: 0.001975
+    lstm_decoder: 0.002076
+    output_layer: 0.040668
+  VSN output std:
+    encoder: 0.117041
+  Attention entropy: 2.948009
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 84
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 84: val_loss=0.470719575881958
+Epoch 84: train_loss=0.5518800020217896
+
+[CollapseMonitor] Epoch 84
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0112, dir_acc=49.2%, pos=100%, unique=178, sharpe=109.77
+    h2: std=0.0090, dir_acc=48.6%, pos=100%, unique=179, sharpe=127.66
+    h3: std=0.0080, dir_acc=48.6%, pos=100%, unique=174, sharpe=140.39
+    h4: std=0.0076, dir_acc=49.2%, pos=100%, unique=177, sharpe=148.97
+    h5: std=0.0074, dir_acc=48.6%, pos=100%, unique=173, sharpe=155.09
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0077, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0426, mean=0.0772, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch84.npz
+  Gradient norms:
+    lstm_encoder: 0.001591
+    lstm_decoder: 0.001991
+    output_layer: 0.035713
+  VSN output std:
+    encoder: 0.116996
+  Attention entropy: 2.947970
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 85
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 85: val_loss=0.4706573486328125
+Epoch 85: train_loss=0.5506862998008728
+
+[CollapseMonitor] Epoch 85
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0111, dir_acc=49.2%, pos=100%, unique=178, sharpe=109.83
+    h2: std=0.0090, dir_acc=48.6%, pos=100%, unique=175, sharpe=127.78
+    h3: std=0.0080, dir_acc=48.6%, pos=100%, unique=176, sharpe=140.57
+    h4: std=0.0076, dir_acc=49.2%, pos=100%, unique=174, sharpe=149.18
+    h5: std=0.0074, dir_acc=48.6%, pos=100%, unique=173, sharpe=155.30
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0077, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0426, mean=0.0771, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch85.npz
+  Gradient norms:
+    lstm_encoder: 0.001713
+    lstm_decoder: 0.001892
+    output_layer: 0.033999
+  VSN output std:
+    encoder: 0.116912
+  Attention entropy: 2.948045
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 86
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 86: val_loss=0.47067034244537354
+Epoch 86: train_loss=0.5505535006523132
+
+[CollapseMonitor] Epoch 86
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0111, dir_acc=49.2%, pos=100%, unique=177, sharpe=109.94
+    h2: std=0.0090, dir_acc=48.6%, pos=100%, unique=175, sharpe=128.05
+    h3: std=0.0080, dir_acc=48.6%, pos=100%, unique=168, sharpe=140.96
+    h4: std=0.0076, dir_acc=49.2%, pos=100%, unique=170, sharpe=149.66
+    h5: std=0.0074, dir_acc=48.6%, pos=100%, unique=171, sharpe=155.83
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0077, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0425, mean=0.0770, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch86.npz
+  Gradient norms:
+    lstm_encoder: 0.001614
+    lstm_decoder: 0.001921
+    output_layer: 0.037596
+  VSN output std:
+    encoder: 0.116795
+  Attention entropy: 2.947968
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 87
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 87: val_loss=0.47077393531799316
+Epoch 87: train_loss=0.5508285760879517
+
+[CollapseMonitor] Epoch 87
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0111, dir_acc=49.2%, pos=100%, unique=177, sharpe=110.05
+    h2: std=0.0090, dir_acc=48.6%, pos=100%, unique=176, sharpe=128.18
+    h3: std=0.0080, dir_acc=48.6%, pos=100%, unique=165, sharpe=141.13
+    h4: std=0.0076, dir_acc=49.2%, pos=100%, unique=175, sharpe=149.84
+    h5: std=0.0074, dir_acc=48.6%, pos=100%, unique=172, sharpe=156.03
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0077, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0425, mean=0.0773, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch87.npz
+  Gradient norms:
+    lstm_encoder: 0.001778
+    lstm_decoder: 0.002156
+    output_layer: 0.041351
+  VSN output std:
+    encoder: 0.116739
+  Attention entropy: 2.947840
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 88
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 88: val_loss=0.47072917222976685
+Epoch 88: train_loss=0.5522527098655701
+
+[CollapseMonitor] Epoch 88
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0111, dir_acc=49.2%, pos=100%, unique=180, sharpe=110.62
+    h2: std=0.0090, dir_acc=48.6%, pos=100%, unique=178, sharpe=128.92
+    h3: std=0.0080, dir_acc=48.6%, pos=100%, unique=175, sharpe=141.99
+    h4: std=0.0076, dir_acc=49.2%, pos=100%, unique=177, sharpe=150.77
+    h5: std=0.0074, dir_acc=48.6%, pos=100%, unique=170, sharpe=156.99
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0077, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0424, mean=0.0774, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch88.npz
+  Gradient norms:
+    lstm_encoder: 0.001502
+    lstm_decoder: 0.001933
+    output_layer: 0.035546
+  VSN output std:
+    encoder: 0.116719
+  Attention entropy: 2.947796
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 89
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 89: val_loss=0.47076019644737244
+Epoch 89: train_loss=0.5503247380256653
+
+[CollapseMonitor] Epoch 89
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0111, dir_acc=49.2%, pos=100%, unique=180, sharpe=110.36
+    h2: std=0.0089, dir_acc=48.6%, pos=100%, unique=173, sharpe=128.65
+    h3: std=0.0080, dir_acc=48.6%, pos=100%, unique=173, sharpe=141.70
+    h4: std=0.0075, dir_acc=49.2%, pos=100%, unique=174, sharpe=150.48
+    h5: std=0.0073, dir_acc=48.6%, pos=100%, unique=172, sharpe=156.69
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0077, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0423, mean=0.0769, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch89.npz
+  Gradient norms:
+    lstm_encoder: 0.001630
+    lstm_decoder: 0.001803
+    output_layer: 0.033208
+  VSN output std:
+    encoder: 0.116697
+  Attention entropy: 2.947795
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 90
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 90: val_loss=0.4707062840461731
+Epoch 90: train_loss=0.5537035465240479
+
+[CollapseMonitor] Epoch 90
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0111, dir_acc=49.2%, pos=100%, unique=175, sharpe=110.88
+    h2: std=0.0089, dir_acc=48.6%, pos=100%, unique=176, sharpe=129.29
+    h3: std=0.0079, dir_acc=48.6%, pos=100%, unique=173, sharpe=142.42
+    h4: std=0.0075, dir_acc=49.2%, pos=100%, unique=176, sharpe=151.23
+    h5: std=0.0073, dir_acc=48.6%, pos=100%, unique=171, sharpe=157.42
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0077, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0423, mean=0.0772, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch90.npz
+  Gradient norms:
+    lstm_encoder: 0.001615
+    lstm_decoder: 0.002101
+    output_layer: 0.037941
+  VSN output std:
+    encoder: 0.116632
+  Attention entropy: 2.947854
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 91
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 91: val_loss=0.4706803560256958
+Epoch 91: train_loss=0.5515024065971375
+
+[CollapseMonitor] Epoch 91
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0110, dir_acc=49.2%, pos=100%, unique=178, sharpe=111.38
+    h2: std=0.0089, dir_acc=48.6%, pos=100%, unique=179, sharpe=129.84
+    h3: std=0.0079, dir_acc=48.6%, pos=100%, unique=169, sharpe=142.97
+    h4: std=0.0075, dir_acc=49.2%, pos=100%, unique=171, sharpe=151.73
+    h5: std=0.0073, dir_acc=48.6%, pos=100%, unique=174, sharpe=157.85
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0077, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0423, mean=0.0774, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch91.npz
+  Gradient norms:
+    lstm_encoder: 0.001627
+    lstm_decoder: 0.002165
+    output_layer: 0.041048
+  VSN output std:
+    encoder: 0.116564
+  Attention entropy: 2.947960
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 92
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 92: val_loss=0.47068142890930176
+Epoch 92: train_loss=0.5512953400611877
+
+[CollapseMonitor] Epoch 92
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0110, dir_acc=49.2%, pos=100%, unique=179, sharpe=111.98
+    h2: std=0.0089, dir_acc=48.6%, pos=100%, unique=178, sharpe=130.60
+    h3: std=0.0079, dir_acc=48.6%, pos=100%, unique=171, sharpe=143.83
+    h4: std=0.0075, dir_acc=49.2%, pos=100%, unique=175, sharpe=152.63
+    h5: std=0.0073, dir_acc=48.6%, pos=100%, unique=176, sharpe=158.76
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0077, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0421, mean=0.0776, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch92.npz
+  Gradient norms:
+    lstm_encoder: 0.001514
+    lstm_decoder: 0.001928
+    output_layer: 0.038681
+  VSN output std:
+    encoder: 0.116536
+  Attention entropy: 2.947957
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 93
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 93: val_loss=0.4706915318965912
+Epoch 93: train_loss=0.5510572195053101
+
+[CollapseMonitor] Epoch 93
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0110, dir_acc=49.2%, pos=100%, unique=177, sharpe=112.16
+    h2: std=0.0088, dir_acc=48.6%, pos=100%, unique=179, sharpe=130.87
+    h3: std=0.0079, dir_acc=48.6%, pos=100%, unique=173, sharpe=144.15
+    h4: std=0.0075, dir_acc=49.2%, pos=100%, unique=174, sharpe=152.97
+    h5: std=0.0073, dir_acc=48.6%, pos=100%, unique=175, sharpe=159.09
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0076, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0420, mean=0.0775, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch93.npz
+  Gradient norms:
+    lstm_encoder: 0.001602
+    lstm_decoder: 0.001884
+    output_layer: 0.037769
+  VSN output std:
+    encoder: 0.116505
+  Attention entropy: 2.947928
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 94
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 94: val_loss=0.470697820186615
+Epoch 94: train_loss=0.5504277944564819
+
+[CollapseMonitor] Epoch 94
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0110, dir_acc=49.2%, pos=100%, unique=176, sharpe=111.43
+    h2: std=0.0089, dir_acc=48.6%, pos=100%, unique=178, sharpe=129.92
+    h3: std=0.0079, dir_acc=48.6%, pos=100%, unique=173, sharpe=143.06
+    h4: std=0.0075, dir_acc=49.2%, pos=100%, unique=174, sharpe=151.79
+    h5: std=0.0073, dir_acc=48.6%, pos=100%, unique=172, sharpe=157.86
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0077, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0422, mean=0.0773, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch94.npz
+  Gradient norms:
+    lstm_encoder: 0.001578
+    lstm_decoder: 0.001895
+    output_layer: 0.034735
+  VSN output std:
+    encoder: 0.116408
+  Attention entropy: 2.947903
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 95
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 95: val_loss=0.4707005023956299
+Epoch 95: train_loss=0.5511569380760193
+
+[CollapseMonitor] Epoch 95
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0111, dir_acc=49.2%, pos=100%, unique=179, sharpe=111.44
+    h2: std=0.0089, dir_acc=48.6%, pos=100%, unique=176, sharpe=129.87
+    h3: std=0.0080, dir_acc=48.6%, pos=100%, unique=172, sharpe=142.98
+    h4: std=0.0075, dir_acc=49.2%, pos=100%, unique=171, sharpe=151.67
+    h5: std=0.0073, dir_acc=48.6%, pos=100%, unique=176, sharpe=157.71
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0077, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0423, mean=0.0777, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch95.npz
+  Gradient norms:
+    lstm_encoder: 0.001665
+    lstm_decoder: 0.001928
+    output_layer: 0.036518
+  VSN output std:
+    encoder: 0.116350
+  Attention entropy: 2.947822
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 96
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 96: val_loss=0.4707253873348236
+Epoch 96: train_loss=0.5515441298484802
+
+[CollapseMonitor] Epoch 96
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0111, dir_acc=49.2%, pos=100%, unique=175, sharpe=110.25
+    h2: std=0.0090, dir_acc=48.6%, pos=100%, unique=178, sharpe=128.33
+    h3: std=0.0080, dir_acc=48.6%, pos=100%, unique=175, sharpe=141.22
+    h4: std=0.0076, dir_acc=49.2%, pos=100%, unique=170, sharpe=149.81
+    h5: std=0.0074, dir_acc=48.6%, pos=100%, unique=172, sharpe=155.80
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0078, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0425, mean=0.0773, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch96.npz
+  Gradient norms:
+    lstm_encoder: 0.001432
+    lstm_decoder: 0.001998
+    output_layer: 0.040698
+  VSN output std:
+    encoder: 0.116309
+  Attention entropy: 2.947721
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 97
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 97: val_loss=0.4707666039466858
+Epoch 97: train_loss=0.5510851144790649
+
+[CollapseMonitor] Epoch 97
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0112, dir_acc=49.2%, pos=100%, unique=176, sharpe=110.70
+    h2: std=0.0091, dir_acc=48.6%, pos=100%, unique=172, sharpe=128.78
+    h3: std=0.0081, dir_acc=48.6%, pos=100%, unique=175, sharpe=141.63
+    h4: std=0.0076, dir_acc=49.2%, pos=100%, unique=176, sharpe=150.18
+    h5: std=0.0075, dir_acc=48.6%, pos=100%, unique=173, sharpe=156.11
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0078, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0427, mean=0.0779, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch97.npz
+  Gradient norms:
+    lstm_encoder: 0.001766
+    lstm_decoder: 0.002147
+    output_layer: 0.039899
+  VSN output std:
+    encoder: 0.116232
+  Attention entropy: 2.947684
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 98
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 98: val_loss=0.47077250480651855
+Epoch 98: train_loss=0.5511074662208557
+
+[CollapseMonitor] Epoch 98
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0112, dir_acc=49.2%, pos=100%, unique=180, sharpe=111.01
+    h2: std=0.0091, dir_acc=48.6%, pos=100%, unique=175, sharpe=129.07
+    h3: std=0.0081, dir_acc=48.6%, pos=100%, unique=171, sharpe=141.92
+    h4: std=0.0077, dir_acc=49.2%, pos=100%, unique=171, sharpe=150.44
+    h5: std=0.0075, dir_acc=48.6%, pos=100%, unique=171, sharpe=156.33
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0079, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0428, mean=0.0783, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch98.npz
+  Gradient norms:
+    lstm_encoder: 0.001564
+    lstm_decoder: 0.001916
+    output_layer: 0.039612
+  VSN output std:
+    encoder: 0.116179
+  Attention entropy: 2.947651
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+[DEBUG CollapseMonitor] on_validation_epoch_start called for epoch 99
+[DEBUG CollapseMonitor] reset_temporal_state() called on loss function
+Epoch 99: val_loss=0.47073373198509216
+Epoch 99: train_loss=0.5525263547897339
+
+[CollapseMonitor] Epoch 99
+  [DEBUG] Processed 3 batches, 20 horizon(s)
+  Multi-horizon metrics (20 horizons):
+    h1: std=0.0112, dir_acc=49.2%, pos=100%, unique=176, sharpe=110.09
+    h2: std=0.0091, dir_acc=48.6%, pos=100%, unique=172, sharpe=127.92
+    h3: std=0.0081, dir_acc=48.6%, pos=100%, unique=171, sharpe=140.62
+    h4: std=0.0077, dir_acc=49.2%, pos=100%, unique=175, sharpe=149.08
+    h5: std=0.0075, dir_acc=48.6%, pos=100%, unique=173, sharpe=154.95
+    ... (15 more horizons)
+  Aggregate: std_avg=0.0079, dir_acc_avg=48.4%, composite_avg=0.3588
+  H1 detail: range=0.0429, mean=0.0778, dist_match=0.4917
+  Collapse penalty: 0.000000 (threshold: 0.005000)
+  Saved validation predictions to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/val_predictions_epoch99.npz
+  Gradient norms:
+    lstm_encoder: 0.001697
+    lstm_decoder: 0.001970
+    output_layer: 0.039613
+  VSN output std:
+    encoder: 0.116152
+  Attention entropy: 2.947515
+  Saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/collapse_monitoring/collapse_monitor_latest.json
+
+
+======================================================================
+Training complete
+======================================================================
+
+Best val_loss checkpoint: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/checkpoints/tft-epoch=epoch=10-valloss=val_loss=0.4671.ckpt
+Best validation loss: 0.467050
+Checkpoints saved:
+  - Best val_loss: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/checkpoints/tft-epoch=epoch=10-valloss=val_loss=0.4671.ckpt
+  - Best pred_std: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/checkpoints/tft-epoch=epoch=10-predstd=val_pred_std=0.0447.ckpt
+  - Best unique: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/checkpoints/tft-epoch=epoch=00-unique=val_num_unique=181.ckpt
+  - Best dir_acc: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/checkpoints/tft-epoch=epoch=10-diracc=val_dir_acc=0.5414.ckpt
+  - Best sharpe: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/checkpoints/tft-epoch=epoch=19-sharpe=val_sharpe=183.1846.ckpt
+  - Best composite: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/checkpoints/tft-epoch=epoch=12-composite=val_composite=0.4944.ckpt
+Completed at: 2025-12-14 17:49:58
+Log saved to: experiments/12c_multi_horizon/macro_heavy_daily_3q_h20_d025/fold_2016/training_20251214_173615.log
+======================================================================

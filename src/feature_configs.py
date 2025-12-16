@@ -42,7 +42,7 @@ FEATURE_SETS = {
         ],
         'enhanced': True,
         'description': 'Core features + regime dynamics (VIX spikes, rate changes)',
-        'min_date': '2000-11-27',
+        'min_date': None,
     },
     'macro_heavy': {
         'features': [
