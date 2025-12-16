@@ -1,4 +1,4 @@
-# Phase 06b: Rolling Window Evaluation (Nov 29, 2024)
+# Phase 06b: Rolling Window Evaluation (Nov 29, 2025)
 
 Rolling window evaluation across 9 years (2016-2024) to test model robustness across different market regimes. Unlike fixed train/val/test splits that only evaluate on recent data, rolling evaluation reveals how models perform during volatility spikes, crashes, bear markets, and recoveries.
 
@@ -51,11 +51,18 @@ Daily config from Phase 02b best baseline. Weekly configs from Phase 06a top per
 - Weekly enc12: 59.1% vs Daily: 53.3% (+5.8pp)
 - Weekly enc8: 58.5% vs Daily: 53.3% (+5.2pp)
 
-**Excess accuracy over baseline (critical metric):**
-- Daily: 53.3% accuracy vs 53.9% positive rate = **-0.6% excess** (not learning)
-- Weekly: 59.1% accuracy vs 56.8% positive rate = **+2.3% excess** (genuine signal)
+**Performance relative to rolling fold base rates:**
 
-Daily models essentially predict "always positive" and get credit for market drift. Weekly models extract actual predictive signal beyond naive baseline.
+Rolling evaluation base rates (average across 9 test folds):
+- Daily: 54.5% positive (range: 43.8% in 2022 to 59.6% in 2019)
+- Weekly: 60.2% positive (range: 45.3% in 2022 to 67.2% in 2024)
+
+Model performance relative to fold-averaged base rates:
+- Daily: 53.3% accuracy vs 54.5% base = -1.2pp below drift
+- Weekly enc12: 59.1% accuracy vs 60.2% base = -1.1pp below drift  
+- Weekly enc8: 58.5% accuracy vs 60.2% base = -1.7pp below drift
+
+Models achieving near-zero excess averaged across folds typically predict predominantly positive returns, benefiting from market drift in bullish periods while failing in bearish periods like 2022.
 
 **Weekly healthy % is more stable:**
 - Daily: 17.6% ± 13.9% (huge variance, 54.8% outlier in 2024)
@@ -119,23 +126,24 @@ Both frequencies perform well in trending markets, but weekly consistently outpe
 
 ## Conclusions
 
-1. **Weekly frequency is superior for this task**: Higher accuracy, better Sharpe, more consistent behavior across regimes.
+1. **Weekly frequency shows higher raw accuracy**: Weekly models achieve 5-6pp higher directional accuracy than daily across regimes (59.1% vs 53.3%).
 
-2. **Daily models don't learn signal**: -0.6% excess accuracy means daily predictions are essentially noise around market drift.
+2. **Both frequencies score near regime-averaged base rates**: When accounting for fold-specific market drift, models achieve approximately zero excess directional accuracy. Daily models average -1.2pp below their 54.5% base rate; weekly models average -1.1pp below their 60.2% base rate.
 
-3. **Weekly models extract genuine signal**: +2.3% excess accuracy indicates actual predictive power beyond naive baseline.
+3. **Models predict predominantly positive**: Configurations achieving near-zero excess across regimes typically make few negative predictions, matching base rate through drift exposure rather than directional forecasting skill.
 
-4. **All models fail in bear markets**: 2022 exposes fundamental limitations. Models cannot predict regime reversals.
+4. **All models fail in bear markets**: 2022 exposes fundamental limitations. Models cannot predict regime reversals, defaulting to positive predictions even during sustained bearish conditions.
 
-5. **Rolling evaluation should be primary presentation**: Reports honest mean ± std, reveals regime-specific failures, standard in financial ML.
+5. **Rolling evaluation reveals limitations masked by fixed splits**: Base rates vary significantly by regime (43.8% in 2022 bear vs 67.2% in 2024 bull for weekly). Fixed-split evaluation on recent data can overstate model skill.
 
 ## Recommended reporting for paper etc.
 
 Use rolling evaluation results as primary metrics:
 - Weekly enc12: 59.1% ± 8.3% dir_acc, 1.52 ± 1.33 Sharpe
 - Compare to daily: 53.3% ± 5.2% dir_acc, 0.95 ± 1.31 Sharpe
-- Emphasize excess over baseline: +2.3% (weekly) vs -0.6% (daily)
-- Acknowledge 2022 failure explicitly (scientific honesty)
+- Report base rate context: Weekly 60.2% avg positive, Daily 54.5% avg positive across folds
+- Acknowledge near-zero excess accuracy (models match drift, limited directional skill)
+- Emphasize 2022 failure explicitly (scientific honesty about regime limitations)
 
 ## Data
 
@@ -187,4 +195,3 @@ python scripts/analyze_rolling.py \
     experiments/06b_rolling/weekly_h16_enc12_d015_bs16 \
     --output experiments/06b_rolling/comparison.csv
 ```
-

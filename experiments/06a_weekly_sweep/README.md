@@ -1,4 +1,4 @@
-# Phase 06a: Weekly Frequency Sweep (Nov 29, 2024)
+# Phase 06a: Weekly Frequency Sweep (Nov 29, 2025)
 
 Systematic hyperparameter sweep for weekly frequency data. Weekly aggregation reduces daily noise and requires different hyperparameters than daily (shorter lookback periods, smaller batch sizes for fewer samples).
 

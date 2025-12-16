@@ -1,4 +1,4 @@
-# Phase 1: Staleness Features (Oct 21-Oct 22, 2024)
+# Phase 1: Staleness Features (Oct 21-Oct 22, 2025)
 
 Investigating staleness features with TFT architecture, using fixed-date preprocessing.
 

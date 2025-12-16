@@ -365,6 +365,7 @@ def prepare_tft_data(train_df, val_df, args, features, add_staleness=True):
         val_df = add_staleness_features(val_df, use_vintage=use_vintage, 
                                         staleness_mode=staleness_mode, verbose=True)
     
+    """
     # DROP SOURCE COLUMNS (used for staleness detection only, not model features)
     source_cols_to_drop = []
     from src.feature_configs import FEATURE_METADATA
@@ -376,7 +377,22 @@ def prepare_tft_data(train_df, val_df, args, features, add_staleness=True):
             if meta.get('source_column') == feature:
                 source_cols_to_drop.append(feature)
                 break
+    """
     
+    # DROP SOURCE COLUMNS (used for staleness detection only, not model features)
+    source_cols_to_drop = []
+    from src.feature_configs import FEATURE_METADATA
+    for feature in train_df.columns:
+        if feature in features['all']:
+            continue  # Keep if explicitly requested in feature set
+        if feature in FEATURE_METADATA:
+            continue  # Keep actual features
+        # Check if this is a source column for another feature
+        for feat, meta in FEATURE_METADATA.items():
+            if meta.get('source_column') == feature:
+                source_cols_to_drop.append(feature)
+                break
+        
     if source_cols_to_drop:
         print(f"\nDropping source columns (used for staleness only): {source_cols_to_drop}")
         train_df = train_df.drop(columns=source_cols_to_drop)

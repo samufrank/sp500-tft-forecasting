@@ -1,4 +1,4 @@
-# Phase 4: Loss Modification Grid (Nov 22, 2024)
+# Phase 4: Loss Modification Grid (Nov 22, 2025)
 
 Systematic evaluation of custom loss modifications to address prediction collapse and improve model robustness. Reruns Phase 02b baseline configurations with added loss penalties to quantify their impact.
 
